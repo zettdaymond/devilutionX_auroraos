@@ -191,7 +191,7 @@ else()
   endif()
 
   if(BUILD_ASSETS_MPQ)
-    set(DEVILUTIONX_MPQ "${CMAKE_CURRENT_BINARY_DIR}/devilutionx.mpq")
+    set(DEVILUTIONX_MPQ "${CMAKE_CURRENT_BINARY_DIR}/devilutionx.mpq" PARENT_SCOPE)
     add_custom_command(
       COMMENT "Building devilutionx.mpq"
       OUTPUT "${DEVILUTIONX_MPQ}"

@@ -66,6 +66,12 @@ void InitializeVirtualGamepad()
 		else
 			SDL_GetWindowSize(ghMainWnd, &clientWidth, &clientHeight);
 
+#ifdef AURORA_OS
+        if(clientWidth < clientHeight) {
+            std::swap(clientHeight, clientWidth);
+        }
+#endif
+
 		hdpi *= static_cast<float>(gnScreenWidth) / clientWidth;
 		vdpi *= static_cast<float>(gnScreenHeight) / clientHeight;
 

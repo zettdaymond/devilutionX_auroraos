@@ -41,6 +41,10 @@
 int _newlib_heap_size_user = 100 * 1024 * 1024;
 #endif
 
+#ifdef AURORA_OS
+#include "StandartPaths.hpp"
+#endif
+
 namespace devilution {
 
 /** True if the game is the current active window */
@@ -125,10 +129,15 @@ std::vector<std::string> GetMPQSearchPaths()
 	if (paths[0] == paths[1])
 		paths.pop_back();
 	paths.push_back(paths::ConfigPath());
+
+#ifdef AURORA_OS
+    paths.push_back(AuroraOsStandartPaths::GetBundledAssetsPath());
+    paths.push_back(AuroraOsStandartPaths::GetAdditionalMPQSearchPath());
+#endif
 	if (paths[0] == paths[1] || (paths.size() == 3 && (paths[0] == paths[2] || paths[1] == paths[2])))
 		paths.pop_back();
 
-#if defined(__unix__) && !defined(__ANDROID__)
+#if defined(__unix__) && !defined(__ANDROID__) && !defined(AURORA_OS)
 	// `XDG_DATA_HOME` is usually the root path of `paths::PrefPath()`, so we only
 	// add `XDG_DATA_DIRS`.
 	const char *xdgDataDirs = std::getenv("XDG_DATA_DIRS");

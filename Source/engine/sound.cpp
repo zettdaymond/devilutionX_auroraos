@@ -26,7 +26,7 @@
 
 namespace devilution {
 
-bool gbSndInited;
+bool gbSndInited = false;
 /** The active background music track id. */
 _music_id sgnMusicTrack = NUM_MUSIC;
 
@@ -204,7 +204,10 @@ TSnd::~TSnd()
 
 void snd_init()
 {
-	sgOptions.Audio.soundVolume.SetValue(CapVolume(*sgOptions.Audio.soundVolume));
+    if(gbSndInited) {
+        return;
+    }
+    sgOptions.Audio.soundVolume.SetValue(CapVolume(*sgOptions.Audio.soundVolume));
 	gbSoundOn = *sgOptions.Audio.soundVolume > VOLUME_MIN;
 	sgbSaveSoundOn = gbSoundOn;
 

@@ -52,4 +52,4 @@ fi
 # The StormLib version check in SMPQ CMake is broken. We bypass it by passing the paths to StormLib explicitly.
 cmake -S"$SMPQ_SRC" -B"$SMPQ_SRC"/build -DCMAKE_BUILD_TYPE=Release -DWITH_KDE=OFF -DCMAKE_PREFIX_PATH=/tmp/smpq-staging \
 	-DSTORMLIB_INCLUDE_DIR=/tmp/smpq-staging/include -DSTORMLIB_LIBRARY=/tmp/smpq-staging/lib/libstorm.a
-sudo cmake --build "$SMPQ_SRC"/build --config Release --target install -j"$PARALLELISM"
+cmake --build "$SMPQ_SRC"/build --config Release --target install -j"$PARALLELISM"

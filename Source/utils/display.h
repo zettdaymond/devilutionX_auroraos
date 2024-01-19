@@ -14,12 +14,21 @@
 #include "utils/sdl_ptrs.h"
 #include "utils/ui_fwd.h"
 
+#ifdef AURORA_OS
+#include "TextureRotatorGLES.hpp"
+#include "VirtualPadSDLRender.hpp"
+#endif
+
 namespace devilution {
 
 extern int refreshDelay; // Screen refresh rate in nanoseconds
 extern SDL_Window *window;
 extern SDL_Window *ghMainWnd;
 extern SDL_Renderer *renderer;
+#ifdef AURORA_OS
+extern std::unique_ptr<AuroraOsTextureAdapter> rotator;
+extern std::unique_ptr<VirtualPadSDLRenderer> virtualPadRenderer;
+#endif
 #ifndef USE_SDL1
 extern SDLTextureUniquePtr texture;
 #endif
