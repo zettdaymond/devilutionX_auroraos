@@ -78,7 +78,7 @@ void DisplayBlankerController::SetPreventDisplayBlanking(bool value)
         }
         else {
             m_impl->m_timer = SDL_AddTimer(kRequestBlankingPauseIntervalMs, kSDLTimerCallback, nullptr);
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Send DBus MCE Request for preventing screen blank and scedule periodic requests");
+            SDL_LogVerbose(SDL_LOG_CATEGORY_APPLICATION, "Send DBus MCE Request for preventing screen blank and scedule periodic requests");
         }
     }
     else if(!value && m_impl->m_timer) {
@@ -90,7 +90,7 @@ void DisplayBlankerController::SetPreventDisplayBlanking(bool value)
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Could not send Dbbus MCE Request for cancel preventing screen blank");
         }
         else {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Send DBus MCE Request for cancel preventing screen blank and disable periodic requests");
+            SDL_LogVerbose(SDL_LOG_CATEGORY_APPLICATION, "Send DBus MCE Request for cancel preventing screen blank and disable periodic requests");
         }
     }
 }

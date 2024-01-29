@@ -1,8 +1,6 @@
-%undefine _auto_set_build_flags
-
 Name:       org.diasurgical.devilutionx
 Summary:    Diablo (1996) port for Aurora OS
-Version:    1.6.0
+Version:    1.5.1
 Release:    1
 License:    Sustainable Use License
 URL:        https://github.com/diasurgical/devilutionX
@@ -45,26 +43,26 @@ BuildRequires: libaudioresource-devel
 Если у вас нет оригинального компакт-диска, вы можете купить Diablo на GoG.com.
 Без него у вас будет доступ только к демонстрационной части игры с shareware версии от Blizzard.
 
-- Полнофункциональный порт Diablo для Аврора ОС.
+- Полнофункциональный порт Diablo для Аврора ОС
 - Доступно на русском и других языках
 - Множество тонких улучшений
-- Сотни исправлений ошибок в оригинальной игре.
+- Сотни исправлений ошибок в оригинальной игре
 
 Как установить полную версию:
 
 1. Установите приложение DevilutionX.
 2. Найдите DIABDAT.MPQ на компакт-диске, в папке установки или с помощью Innoextract.
 3. Подключите устройство к компьютеру и разрешите доступ к данным нажав "Использовать протокол передачи мультимедиа MTP".
-4. Перенесите DIABDAT.MPQ в папку Documents/devilutionx/
+4. Перенесите DIABDAT.MPQ в папку ~/Documents/devilutionx/ ( или ~/.local/share/org.diasurgical/devilutionx/ )
 5. Для русской озвучки можно скачать ru.mpq ( https://github.com/diasurgical/devilutionx-assets/releases/download/v4/ru.mpq )
-   и перенести его в папку Documents/devilutionx/
+   и перенести его в папку ~/Documents/devilutionx/ ( или ~/.local/share/org.diasurgical/devilutionx/ )
 6. Для запуска дополнения Diablo: Hellfire нужно также перенести дополнительные файлы - hellfire.mpq, hfmonk.mpq, hfmusic.mpq, hfvoice.mpq
 
 %prep
 %autosetup
 
 %build
-%cmake -GNinja
+%cmake
 %ninja_build
 
 %install

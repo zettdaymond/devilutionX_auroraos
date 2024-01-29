@@ -7,7 +7,7 @@ Name=DevilutionX
 Name[ru]=DevilutionX
 
 [X-Application]
-Permissions=DeviceInfo;Audio;MediaIndexing;RemovableMedia;UserDirs
+Permissions=Audio;MediaIndexing;UserDirs
 OrganizationName=org.diasurgical
 ApplicationName=devilutionx
 ExecDBus=/usr/bin/org.diasurgical.devilutionx

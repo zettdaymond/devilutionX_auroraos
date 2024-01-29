@@ -47,11 +47,11 @@ std::unique_ptr<AudioResource> AudioResource::Aquire()
     impl->audio_resource = audio_resource;
 
     if(impl->audio_resource_aquired) {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Audioresource with tag 'GAME' successfully aquired");
+        SDL_LogVerbose(SDL_LOG_CATEGORY_APPLICATION, "Audioresource with tag 'GAME' successfully aquired");
         return std::unique_ptr<AudioResource>( new AudioResource(std::move(impl)) );
     }
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Could not aquire audioresource with tag 'GAME'");
+    SDL_LogVerbose(SDL_LOG_CATEGORY_APPLICATION, "Could not aquire audioresource with tag 'GAME'");
     audioresource_free(audio_resource);
 
     return nullptr;
@@ -62,7 +62,7 @@ AudioResource::~AudioResource()
     audioresource_release(m_impl->audio_resource);
     audioresource_free(m_impl->audio_resource);
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Audioresource with tag 'GAME' has been released");
+    SDL_LogVerbose(SDL_LOG_CATEGORY_APPLICATION, "Audioresource with tag 'GAME' has been released");
 }
 
 AudioResource::AudioResource(std::unique_ptr<Impl> && impl)

@@ -30,6 +30,9 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/lib")
 set(NONET ON)
 set(ASAN OFF)
 set(UBSAN OFF)
+set(DEBUG OFF)
+set(CPACK OFF)
+set(DEVILUTIONX_STATIC_CXX_STDLIB OFF)
 set(NOEXIT ON)
 set(BUILD_TESTING OFF)
 
@@ -63,7 +66,7 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 if(BUILD_ASSETS_MPQ)
-    install(FILES "${DEVILUTIONX_MPQ}"
+    install(FILES "${CMAKE_BINARY_DIR}/devilutionX/devilutionx.mpq"
       DESTINATION share/org.diasurgical.devilutionx/assets
     )
 else()
