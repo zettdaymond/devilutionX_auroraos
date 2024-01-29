@@ -1,5 +1,6 @@
 #include "DisplayBlankerController.hpp"
 
+#include <mutex>
 #include <assert.h>
 #include <optional>
 

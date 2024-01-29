@@ -33,7 +33,7 @@ target_include_directories(libdevilutionx_aurora_os
 )
 target_include_directories(libdevilutionx_aurora_os
     PRIVATE
-        ${AURORA_INCLUDE_DIRS}
+#        ${AURORA_INCLUDE_DIRS}
 #        ${DBUS_INCLUDE_DIRS}
         "/usr/include/dbus-1.0"
         "/usr/lib/dbus-1.0/include"
@@ -47,8 +47,8 @@ target_link_libraries(libdevilutionx_aurora_os
     PRIVATE
         Qt5::Core
         Qt5::Gui
-        ${AURORA_LIBRARIES}
-        ${AURORA_LDFLAGS}
+#        ${AURORA_LIBRARIES}
+#        ${AURORA_LDFLAGS}
         ${AUDIORESOURCE_LIBRARIES}
         ${GLIB_LIBRARIES}
 )

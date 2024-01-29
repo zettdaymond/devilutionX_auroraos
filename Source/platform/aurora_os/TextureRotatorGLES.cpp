@@ -144,6 +144,23 @@ static const GLfloat textureVertices[] = {
 
 struct AuroraOsTextureAdapter::Impl
 {
+    Impl(const ivec2& _output_size,
+         ShaderProgramGLES&& _sp,
+         std::uint32_t _sampler_location,
+         std::uint32_t _output_size_uniform_location,
+         std::uint32_t _intput_size_uniform_location,
+         std::uint32_t _pos_atrib_location,
+         std::uint32_t _uv_atrib_location)
+        :  output_size(_output_size)
+        ,  shader_program( std::move(_sp))
+        ,  sampler_location(_sampler_location)
+        ,  output_size_uniform_location(_output_size_uniform_location)
+        ,  intput_size_uniform_location(_intput_size_uniform_location)
+        ,  pos_atrib_location(_pos_atrib_location)
+        ,  uv_atrib_location(_uv_atrib_location)
+    {
+    }
+
     ivec2 output_size;
 
     ShaderProgramGLES shader_program;
