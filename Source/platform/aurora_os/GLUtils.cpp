@@ -126,4 +126,57 @@ std::optional<ShaderProgramGLES> CompileAndLink(std::string_view vertex_code, st
     return {};
 }
 
+void InstallDebugCallback()
+{
+    static auto message_callback = []( GLenum source,
+                     GLenum type,
+                     GLuint id,
+                     GLenum severity,
+                     GLsizei length,
+                     const GLchar* message,
+                     const void* userParam ) -> void
+    {
+      SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                   "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+                   ( type == GL_DEBUG_TYPE_ERROR_KHR ? "** GL ERROR **" : "" ),
+                   type,
+                   severity,
+                   message );
+    };
+
+    // During init, enable debug output
+    gl::glEnable( GL_DEBUG_OUTPUT_KHR );
+    gl::glDebugMessageCallback( message_callback, 0 );
+}
+
+ArrayBufferGLES::ArrayBufferGLES(uint32_t b)
+    : id(b)
+{
+
+}
+
+ArrayBufferGLES::ArrayBufferGLES(ArrayBufferGLES &&b)
+    : id(b.id)
+{
+    b.id = -1;
+}
+
+ArrayBufferGLES::~ArrayBufferGLES()
+{
+    if(id > 0) {
+        gl::glDeleteBuffers(1, &id);
+    }
+}
+
+auto MakeArrayBuffer(const GLfloat* buffer_data, std::size_t buffer_size)  -> ArrayBufferGLES
+{
+    unsigned vertexBuffer;
+    gl::glGenBuffers(1, &vertexBuffer);
+    gl::glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    gl::glBufferData(GL_ARRAY_BUFFER, buffer_size, buffer_data, GL_STATIC_DRAW);
+    gl::glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    return ArrayBufferGLES(vertexBuffer);
+}
+
 }

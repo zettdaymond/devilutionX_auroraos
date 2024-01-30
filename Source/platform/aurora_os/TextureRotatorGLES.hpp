@@ -15,7 +15,9 @@ public:
 
     ~AuroraOsTextureAdapter();
 
+    void BeginDraw();
     void Draw(ivec2 const& tex_size, bool with_blend);
+    void EndDraw();
     void ClearRT();
 
 private:

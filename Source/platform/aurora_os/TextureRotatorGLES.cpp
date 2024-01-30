@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
 
 #include <SDL2/SDL.h>
 
@@ -31,62 +32,75 @@ struct GLStateSaver
         gl::glGetIntegerv( GL_VIEWPORT, ( GLint* )&viewport_rect );
 
         previousBlendState = gl::glIsEnabled(GL_BLEND);
+        previousDepthTestState = gl::glIsEnabled(GL_DEPTH_TEST);
+        previousStencilState = gl::glIsEnabled(GL_STENCIL_TEST);
+
         gl::glGetIntegerv(GL_BLEND_SRC_RGB, &last_blend_src_rgb);
         gl::glGetIntegerv(GL_BLEND_DST_RGB, &last_blend_dst_rgb);
         gl::glGetIntegerv(GL_BLEND_SRC_ALPHA, &last_blend_src_alpha);
         gl::glGetIntegerv(GL_BLEND_DST_ALPHA, &last_blend_dst_alpha);
+        gl::glGetIntegerv(GL_FRAMEBUFFER_BINDING, &drawFboId);
+        gl::glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &lastArrayBuffer);
     }
 
     ~GLStateSaver()
     {
-        if(previousBlendState) {
-            gl::glEnable(GL_BLEND);
-        }
-        else {
-            gl::glDisable(GL_BLEND);
-        }
+        RestoreState(previousBlendState, GL_BLEND);
+        RestoreState(previousDepthTestState, GL_DEPTH_TEST);
+        RestoreState(previousStencilState, GL_STENCIL_TEST);
+
 
         gl::glBlendFuncSeparate(last_blend_src_rgb, last_blend_dst_rgb, last_blend_src_alpha, last_blend_dst_alpha);
         gl::glViewport(viewport_rect.x, viewport_rect.y, viewport_rect.w, viewport_rect.h);
 
         gl::glUseProgram( previous_program_id );
+
+        gl::glBindFramebuffer(GL_FRAMEBUFFER, drawFboId);
+        gl::glBindBuffer(GL_ARRAY_BUFFER, lastArrayBuffer);
+    }
+
+    static void RestoreState(bool value, GLenum gl_state)
+    {
+        if(value) {
+            gl::glEnable(gl_state);
+        }
+        else {
+            gl::glDisable(gl_state);
+        }
     }
 
     GLint previous_program_id;
     GLViewport viewport_rect;
     bool previousBlendState;
+    bool previousDepthTestState;
+    bool previousStencilState;
     GLint last_blend_src_rgb;
     GLint last_blend_dst_rgb;
     GLint last_blend_src_alpha;
     GLint last_blend_dst_alpha;
+    GLint drawFboId;
+    GLint lastArrayBuffer;
 };
 
 static constexpr std::string_view vertex_code =
    R"shader(
-#version 100
+attribute vec3 position;
+attribute vec2 inputTextureUV;
 
-attribute vec4 position;
-attribute vec4 inputTextureUV;
-
-varying vec4 pos;
 varying vec2 uv;
 
 void main()
 {
-    gl_Position = position;
-    pos = position;
-    uv = inputTextureUV.xy;
+    gl_Position = vec4(position, 1.0);
+    uv = inputTextureUV;
 }
 
 )shader";
 
 static constexpr std::string_view fragment_code =
    R"shader(
-#version 100
-
 precision highp float;
 
-varying highp vec4 pos;
 varying highp vec2 uv;
 
 uniform sampler2D iTexture0;
@@ -126,18 +140,12 @@ void main()
 
 // clang-format off
 static const GLfloat squareVertices[] = {
-    -1.0f, -1.0f,
-    1.0f, -1.0f,
-    -1.0f,  1.0f,
-    1.0f,  1.0f,
+    -1.0f,  -1.0f,  0.0f,  0.0f, 0.0f,
+     1.0f,  -1.0f,  0.0f,  1.0f, 0.0f,
+    -1.0f,   1.0f,  0.0f,  0.0f,  1.0f,
+     1.0f,   1.0f,  0.0f,  1.0f,  1.0f,
 };
 
-static const GLfloat textureVertices[] = {
-    0.0f, 0.0f,
-    1.0f, 0.0f,
-    0.0f,  1.0f,
-    1.0f,  1.0f,
-};
 // clang-format on
 
 } // namespace
@@ -150,7 +158,8 @@ struct AuroraOsTextureAdapter::Impl
          std::uint32_t _output_size_uniform_location,
          std::uint32_t _intput_size_uniform_location,
          std::uint32_t _pos_atrib_location,
-         std::uint32_t _uv_atrib_location)
+         std::uint32_t _uv_atrib_location,
+         ArrayBufferGLES&& _vertexBuffer)
         :  output_size(_output_size)
         ,  shader_program( std::move(_sp))
         ,  sampler_location(_sampler_location)
@@ -158,6 +167,7 @@ struct AuroraOsTextureAdapter::Impl
         ,  intput_size_uniform_location(_intput_size_uniform_location)
         ,  pos_atrib_location(_pos_atrib_location)
         ,  uv_atrib_location(_uv_atrib_location)
+        ,  vertexBuffer( std::move(_vertexBuffer) )
     {
     }
 
@@ -172,12 +182,18 @@ struct AuroraOsTextureAdapter::Impl
 
     std::uint32_t pos_atrib_location;
     std::uint32_t uv_atrib_location;
+
+    ArrayBufferGLES vertexBuffer;
 };
 
 std::unique_ptr< AuroraOsTextureAdapter > devilution::AuroraOsTextureAdapter::Create(ivec2 const& output_size)
 {
     if(!gl::IsSymbolsLoaded()){
         gl::LoadSymbols();
+
+        if(!gl::IsSymbolsLoaded()) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "COuld not load opengl symbols");
+        }
     }
 
     auto shader_program = CompileAndLink( vertex_code, fragment_code );
@@ -186,7 +202,7 @@ std::unique_ptr< AuroraOsTextureAdapter > devilution::AuroraOsTextureAdapter::Cr
         return {};
     }
 
-    auto sampler_location = gl::glGetUniformLocation( shader_program->id, "sampler2D" );
+    auto sampler_location = gl::glGetUniformLocation( shader_program->id, "iTexture0" );
 
     auto output_size_uniform_location = gl::glGetUniformLocation( shader_program->id, "OutputSize" );
     auto intput_size_uniform_location = gl::glGetUniformLocation( shader_program->id, "InputSize" );
@@ -194,11 +210,18 @@ std::unique_ptr< AuroraOsTextureAdapter > devilution::AuroraOsTextureAdapter::Cr
     auto pos_atrib_location = gl::glGetAttribLocation( shader_program->id, "position" );
     auto uv_atrib_location = gl::glGetAttribLocation( shader_program->id, "inputTextureUV" );
 
+    auto vertex_buffer = MakeArrayBuffer(std::cbegin(squareVertices), sizeof(squareVertices));
+
     auto impl =
        std::make_unique< Impl >( output_size, std::move( shader_program.value() ), sampler_location, output_size_uniform_location,
-                                 intput_size_uniform_location, pos_atrib_location, uv_atrib_location );
+                                 intput_size_uniform_location, pos_atrib_location, uv_atrib_location, std::move(vertex_buffer) );
 
     return std::unique_ptr< AuroraOsTextureAdapter >( new AuroraOsTextureAdapter( std::move( impl ) ) );
+}
+
+void AuroraOsTextureAdapter::BeginDraw()
+{
+    gl::glActiveTexture( GL_TEXTURE0 );
 }
 
 void AuroraOsTextureAdapter::Draw( ivec2 const& tex_size, bool with_blend )
@@ -206,6 +229,7 @@ void AuroraOsTextureAdapter::Draw( ivec2 const& tex_size, bool with_blend )
     GLStateSaver gl_saver;
 
     gl::glUseProgram( m_impl->shader_program.id );
+    gl::glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Pass output size parameters
     {
@@ -230,23 +254,32 @@ void AuroraOsTextureAdapter::Draw( ivec2 const& tex_size, bool with_blend )
         }
     }
 
-    gl::glActiveTexture( GL_TEXTURE0 );
-    // glBindTexture( GL_TEXTURE_2D, texture_handle );
-
     gl::glUniform1i( m_impl->sampler_location, 0 );
 
-    gl::glVertexAttribPointer( m_impl->pos_atrib_location, 2, GL_FLOAT, 0, 0, squareVertices );
-    gl::glEnableVertexAttribArray( m_impl->pos_atrib_location );
-    gl::glVertexAttribPointer( m_impl->uv_atrib_location, 2, GL_FLOAT, 0, 0, textureVertices );
-    gl::glEnableVertexAttribArray( m_impl->uv_atrib_location );
+    gl::glBindBuffer(GL_ARRAY_BUFFER, m_impl->vertexBuffer.id);
+
+    size_t stride = 5 * sizeof(GLfloat);
+    size_t offset = 0;
+    gl::glEnableVertexAttribArray(m_impl->pos_atrib_location);
+    gl::glVertexAttribPointer(m_impl->pos_atrib_location, 3, GL_FLOAT, GL_FALSE, stride, (void*) offset);
+
+    offset += 3 * sizeof(GLfloat);
+
+    gl::glEnableVertexAttribArray(m_impl->uv_atrib_location);
+    gl::glVertexAttribPointer(m_impl->uv_atrib_location, 2, GL_FLOAT, GL_FALSE, stride, (void*) offset);
 
     gl::glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
 }
 
+void AuroraOsTextureAdapter::EndDraw()
+{
+
+}
+
 void AuroraOsTextureAdapter::ClearRT()
 {
-    gl::glClearColor(0,0,0,0);
-    gl::glClear(GL_COLOR_BUFFER_BIT);
+//    gl::glClearColor(0,0,0,1);
+//    gl::glClear(GL_COLOR_BUFFER_BIT);
 }
 
 AuroraOsTextureAdapter::AuroraOsTextureAdapter( std::unique_ptr< Impl >&& impl )

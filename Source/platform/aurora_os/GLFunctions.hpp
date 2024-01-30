@@ -1,6 +1,7 @@
 #pragma once
 
 #include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
 
 namespace devilution::glutils
 {
@@ -40,5 +41,12 @@ public:
     static inline PFNGLCLEARPROC glClear = nullptr;
     static inline PFNGLISENABLEDPROC glIsEnabled = nullptr;
     static inline PFNGLVIEWPORTPROC glViewport = nullptr;
+    static inline PFNGLBINDFRAMEBUFFERPROC glBindFramebuffer = nullptr;
+    static inline PFNGLGETERRORPROC glGetError = nullptr;
+    static inline PFNGLDEBUGMESSAGECALLBACKKHRPROC glDebugMessageCallback = nullptr;
+    static inline PFNGLGENBUFFERSPROC glGenBuffers = nullptr;
+    static inline PFNGLBINDBUFFERPROC glBindBuffer = nullptr;
+    static inline PFNGLBUFFERDATAPROC glBufferData = nullptr;
+    static inline PFNGLDELETEBUFFERSPROC glDeleteBuffers = nullptr;
 };
 } // namespace devilutuion::glutils

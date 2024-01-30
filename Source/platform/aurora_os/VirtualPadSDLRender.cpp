@@ -31,13 +31,10 @@ std::unique_ptr< VirtualPadSDLRenderer > VirtualPadSDLRenderer::Create( SDL_Rend
     auto impl = std::make_unique< Pimpl >();
     impl->renderer = renderer;
 
-    // int w, h;
-    // SDL_GetRendererOutputSize(renderer, &w, &h);
     impl->texture =
        SDLTextureUPtr( SDL_CreateTexture( renderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_TARGET, w, h ) );
 
-    SDL_SetTextureScaleMode( impl->texture.get(), SDL_ScaleModeBest );
-    // SDL_SetTextureBlendMode( impl->texture.get(), SDL_BLENDMODE_BLEND);
+    SDL_SetTextureScaleMode(impl->texture.get(), SDL_ScaleModeBest);
 
     return std::unique_ptr< VirtualPadSDLRenderer >( new VirtualPadSDLRenderer( std::move( impl ) ) );
 }

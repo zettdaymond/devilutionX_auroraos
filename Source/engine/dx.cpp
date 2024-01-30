@@ -257,6 +257,9 @@ void RenderPresent()
 #ifdef AURORA_OS
         // If framebuffer has native Portrait orientation - rotate content
         if(rotator && virtualPadRenderer) {
+
+            rotator->BeginDraw();
+
             if (SDL_GL_BindTexture(texture.get(), nullptr, nullptr) <= -1 ) {
                 ErrSdl();
             }
@@ -264,9 +267,7 @@ void RenderPresent()
             int tex_w, tex_h;
             SDL_QueryTexture(texture.get(), nullptr, nullptr, &tex_w, &tex_h);
 
-            if(nullptr != rotator){
-                rotator->Draw(ivec2(tex_w, tex_h), false);
-            }
+            rotator->Draw(ivec2(tex_w, tex_h), false);
 
             if (SDL_GL_UnbindTexture(texture.get()) <= -1 ) {
                 ErrSdl();
@@ -278,13 +279,13 @@ void RenderPresent()
                 auto vp_texture = virtualPadRenderer->GetSDLTexture();
                 SDL_QueryTexture(vp_texture, nullptr, nullptr, &tex_w, &tex_h);
 
+                rotator->BeginDraw();
+
                 if (SDL_GL_BindTexture(vp_texture, nullptr, nullptr) <= -1 ) {
                     ErrSdl();
                 }
 
-                if(nullptr != rotator){
-                    rotator->Draw(ivec2(tex_w, tex_h), true);
-                }
+                rotator->Draw(ivec2(tex_w, tex_h), true);
 
                 if (SDL_GL_UnbindTexture(vp_texture) <= -1 ) {
                     ErrSdl();

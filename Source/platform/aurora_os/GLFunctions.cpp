@@ -6,35 +6,46 @@ namespace devilution::glutils
 {
 void gl::LoadSymbols()
 {
-    gl::glDeleteShader = ( PFNGLDELETESHADERPROC )SDL_GL_GetProcAddress( "glDeleteShader" );
-    gl::glDeleteProgram = ( PFNGLDELETEPROGRAMPROC )SDL_GL_GetProcAddress( "glDeleteProgram" );
-    gl::glCreateShader = ( PFNGLCREATESHADERPROC )SDL_GL_GetProcAddress( "glCreateShader" );
-    gl::glShaderSource = ( PFNGLSHADERSOURCEPROC )SDL_GL_GetProcAddress( "glShaderSource" );
-    gl::glCompileShader = ( PFNGLCOMPILESHADERPROC )SDL_GL_GetProcAddress( "glCompileShader" );
-    gl::glGetShaderiv = ( PFNGLGETSHADERIVPROC )SDL_GL_GetProcAddress( "glGetShaderiv" );
-    gl::glDrawArrays = ( PFNGLDRAWARRAYSPROC )SDL_GL_GetProcAddress( "glDrawArrays" );
-    gl::glEnableVertexAttribArray = ( PFNGLENABLEVERTEXATTRIBARRAYPROC )SDL_GL_GetProcAddress( "glEnableVertexAttribArray" );
-    gl::glVertexAttribPointer = ( PFNGLVERTEXATTRIBPOINTERPROC )SDL_GL_GetProcAddress( "glVertexAttribPointer" );
-    gl::glUniform1i = ( PFNGLUNIFORM1IPROC )SDL_GL_GetProcAddress( "glUniform1i" );
-    gl::glActiveTexture = ( PFNGLACTIVETEXTUREPROC )SDL_GL_GetProcAddress( "glActiveTexture" );
-    gl::glUseProgram = ( PFNGLUSEPROGRAMPROC )SDL_GL_GetProcAddress( "glUseProgram" );
-    gl::glGetAttribLocation = ( PFNGLGETATTRIBLOCATIONPROC )SDL_GL_GetProcAddress( "glGetAttribLocation" );
-    gl::glGetUniformLocation = ( PFNGLGETUNIFORMLOCATIONPROC )SDL_GL_GetProcAddress( "glGetUniformLocation" );
-    gl::glGetProgramInfoLog = ( PFNGLGETPROGRAMINFOLOGPROC )SDL_GL_GetProcAddress( "glGetProgramInfoLog" );
-    gl::glGetProgramiv = ( PFNGLGETPROGRAMIVPROC )SDL_GL_GetProcAddress( "glGetProgramiv" );
-    gl::glLinkProgram = ( PFNGLLINKPROGRAMPROC )SDL_GL_GetProcAddress( "glLinkProgram" );
-    gl::glAttachShader = ( PFNGLATTACHSHADERPROC )SDL_GL_GetProcAddress( "glAttachShader" );
-    gl::glCreateProgram = ( PFNGLCREATEPROGRAMPROC )SDL_GL_GetProcAddress( "glCreateProgram" );
-    gl::glGetShaderInfoLog = ( PFNGLGETSHADERINFOLOGPROC )SDL_GL_GetProcAddress( "glGetShaderInfoLog" );
-    gl::glUniform2i = ( PFNGLUNIFORM2IPROC )SDL_GL_GetProcAddress( "glUniform2i" );
-    gl::glGetIntegerv = ( PFNGLGETINTEGERVPROC )SDL_GL_GetProcAddress( "glGetIntegerv" );
-    gl::glEnable = ( PFNGLENABLEPROC )SDL_GL_GetProcAddress( "glEnable" );
-    gl::glDisable = ( PFNGLDISABLEPROC )SDL_GL_GetProcAddress( "glDisable" );
-    gl::glBlendFuncSeparate = ( PFNGLBLENDFUNCSEPARATEPROC )SDL_GL_GetProcAddress( "glBlendFuncSeparate" );
-    gl::glClearColor = ( PFNGLCLEARCOLORPROC )SDL_GL_GetProcAddress( "glClearColor" );
-    gl::glClear = ( PFNGLCLEARPROC )SDL_GL_GetProcAddress( "glClear" );
-    gl::glIsEnabled = ( PFNGLISENABLEDPROC )SDL_GL_GetProcAddress( "glIsEnabled" );
-    gl::glViewport = ( PFNGLVIEWPORTPROC )SDL_GL_GetProcAddress( "glViewport" );
+    #define LOAD_GL_FUNC(name) gl::name = (decltype(gl::name))SDL_GL_GetProcAddress( #name )
+
+    LOAD_GL_FUNC(glDeleteShader);
+    LOAD_GL_FUNC(glDeleteProgram);
+    LOAD_GL_FUNC(glCreateShader);
+    LOAD_GL_FUNC(glShaderSource);
+    LOAD_GL_FUNC(glCompileShader);
+    LOAD_GL_FUNC(glGetShaderiv);
+    LOAD_GL_FUNC(glDrawArrays);
+    LOAD_GL_FUNC(glEnableVertexAttribArray);
+    LOAD_GL_FUNC(glVertexAttribPointer);
+    LOAD_GL_FUNC(glUniform1i);
+    LOAD_GL_FUNC(glActiveTexture);
+    LOAD_GL_FUNC(glUseProgram);
+    LOAD_GL_FUNC(glGetAttribLocation);
+    LOAD_GL_FUNC(glGetUniformLocation);
+    LOAD_GL_FUNC(glGetProgramInfoLog);
+    LOAD_GL_FUNC(glGetProgramiv);
+    LOAD_GL_FUNC(glLinkProgram);
+    LOAD_GL_FUNC(glAttachShader);
+    LOAD_GL_FUNC(glCreateProgram);
+    LOAD_GL_FUNC(glGetShaderInfoLog);
+    LOAD_GL_FUNC(glUniform2i);
+    LOAD_GL_FUNC(glGetIntegerv);
+    LOAD_GL_FUNC(glEnable);
+    LOAD_GL_FUNC(glDisable);
+    LOAD_GL_FUNC(glBlendFuncSeparate);
+    LOAD_GL_FUNC(glClearColor);
+    LOAD_GL_FUNC(glClear);
+    LOAD_GL_FUNC(glIsEnabled);
+    LOAD_GL_FUNC(glViewport);
+    LOAD_GL_FUNC(glBindFramebuffer);
+    LOAD_GL_FUNC(glGetError);
+    LOAD_GL_FUNC(glDebugMessageCallback);
+    LOAD_GL_FUNC(glGenBuffers);
+    LOAD_GL_FUNC(glBindBuffer);
+    LOAD_GL_FUNC(glBufferData);
+    LOAD_GL_FUNC(glDeleteBuffers);
+
+    #undef LOAD_GL_FUNC
 }
 
 bool gl::IsSymbolsLoaded()
@@ -45,6 +56,7 @@ bool gl::IsSymbolsLoaded()
             && gl::glGetUniformLocation && gl::glGetProgramInfoLog && gl::glGetProgramiv && gl::glLinkProgram
             && gl::glAttachShader && gl::glCreateProgram && gl::glGetShaderInfoLog && gl::glUniform2i
             && gl::glGetIntegerv && gl::glEnable && gl::glDisable && gl::glBlendFuncSeparate
-            && gl::glClearColor && gl::glClear && gl::glIsEnabled && gl::glViewport;
+            && gl::glClearColor && gl::glClear && gl::glIsEnabled && gl::glViewport && gl::glBindFramebuffer && gl::glGetError
+            && gl::glDebugMessageCallback && gl::glGenBuffers && gl::glBindBuffer && gl::glBufferData;
 }
 }

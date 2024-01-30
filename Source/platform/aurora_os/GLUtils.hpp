@@ -31,6 +31,19 @@ struct ShaderProgramGLES
     uint32_t id = -1;
 };
 
+struct ArrayBufferGLES
+{
+    ArrayBufferGLES( uint32_t b );
+    ArrayBufferGLES( ArrayBufferGLES&& b );
+    ArrayBufferGLES( ArrayBufferGLES& b ) = delete;
+    ArrayBufferGLES( ArrayBufferGLES const& b ) = delete;
+    ~ArrayBufferGLES();
+
+    uint32_t id = -1;
+};
+
 auto CompileShader( std::string_view code, GLenum shader_type ) -> std::optional< GLuint >;
 auto CompileAndLink( std::string_view vertex_code, std::string_view fragment_code ) -> std::optional< ShaderProgramGLES >;
+auto MakeArrayBuffer(const GLfloat *buffer_data, std::size_t buffer_size) -> ArrayBufferGLES;
+void InstallDebugCallback();
 } // namespace devilution::glutils
