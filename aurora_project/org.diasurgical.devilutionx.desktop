@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-X-Nemo-Application-Type=generic
+X-Nemo-Application-Type=silica-qt5
 Icon=org.diasurgical.devilutionx
 Exec=/usr/bin/org.diasurgical.devilutionx
 Name=DevilutionX

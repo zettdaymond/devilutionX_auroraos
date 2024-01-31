@@ -6,7 +6,8 @@ License:    Sustainable Use License
 URL:        https://github.com/diasurgical/devilutionX
 Source0:    %{name}-%{version}.tar.bz2
 
-Requires:   sailfishsilica-qt5 >= 0.10.9
+BuildRequires:  pkgconfig(Qt5Core)
+BuildRequires:  pkgconfig(Qt5Gui)
 
 BuildRequires: cmake
 BuildRequires: ninja

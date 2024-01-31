@@ -24,6 +24,7 @@ set(CMAKE_SKIP_RPATH FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/lib")
 
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 # Disable sanitizers. They're not supported out-of-the-box.
 set(NONET ON)
@@ -61,7 +62,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/.. devilutionX)
 
 add_executable(${PROJECT_NAME} "src/dummy.cpp")
 target_link_libraries(${PROJECT_NAME} PUBLIC devilution::lib)
-target_link_options(${PROJECT_NAME} PUBLIC -Wl,--gc-sections)
+target_link_options(${PROJECT_NAME} PUBLIC -Wl,--gc-sections -rdynamic)
 set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
 install(TARGETS ${PROJECT_NAME}
@@ -78,15 +79,6 @@ else()
             share/org.diasurgical.devilutionx
     )
 endif()
-
-#install(
-#    FILES
-#        "${CMAKE_CURRENT_SOURCE_DIR}/assets/ru.mpq"
-#        "${CMAKE_CURRENT_SOURCE_DIR}/assets/spawn.mpq"
-#    DESTINATION
-#        share/org.diasurgical.devilutionx/assets
-#)
-
 
 set(IconSize 86x86 108x108 128x128 172x172)
 foreach(_size IN LISTS IconSize)

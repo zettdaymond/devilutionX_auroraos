@@ -7,8 +7,6 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 include(FindPkgConfig)
 pkg_search_module(WAYLAND wayland-client )
-pkg_search_module(KEEPALIVE keepalive REQUIRED)
-pkg_search_module(AURORA auroraapp REQUIRED)
 pkg_search_module(DBUS REQUIRED dbus-1)
 pkg_search_module(GLIB REQUIRED glib-2.0)
 pkg_search_module(AUDIORESOURCE REQUIRED audioresource)
@@ -33,7 +31,6 @@ target_include_directories(libdevilutionx_aurora_os
 )
 target_include_directories(libdevilutionx_aurora_os
     PRIVATE
-#        ${AURORA_INCLUDE_DIRS}
 #        ${DBUS_INCLUDE_DIRS}
         "/usr/include/dbus-1.0"
         "/usr/lib/dbus-1.0/include"
@@ -47,9 +44,7 @@ target_link_libraries(libdevilutionx_aurora_os
     PRIVATE
         Qt5::Core
         Qt5::Gui
-#        ${AURORA_LIBRARIES}
-#        ${AURORA_LDFLAGS}
         ${AUDIORESOURCE_LIBRARIES}
         ${GLIB_LIBRARIES}
+        ${WAYLAND_LIBRARIES}
 )
-target_link_libraries(libdevilutionx_aurora_os PUBLIC ${WAYLAND_LIBRARIES} ${KEEPALIVE_LIBRARIES} ${KEEPALIVE_GLIB_LIBRARIES})

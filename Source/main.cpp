@@ -21,9 +21,12 @@
 #endif
 
 #ifdef AURORA_OS
-#include "Utilities.hpp"
-#include "StandartPaths.hpp"
-#include "DisplayBlankerController.hpp"
+#   include "Utilities.hpp"
+#   include "StandartPaths.hpp"
+#   include "DisplayBlankerController.hpp"
+#   define FUNC_EXPORT extern "C" __attribute__((visibility("default"))) int main
+#else
+#   define FUNC_EXPORT extern "C" int main
 #endif
 
 #include "diablo.h"
@@ -36,7 +39,7 @@ extern "C" const char *__asan_default_options() // NOLINT(bugprone-reserved-iden
 }
 #endif
 
-extern "C" int main(int argc, char **argv)
+FUNC_EXPORT(int argc, char **argv)
 {
 #ifdef __SWITCH__
 	switch_romfs_init();
