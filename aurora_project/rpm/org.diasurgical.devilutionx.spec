@@ -6,6 +6,17 @@ License:    Sustainable Use License
 URL:        https://github.com/diasurgical/devilutionX
 Source0:    %{name}-%{version}.tar.bz2
 
+Requires: libQt5Core.so.5
+Requires: libQt5Gui.so.5
+Requires: libSDL2-2.0.so.0
+Requires: libSDL2_image-2.0.so.0
+Requires: libdbus-1.so.3
+Requires: libglib-2.0.so.0
+Requires: libaudioresource.so.1
+Requires: libwayland-client.so.0
+Requires: libz.so.1
+Requires: libbz2.so.1
+
 BuildRequires:  pkgconfig(Qt5Core)
 BuildRequires:  pkgconfig(Qt5Gui)
 
