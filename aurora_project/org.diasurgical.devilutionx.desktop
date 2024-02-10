@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+X-Nemo-Application-Type=silica-qt5
+Icon=org.diasurgical.devilutionx
+Exec=/usr/bin/org.diasurgical.devilutionx
+Name=DevilutionX
+Name[ru]=DevilutionX
+
+[X-Application]
+Permissions=Audio;UserDirs
+OrganizationName=org.diasurgical
+ApplicationName=devilutionx
+ExecDBus=/usr/bin/org.diasurgical.devilutionx

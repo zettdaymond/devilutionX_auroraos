@@ -6,6 +6,8 @@
 #include "utils/display.h"
 #include "utils/ui_fwd.h"
 
+#include "ComposerAdapter.hpp"
+
 namespace devilution {
 
 VirtualGamepad VirtualGamepadState;
@@ -57,14 +59,28 @@ void InitializeVirtualGamepad()
 
 	float hdpi;
 	float vdpi;
+#ifdef AURORA_OS_DPI_GAMEPAD_FIX
+    if(auto dpi = WaylandComposerAdapter::GetScreenDpi()) {
+        hdpi = dpi.x;
+        vdpi = dpi.y;
+#else
 	int displayIndex = SDL_GetWindowDisplayIndex(ghMainWnd);
 	if (SDL_GetDisplayDPI(displayIndex, nullptr, &hdpi, &vdpi) == 0) {
+#endif
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Display resolution: %f x %f", (float)hdpi, (float)vdpi);
 		int clientWidth;
 		int clientHeight;
 		if (renderer != nullptr)
 			SDL_GetRendererOutputSize(renderer, &clientWidth, &clientHeight);
 		else
 			SDL_GetWindowSize(ghMainWnd, &clientWidth, &clientHeight);
+
+#ifdef AURORA_OS
+        if(clientWidth < clientHeight) {
+            std::swap(clientHeight, clientWidth);
+            std::swap(hdpi, vdpi);
+        }
+#endif
 
 		hdpi *= static_cast<float>(gnScreenWidth) / clientWidth;
 		vdpi *= static_cast<float>(gnScreenHeight) / clientHeight;

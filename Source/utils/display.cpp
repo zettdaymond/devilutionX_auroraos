@@ -42,6 +42,11 @@
 #endif
 #endif
 
+#if defined(AURORA_OS)
+#include "Utilities.hpp"
+#include "ComposerAdapter.hpp"
+#include "InputAdapter.hpp"
+#endif
 namespace devilution {
 
 extern SDLSurfaceUniquePtr RendererTextureSurface; /** defined in dx.cpp */
@@ -121,6 +126,10 @@ void FreeRenderer()
 	if (renderer != nullptr) {
 		SDL_DestroyRenderer(renderer);
 		renderer = nullptr;
+#ifdef AURORA_OS
+        rotator = nullptr;
+        virtualPadRenderer = nullptr;
+#endif
 	}
 
 #if defined(_WIN32) && !defined(NXDK)
@@ -305,7 +314,8 @@ bool SpawnWindow(const char *lpWindowName)
 #ifndef USE_SDL1
 	initFlags |= SDL_INIT_GAMECONTROLLER;
 
-	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
 #endif
 	if (SDL_Init(initFlags) <= -1) {
 		ErrSdl();
@@ -348,6 +358,21 @@ bool SpawnWindow(const char *lpWindowName)
 	}
 
 	ghMainWnd = SDL_CreateWindow(lpWindowName, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, windowSize.width, windowSize.height, flags);
+
+#ifdef AURORA_OS
+    AuroraOSInputAdapter::InstallInputEventsFilter(ghMainWnd,
+                                                   [](){ return GetScreenWidth(); },
+                                                   [](){ return GetScreenHeight(); });
+
+    int rtW,rtH;
+    SDL_GL_GetDrawableSize(ghMainWnd, &rtW, &rtH);
+
+    const bool fbNativePortrait = (rtW < rtH);
+
+    if(fbNativePortrait) {
+        WaylandComposerAdapter::SetWindowOrientation(ghMainWnd, SDL_ORIENTATION_LANDSCAPE_FLIPPED);
+    }
+#endif
 
 	// Note: https://github.com/libsdl-org/SDL/issues/962
 	// This is a solution to a problem related to SDL mouse grab.
@@ -426,6 +451,19 @@ void ReinitializeRenderer()
 		}
 
 		renderer = SDL_CreateRenderer(ghMainWnd, -1, rendererFlags);
+
+#ifdef AURORA_OS
+        int rtW,rtH;
+        SDL_GL_GetDrawableSize(ghMainWnd, &rtW, &rtH);
+
+        const bool fbNativePortrait = (rtW < rtH);
+
+        if(fbNativePortrait) {
+            rotator = AuroraOsTextureAdapter::Create(ivec2(rtW, rtH));
+            virtualPadRenderer = VirtualPadSDLRenderer::Create(renderer, gnScreenWidth, gnScreenHeight);
+        }
+#endif
+
 		if (renderer == nullptr) {
 			ErrSdl();
 		}
@@ -436,9 +474,12 @@ void ReinitializeRenderer()
 			ErrSdl();
 		}
 
-		if (SDL_RenderSetLogicalSize(renderer, gnScreenWidth, gnScreenHeight) <= -1) {
-			ErrSdl();
-		}
+#ifdef AURORA_OS
+        if(!fbNativePortrait)
+#endif
+        if (SDL_RenderSetLogicalSize(renderer, gnScreenWidth, gnScreenHeight) <= -1) {
+            ErrSdl();
+        }
 
 		Uint32 format;
 		if (SDL_QueryTexture(texture.get(), &format, nullptr, nullptr, nullptr) < 0)

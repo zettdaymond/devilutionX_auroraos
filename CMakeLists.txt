@@ -316,6 +316,10 @@ endif()
 
 if(ANDROID)
   add_library(${BIN_TARGET} SHARED Source/main.cpp)
+elseif(DEVILUTIONX_AURORA_OS)
+  add_library(${BIN_TARGET} STATIC Source/main.cpp)
+  add_library(devilution::lib ALIAS ${BIN_TARGET})
+  # target_link_libraries(${BIN_TARGET} PUBLIC SDL2::SDL2main)
 elseif(UWP_LIB)
   add_custom_target(${BIN_TARGET})  # we only need libdevilutionx
 else()

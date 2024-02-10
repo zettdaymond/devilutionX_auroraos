@@ -23,10 +23,19 @@
 #include <3ds.h>
 #endif
 
+#ifdef AURORA_OS
+#include "TextureRotatorGLES.hpp"
+#include "VirtualPadSDLRender.hpp"
+#endif
+
 namespace devilution {
 
 int refreshDelay;
 SDL_Renderer *renderer;
+#ifdef AURORA_OS
+std::unique_ptr<AuroraOsTextureAdapter> rotator;
+std::unique_ptr<VirtualPadSDLRenderer> virtualPadRenderer;
+#endif
 #ifndef USE_SDL1
 SDLTextureUniquePtr texture;
 #endif
@@ -116,6 +125,12 @@ void dx_cleanup()
 	texture = nullptr;
 	if (*sgOptions.Graphics.upscale)
 		SDL_DestroyRenderer(renderer);
+
+#ifdef AURORA_OS
+    virtualPadRenderer = nullptr;
+    rotator = nullptr;
+#endif
+
 #endif
 	SDL_DestroyWindow(ghMainWnd);
 }
@@ -238,12 +253,64 @@ void RenderPresent()
 		if (SDL_RenderClear(renderer) <= -1) {
 			ErrSdl();
 		}
-		if (SDL_RenderCopy(renderer, texture.get(), nullptr, nullptr) <= -1) {
-			ErrSdl();
-		}
-		if (ControlMode == ControlTypes::VirtualGamepad) {
-			RenderVirtualGamepad(renderer);
-		}
+
+#ifdef AURORA_OS
+        // If framebuffer has native Portrait orientation - rotate content
+        if(rotator && virtualPadRenderer) {
+
+            rotator->BeginDraw();
+
+            if (SDL_GL_BindTexture(texture.get(), nullptr, nullptr) <= -1 ) {
+                ErrSdl();
+            }
+
+            int tex_w, tex_h;
+            SDL_QueryTexture(texture.get(), nullptr, nullptr, &tex_w, &tex_h);
+
+            rotator->Draw(ivec2(tex_w, tex_h), false);
+
+            if (SDL_GL_UnbindTexture(texture.get()) <= -1 ) {
+                ErrSdl();
+            }
+
+            if (ControlMode == ControlTypes::VirtualGamepad) {
+                virtualPadRenderer->RenderVirtualPadToRenderTarget( static_cast<void(*)(SDL_Renderer*)> (&RenderVirtualGamepad) );
+
+                auto vp_texture = virtualPadRenderer->GetSDLTexture();
+                SDL_QueryTexture(vp_texture, nullptr, nullptr, &tex_w, &tex_h);
+
+                rotator->BeginDraw();
+
+                if (SDL_GL_BindTexture(vp_texture, nullptr, nullptr) <= -1 ) {
+                    ErrSdl();
+                }
+
+                rotator->Draw(ivec2(tex_w, tex_h), true);
+
+                if (SDL_GL_UnbindTexture(vp_texture) <= -1 ) {
+                    ErrSdl();
+                }
+            }
+        }
+        // If framebuffer has native Landscape orientation - do basic render logic
+        else {
+            if (SDL_RenderCopy(renderer, texture.get(), nullptr, nullptr) <= -1) {
+                 ErrSdl();
+            }
+
+            if (ControlMode == ControlTypes::VirtualGamepad) {
+                RenderVirtualGamepad(renderer);
+            }
+        }
+#else
+        if (SDL_RenderCopy(renderer, texture.get(), nullptr, nullptr) <= -1) {
+             ErrSdl();
+        }
+
+        if (ControlMode == ControlTypes::VirtualGamepad) {
+            RenderVirtualGamepad(renderer);
+        }
+#endif
 		SDL_RenderPresent(renderer);
 
 		if (!*sgOptions.Graphics.vSync) {

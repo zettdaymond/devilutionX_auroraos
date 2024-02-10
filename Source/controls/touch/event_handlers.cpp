@@ -29,7 +29,7 @@ Point ScaleToScreenCoordinates(float x, float y)
 
 void SimulateMouseMovement(const SDL_Event &event)
 {
-	Point position = ScaleToScreenCoordinates(event.tfinger.x, event.tfinger.y);
+    Point position = ScaleToScreenCoordinates(event.tfinger.x, event.tfinger.y);
 
 	bool isInMainPanel = GetMainPanel().contains(position);
 	bool isInLeftPanel = GetLeftPanel().contains(position);
@@ -42,7 +42,7 @@ void SimulateMouseMovement(const SDL_Event &event)
 			return;
 	}
 
-	MousePosition = position;
+    MousePosition = position;
 
 	SetPointAndClick(true);
 
@@ -130,8 +130,10 @@ void HandleStashPanelInteraction(const SDL_Event &event)
 
 } // namespace
 
-void HandleTouchEvent(const SDL_Event &event)
+void HandleTouchEvent(const SDL_Event &event_back)
 {
+    SDL_Event event = event_back;
+
 	SetPointAndClick(false);
 
 	if (Handler.Handle(event)) {

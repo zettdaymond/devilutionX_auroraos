@@ -20,7 +20,17 @@
 #include <gperftools/heap-profiler.h>
 #endif
 
+#ifdef AURORA_OS
+#   include "Utilities.hpp"
+#   include "StandartPaths.hpp"
+#   include "DisplayBlankerController.hpp"
+#   define FUNC_EXPORT extern "C" __attribute__((visibility("default"))) int main
+#else
+#   define FUNC_EXPORT extern "C" int main
+#endif
+
 #include "diablo.h"
+
 
 #if !defined(__APPLE__)
 extern "C" const char *__asan_default_options() // NOLINT(bugprone-reserved-identifier, readability-identifier-naming)
@@ -29,7 +39,7 @@ extern "C" const char *__asan_default_options() // NOLINT(bugprone-reserved-iden
 }
 #endif
 
-extern "C" int main(int argc, char **argv)
+FUNC_EXPORT(int argc, char **argv)
 {
 #ifdef __SWITCH__
 	switch_romfs_init();
@@ -49,9 +59,21 @@ extern "C" int main(int argc, char **argv)
 #ifdef GPERF_HEAP_MAIN
 	HeapProfilerStart("main");
 #endif
+
+#ifdef AURORA_OS
+    auto context = devilution::AuroraOsStandartPaths::MakeAppContext(argc, argv);
+
+    devilution::DisplayBlankerController::Init();
+    devilution::DisplayBlankerController::SetPreventDisplayBlanking(true);
+#endif
+
 	const int result = devilution::DiabloMain(argc, argv);
 #ifdef GPERF_HEAP_MAIN
 	HeapProfilerStop();
+#endif
+
+#ifdef AURORA_OS
+    devilution::DisplayBlankerController::Shutdown();
 #endif
 	return result;
 }

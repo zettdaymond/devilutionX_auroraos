@@ -22,6 +22,10 @@
 #include "utils/stdcompat/optional.hpp"
 
 namespace devilution {
+
+#ifdef AURORA_OS
+extern SDL_Window *ghMainWnd;
+#endif
 namespace {
 
 #ifndef NOSOUND
@@ -286,9 +290,17 @@ bool SVidPlayBegin(const char *filename, int flags)
 		int renderWidth = static_cast<int>(SVidWidth);
 		int renderHeight = static_cast<int>(SVidHeight);
 		texture = SDLWrap::CreateTexture(renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING, renderWidth, renderHeight);
-		if (SDL_RenderSetLogicalSize(renderer, renderWidth, renderHeight) <= -1) {
-			ErrSdl();
-		}
+#ifdef AURORA_OS
+        int rtW,rtH;
+        SDL_GL_GetDrawableSize(ghMainWnd, &rtW, &rtH);
+
+        const bool fbNativePortrait = (rtW < rtH);
+
+        if(!fbNativePortrait)
+#endif
+        if (SDL_RenderSetLogicalSize(renderer, renderWidth, renderHeight) <= -1) {
+            ErrSdl();
+        }
 	}
 #else
 	TrySetVideoModeToSVidForSDL1();
@@ -380,9 +392,17 @@ void SVidPlayEnd()
 #ifndef USE_SDL1
 	if (renderer != nullptr) {
 		texture = SDLWrap::CreateTexture(renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING, gnScreenWidth, gnScreenHeight);
-		if (renderer != nullptr && SDL_RenderSetLogicalSize(renderer, gnScreenWidth, gnScreenHeight) <= -1) {
-			ErrSdl();
-		}
+#ifdef AURORA_OS
+        int rtW,rtH;
+        SDL_GL_GetDrawableSize(ghMainWnd, &rtW, &rtH);
+
+        const bool fbNativePortrait = (rtW < rtH);
+
+        if(!fbNativePortrait)
+#endif
+        if (renderer != nullptr && SDL_RenderSetLogicalSize(renderer, gnScreenWidth, gnScreenHeight) <= -1) {
+            ErrSdl();
+        }
 	}
 #else
 	if (IsSVidVideoMode) {

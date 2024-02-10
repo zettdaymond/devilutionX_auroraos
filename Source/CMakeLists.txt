@@ -296,6 +296,7 @@ foreach(path ${DEVILUTIONX_PLATFORM_SUBDIRECTORIES})
   add_subdirectory(${path})
 endforeach()
 
+
 target_link_libraries(libdevilutionx PUBLIC ${DEVILUTIONX_PLATFORM_LINK_LIBRARIES})
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")

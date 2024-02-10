@@ -21,6 +21,10 @@
 #include "utils/sdl2_to_1_2_backports.h"
 #endif
 
+#ifdef AURORA_OS
+#include "StandartPaths.hpp"
+#endif
+
 namespace devilution {
 
 namespace paths {
@@ -80,6 +84,11 @@ const std::string &PrefPath()
 		prefPath = FromSDL(IOSGetPrefPath());
 #elif defined(NXDK)
 		prefPath = NxdkGetPrefPath();
+#elif defined(AURORA_OS)
+    prefPath = AuroraOsStandartPaths::GetWritableDataPath();
+    if(!DirectoryExists(prefPath->c_str())) {
+        RecursivelyCreateDir(prefPath->c_str());
+    }
 #else
 		prefPath = FromSDL(SDL_GetPrefPath("diasurgical", "devilution"));
 #if !defined(__amigaos__)
@@ -99,6 +108,11 @@ const std::string &ConfigPath()
 		configPath = FromSDL(IOSGetPrefPath());
 #elif defined(NXDK)
 		configPath = NxdkGetPrefPath();
+#elif defined(AURORA_OS)
+        configPath = AuroraOsStandartPaths::GetConfigPath();
+        if(!DirectoryExists(configPath->c_str())) {
+            RecursivelyCreateDir(configPath->c_str());
+        }
 #else
 		configPath = FromSDL(SDL_GetPrefPath("diasurgical", "devilution"));
 #if !defined(__amigaos__)
@@ -120,8 +134,10 @@ const std::string &AssetsPath()
 		assetsPath.emplace("D:\\assets\\");
 #elif defined(__3DS__) || defined(__SWITCH__)
 		assetsPath.emplace("romfs:/");
+#elif defined(AURORA_OS)
+        assetsPath.emplace( AuroraOsStandartPaths::GetBundledAssetsPath() );
 #else
-		assetsPath.emplace(FromSDL(SDL_GetBasePath()) + ("assets" DIRECTORY_SEPARATOR_STR));
+        assetsPath.emplace(FromSDL(SDL_GetBasePath()) + ("assets" DIRECTORY_SEPARATOR_STR));
 #endif
 	}
 	return *assetsPath;
