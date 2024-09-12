@@ -19,10 +19,19 @@ endif()
 include(functions/FetchContent_MakeAvailableExcludeFromAll)
 include(FetchContent)
 
-FetchContent_Declare(SDL_image
-  URL https://github.com/libsdl-org/SDL_image/archive/refs/tags/release-2.0.5.tar.gz
-  URL_HASH MD5=3446ed7ee3c700065dcb33426a9b0c6e
-)
+if(DEVILUTIONX_AURORA_OS)
+  FetchContent_Declare(SDL_image
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
+    GIT_TAG        release-2.0.5
+    GIT_SHALLOW    1
+  )
+else()
+  FetchContent_Declare(SDL_image
+    URL https://github.com/libsdl-org/SDL_image/archive/refs/tags/release-2.0.5.tar.gz
+    URL_HASH MD5=3446ed7ee3c700065dcb33426a9b0c6e
+  )
+endif()
+
 FetchContent_MakeAvailableExcludeFromAll(SDL_image)
 
 if(DEVILUTIONX_STATIC_SDL_IMAGE)

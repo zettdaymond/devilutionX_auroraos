@@ -20,14 +20,10 @@ Requires: libbz2.so.1
 BuildRequires:  pkgconfig(Qt5Core)
 BuildRequires:  pkgconfig(Qt5Gui)
 
+BuildRequires: gcc
 BuildRequires: cmake
 BuildRequires: ninja
-
-BuildRequires: SDL2
-BuildRequires: SDL2-devel
-
-BuildRequires: SDL2_image
-BuildRequires: SDL2_image-devel
+BuildRequires: git
 
 BuildRequires: wayland-devel
 
@@ -42,6 +38,19 @@ BuildRequires: bzip2-libs
 
 BuildRequires: libaudioresource
 BuildRequires: libaudioresource-devel
+
+# For SDL2 static build
+BuildRequires: pkgconfig(wayland-egl)
+BuildRequires: pkgconfig(wayland-client)
+BuildRequires: pkgconfig(wayland-cursor)
+BuildRequires: pkgconfig(wayland-protocols)
+BuildRequires: pkgconfig(wayland-scanner)
+BuildRequires: pkgconfig(egl)
+BuildRequires: pkgconfig(glesv1_cm)
+BuildRequires: pkgconfig(glesv2)
+BuildRequires: pkgconfig(xkbcommon)
+BuildRequires: pkgconfig(libpulse-simple)
+BuildRequires: pulseaudio-devel
 
 
 %description
