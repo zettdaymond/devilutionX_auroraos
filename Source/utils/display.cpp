@@ -363,15 +363,6 @@ bool SpawnWindow(const char *lpWindowName)
     AuroraOSInputAdapter::InstallInputEventsFilter(ghMainWnd,
                                                    [](){ return GetScreenWidth(); },
                                                    [](){ return GetScreenHeight(); });
-
-    int rtW,rtH;
-    SDL_GL_GetDrawableSize(ghMainWnd, &rtW, &rtH);
-
-    const bool fbNativePortrait = (rtW < rtH);
-
-    if(fbNativePortrait) {
-        WaylandComposerAdapter::SetWindowOrientation(ghMainWnd, SDL_ORIENTATION_LANDSCAPE_FLIPPED);
-    }
 #endif
 
 	// Note: https://github.com/libsdl-org/SDL/issues/962
@@ -396,6 +387,21 @@ bool SpawnWindow(const char *lpWindowName)
 	refreshDelay = 1000000 / refreshRate;
 
 	ReinitializeRenderer();
+
+#ifdef AURORA_OS
+    int rtW,rtH;
+    SDL_GL_GetDrawableSize(ghMainWnd, &rtW, &rtH);
+
+    const bool fbNativePortrait = (rtW < rtH);
+
+    if(fbNativePortrait) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Display orientation changed to %i", (int)SDL_ORIENTATION_LANDSCAPE_FLIPPED);
+        WaylandComposerAdapter::SetWindowOrientation(ghMainWnd, SDL_ORIENTATION_LANDSCAPE_FLIPPED);
+    }
+    else {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Display orientation do not touched");
+    }
+#endif
 
 	return ghMainWnd != nullptr;
 }
