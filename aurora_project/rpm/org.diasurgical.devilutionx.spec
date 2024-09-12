@@ -1,7 +1,7 @@
 Name:       org.diasurgical.devilutionx
 Summary:    Diablo (1996) port for Aurora OS
-Version:    1.5.1
-Release:    3
+Version:    1.5.3
+Release:    1
 License:    Sustainable Use License
 URL:        https://github.com/diasurgical/devilutionX
 Source0:    %{name}-%{version}.tar.bz2
