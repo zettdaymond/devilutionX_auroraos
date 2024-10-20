@@ -2,6 +2,7 @@
 
 #include <array>
 
+#include <QSettings>
 #include <QStandardPaths>
 #include <QtGui/QGuiApplication>
 
@@ -9,14 +10,12 @@
 
 namespace devilution {
 
-struct AppContextImpl : public AuroraOsStandartPaths::AppContext
-{
+struct AppContextImpl : public AuroraOsStandartPaths::AppContext {
     ~AppContextImpl() override
-    {
-
-    }
+    {}
 
     std::unique_ptr<QGuiApplication> app;
+    std::unique_ptr<QSettings> settings;
 };
 
 std::string AuroraOsStandartPaths::GetWritableDataPath()
@@ -37,11 +36,23 @@ std::string AuroraOsStandartPaths::GetBundledAssetsPath()
 
 std::string AuroraOsStandartPaths::GetAdditionalMPQSearchPath()
 {
-    auto str = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation).toStdString() + "/devilutionx/";
-    return str;
+    return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation).toStdString() + "/";
 }
 
-std::unique_ptr<AuroraOsStandartPaths::AppContext> AuroraOsStandartPaths::MakeAppContext(int argc, char **argv)
+std::optional<std::string> AuroraOsStandartPaths::GetUserDefinedMPQSearchPath()
+{
+    QSettings s(QStringLiteral("org.diasurgical"), QStringLiteral("devilutionx"));
+
+    auto dir = s.value("userDataDirectory");
+
+    if (dir.isNull()) {
+        return {};
+    }
+
+    return dir.toString().toStdString();
+}
+
+std::unique_ptr<AuroraOsStandartPaths::AppContext> AuroraOsStandartPaths::MakeAppContext(int argc, char** argv)
 {
     auto context = std::make_unique<AppContextImpl>();
 
@@ -53,10 +64,7 @@ std::unique_ptr<AuroraOsStandartPaths::AppContext> AuroraOsStandartPaths::MakeAp
     return context;
 }
 
-
 AuroraOsStandartPaths::AppContext::~AppContext()
-{
+{}
 
-}
-
-}
+} // namespace devilution

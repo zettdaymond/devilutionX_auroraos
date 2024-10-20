@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <optional>
 #include <memory>
 
 class QGuiApplication;
@@ -22,6 +23,8 @@ public:
     static std::string GetBundledAssetsPath();
 
     static std::string GetAdditionalMPQSearchPath();
+
+    static std::optional<std::string> GetUserDefinedMPQSearchPath();
 
     static std::unique_ptr<AppContext> MakeAppContext(int argc, char** argv);
 };

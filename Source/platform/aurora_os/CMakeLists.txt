@@ -41,6 +41,7 @@ target_include_directories(libdevilutionx_aurora_os
 target_link_libraries(libdevilutionx_aurora_os
     PUBLIC
         SDL2::SDL2
+        SDL2::SDL2_image
     PRIVATE
         Qt5::Core
         Qt5::Gui
@@ -48,3 +49,6 @@ target_link_libraries(libdevilutionx_aurora_os
         ${GLIB_LIBRARIES}
         ${WAYLAND_LIBRARIES}
 )
+
+add_subdirectory(devilution_launcher)
+target_link_libraries(libdevilutionx_aurora_os PUBLIC devilution_launcher)

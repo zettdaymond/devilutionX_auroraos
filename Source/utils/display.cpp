@@ -46,6 +46,7 @@
 #include "Utilities.hpp"
 #include "ComposerAdapter.hpp"
 #include "InputAdapter.hpp"
+#include "Application.hpp"
 #endif
 namespace devilution {
 
@@ -360,6 +361,10 @@ bool SpawnWindow(const char *lpWindowName)
 	ghMainWnd = SDL_CreateWindow(lpWindowName, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, windowSize.width, windowSize.height, flags);
 
 #ifdef AURORA_OS
+    auto app = App::Application(ghMainWnd, "org.diasurgical", "devilutionx");
+
+    app.run();
+
     AuroraOSInputAdapter::InstallInputEventsFilter(ghMainWnd,
                                                    [](){ return GetScreenWidth(); },
                                                    [](){ return GetScreenHeight(); });
