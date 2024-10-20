@@ -48,3 +48,6 @@ target_link_libraries(libdevilutionx_aurora_os
         ${GLIB_LIBRARIES}
         ${WAYLAND_LIBRARIES}
 )
+
+add_subdirectory(devilution_launcher)
+target_link_libraries(libdevilutionx_aurora_os PUBLIC devilution_launcher)

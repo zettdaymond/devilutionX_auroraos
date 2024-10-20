@@ -22,8 +22,9 @@ include(FetchContent)
 if(DEVILUTIONX_AURORA_OS)
   FetchContent_Declare(SDL_image
     GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
-    GIT_TAG        release-2.0.5
+    GIT_TAG        release-2.8.2
     GIT_SHALLOW    1
+
   )
 else()
   FetchContent_Declare(SDL_image
@@ -32,22 +33,26 @@ else()
   )
 endif()
 
+set(BUILD_SHARED_LIBS OFF)
+
 FetchContent_MakeAvailableExcludeFromAll(SDL_image)
 
-if(DEVILUTIONX_STATIC_SDL_IMAGE)
-  add_library(SDL_image STATIC ${CMAKE_CURRENT_LIST_DIR}/IMG.c ${sdl_image_SOURCE_DIR}/IMG_png.c)
-else()
-  add_library(SDL_image SHARED ${CMAKE_CURRENT_LIST_DIR}/IMG.c ${sdl_image_SOURCE_DIR}/IMG_png.c)
-endif()
+add_library(SDL2::SDL2_image ALIAS SDL2_image)
 
-target_include_directories(SDL_image PRIVATE ${sdl_image_SOURCE_DIR})
-target_compile_definitions(SDL_image PRIVATE LOAD_PNG SDL_IMAGE_USE_COMMON_BACKEND)
-target_link_libraries(SDL_image PNG::PNG)
+#if(DEVILUTIONX_STATIC_SDL_IMAGE)
+#  add_library(SDL_image STATIC ${CMAKE_CURRENT_LIST_DIR}/IMG.c ${sdl_image_SOURCE_DIR}/IMG_png.c)
+#else()
+#  add_library(SDL_image SHARED ${CMAKE_CURRENT_LIST_DIR}/IMG.c ${sdl_image_SOURCE_DIR}/IMG_png.c)
+#endif()
 
-if(TARGET SDL2::SDL2)
-  target_link_libraries(SDL_image SDL2::SDL2)
-  add_library(SDL2::SDL2_image ALIAS SDL_image)
-elseif(TARGET SDL2::SDL2-static)
-  target_link_libraries(SDL_image SDL2::SDL2-static)
-  add_library(SDL2::SDL2_image ALIAS SDL_image)
-endif()
+#target_include_directories(SDL_image PRIVATE ${sdl_image_SOURCE_DIR})
+#target_compile_definitions(SDL_image PRIVATE LOAD_PNG SDL_IMAGE_USE_COMMON_BACKEND)
+#target_link_libraries(SDL_image PNG::PNG)
+
+#if(TARGET SDL2::SDL2)
+#  target_link_libraries(SDL_image SDL2::SDL2)
+#  add_library(SDL2::SDL2_image ALIAS SDL_image)
+#elseif(TARGET SDL2::SDL2-static)
+#  target_link_libraries(SDL_image SDL2::SDL2-static)
+#  add_library(SDL2::SDL2_image ALIAS SDL_image)
+#endif()
