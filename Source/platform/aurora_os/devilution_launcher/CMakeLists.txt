@@ -32,13 +32,6 @@ FetchContent_Declare(
   GIT_TAG v3.1
 )
 
-FetchContent_Declare(
-  imfilebrowser
-  GIT_REPOSITORY "https://github.com/AirGuanZ/imgui-filebrowser"
-  GIT_TAG 60d4e09ab1270d94d0115ad8ec40f939e801e105
-)
-
-
 FetchContent_MakeAvailableExcludeFromAll(imgui)
 
 add_library(imgui STATIC
@@ -58,7 +51,7 @@ target_link_libraries(imgui PUBLIC SDL2::SDL2)
 
 # Populate
 
-FetchContent_MakeAvailableExcludeFromAll(spdlog zoe imfilebrowser)
+FetchContent_MakeAvailableExcludeFromAll(spdlog zoe)
 
 include(CMakeRC.cmake)
 
@@ -76,6 +69,7 @@ cmrc_add_resource_library(launcher_assets
     assets/Beaufort-Regular.ttf
     assets/Roboto-Bold.ttf
     assets/Roboto-Regular.ttf
+    assets/fontawesome-webfont.ttf
 )
 
 add_devilutionx_object_library(devilution_launcher
@@ -109,7 +103,6 @@ target_link_libraries(devilution_launcher
 target_include_directories(devilution_launcher
     PRIVATE
         ${zoe_SOURCE_DIR}/include/zoe
-        ${imfilebrowser_SOURCE_DIR}
     PUBLIC
     	${CMAKE_CURRENT_SOURCE_DIR}
 )

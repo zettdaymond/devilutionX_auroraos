@@ -2,6 +2,8 @@
 
 #include "SDL_render.h"
 
+#include <imgui.h>
+
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -23,18 +25,20 @@ public:
     LauncherView(SDL_Renderer* renderer);
     ~LauncherView();
 
-    void FillPopupContent(const LauncherMVVM &mvvm);
+    void FillPopupContent(const LauncherMVVM &mvvm, ImVec2 winSize);
     void Update(const LauncherMVVM& mvvm);
 
     void ShowDownloadingPopup();
     void CloseDownloadingPopup();
+    void ShowFileDialogPopup();
 
     std::function<void()> OnDiabloClicked;
     std::function<void()> OnDemoClicked;
     std::function<void()> OnFolderClicked;
     std::function<void()> OnInfoClicked;
     std::function<void(std::filesystem::path)> OnResourceSelected;
-
+	
+	void FillPopupContent2(const LauncherMVVM &mvvm, ImVec2 winSize);
 private:
     SDL_Renderer* m_renderer{nullptr};
     SDL_Surface* m_bg_surface{nullptr};

@@ -23,6 +23,12 @@ CMRC_DECLARE(assets);
 
 namespace App {
 
+static const ImWchar kAwesomeIconsRanges[] = {
+   0xf000,
+   0xf3ff,
+   0,
+};
+
 Application::Application(SDL_Window* window, std::string const& company_namespace, std::string const& app_name)
    : m_window(window)
    , m_company_namespace(company_namespace)
@@ -44,11 +50,10 @@ Application::Application(SDL_Window* window, std::string const& company_namespac
 
 Application::~Application()
 {
+    SDL_DestroyRenderer(m_renderer);
     ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
-
-    SDL_Quit();
 }
 
 ExitStatus App::Application::run()
@@ -78,13 +83,30 @@ ExitStatus App::Application::run()
 
     auto font = fs.open("assets/Beaufort-Regular.ttf");
     io.FontDefault = io.Fonts->AddFontFromMemoryTTF((void*)font.begin(), font.size(), font_size);
+    
+    ImFontConfig config;
+    config.MergeMode = true;
+
+    io.Fonts->AddFontFromMemoryTTF((void*)font.begin(),
+                                   font.size(),
+                                   font_size,
+                                   &config,
+                                   io.Fonts->GetGlyphRangesCyrillic());
+
+    auto font_awesome_data = fs.open("assets/fontawesome-webfont.ttf");
+    io.Fonts->AddFontFromMemoryTTF((void*)font_awesome_data.begin(),
+                                   font_awesome_data.size(),
+                                   font_size,
+                                   &config,
+                                   kAwesomeIconsRanges);
+                                   
     DPIHandler::set_global_font_scaling(&io);
 
     // Setup Platform/Renderer backends
     ImGui_ImplSDL2_InitForSDLRenderer(m_window, m_renderer);
     ImGui_ImplSDLRenderer2_Init(m_renderer);
 
-    auto launcher_controller = std::make_unique<LauncherController>(m_renderer, user_config_path, user_config_path);
+    auto launcher_controller = std::make_unique<LauncherController>(m_renderer, user_config_path);
 
     m_running = true;
     while (m_running) {

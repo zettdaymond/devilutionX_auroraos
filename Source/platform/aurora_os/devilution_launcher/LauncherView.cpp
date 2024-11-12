@@ -1,3 +1,4 @@
+#include "DPIHandler.hpp"
 #include "LauncherView.hpp"
 #include "imgui_internal.h"
 #include "spdlog/spdlog.h"
@@ -12,12 +13,14 @@ CMRC_DECLARE(assets);
 
 #include "widgets/imgui/ImguiExtension.h"
 
-#include <imfilebrowser.h>
+#include "DPIHandler.hpp"
+
+#include "thirdparty/FileBrowser.h"
 
 namespace {
 ImVec2 MainButtonSize()
 {
-    return ImVec2{380, 80};
+    return ImVec2{160 * App::DPIHandler::get_scale(), 40 * App::DPIHandler::get_scale()};
 }
 
 ImVec2 SecondaryButtonSize()
@@ -51,8 +54,6 @@ bool SecondaryButton(std::string_view label)
     return ret;
 }
 
-
-
 ImVec2 GetButtonsBlockSize()
 {
     ImGuiStyle& style = ImGui::GetStyle();
@@ -78,14 +79,21 @@ LauncherView::LauncherView(SDL_Renderer* renderer)
     m_file_browser = std::make_unique<ImGui::FileBrowser>(ImGuiFileBrowserFlags_NoTitleBar);
     m_file_browser->SetTypeFilters({".mpq", ".MPQ"});
     m_file_browser->SetTitle("Choose diabdat.mpq");
-    m_file_browser->SetWindowPos(0,0);
+    m_file_browser->SetWindowPos(0, 0);
 }
 
 LauncherView::~LauncherView()
 {}
 
-void LauncherView::FillPopupContent(const LauncherMVVM& mvvm)
+void LauncherView::FillPopupContent(const LauncherMVVM& mvvm, ImVec2 winSize)
 {
+    const float scaling_factor{App::DPIHandler::get_scale()};
+    
+    bool vertivalViewport = winSize.x < winSize.y;
+
+    if (vertivalViewport) {
+        
+    }
     const ImU32 circularColor = 0xffffffff;
     const ImU32 col = 0xFF00003B;
     const ImU32 bg = 0xFF0C0C0C;
@@ -95,17 +103,17 @@ void LauncherView::FillPopupContent(const LauncherMVVM& mvvm)
 
         ImGui::Dummy(ImVec2(32, 0));
         ImGui::SameLine();
-        ImGui::Spinner("##spinner", 24, 4, circularColor);
+        ImGui::Spinner("##spinner", 24 * scaling_factor, 4 * scaling_factor, circularColor);
         ImGui::SameLine();
         ImGui::Dummy(ImVec2(8, 0));
         ImGui::SameLine();
 
         {
             ImGui::BeginGroup();
-            ImGui::Text("Downloading resources of demo version...");
+            ImGui::Text("Downloading resources...");
             ImGui::Spacing();
             ImGui::Spacing();
-            ImGui::BufferingBar("##buffer_bar", mvvm.downloadValue, ImVec2(320, 6), bg, col);
+            ImGui::BufferingBar("##buffer_bar", mvvm.downloadValue, ImVec2(vertivalViewport ? (winSize.x * 0.75) : (winSize.x * 0.25), 6 * scaling_factor), bg, col);
             ImGui::EndGroup();
         }
         ImGui::SameLine();
@@ -114,6 +122,52 @@ void LauncherView::FillPopupContent(const LauncherMVVM& mvvm)
         ImGui::Dummy(ImVec2(0, 64));
     }
 }
+
+void LauncherView::FillPopupContent2(const LauncherMVVM& mvvm, ImVec2 winSize)
+{
+    const float scaling_factor{App::DPIHandler::get_scale()};
+    
+    bool verticalViewport = winSize.x < winSize.y;
+    
+    ImVec2 size;
+    if (verticalViewport) {
+        size.x = winSize.x * 0.95;
+        size.y = size.x / 9.0 * 16.0;
+    }
+    else {
+        size.x = winSize.x * 0.25;
+        size.y = size.x / 9.0 * 16.0;
+    }
+    
+    const ImU32 circularColor = 0xffffffff;
+    const ImU32 col = 0xFF00003B;
+    const ImU32 bg = 0xFF0C0C0C;
+
+    {
+        ImGui::Dummy(ImVec2(0, 64));
+
+        ImGui::Dummy(ImVec2(32, 0));
+        ImGui::SameLine();
+        ImGui::Spinner("##spinner", 24 * scaling_factor, 4 * scaling_factor, circularColor);
+        ImGui::SameLine();
+        ImGui::Dummy(ImVec2(8, 0));
+        ImGui::SameLine();
+
+        {
+            ImGui::BeginGroup();
+            ImGui::Text("Downloading resources...");
+            ImGui::Spacing();
+            ImGui::Spacing();
+            ImGui::BufferingBar("##buffer_bar", mvvm.downloadValue, ImVec2(vertivalViewport ? (winSize.x * 0.75) : (winSize.x * 0.25), 6 * scaling_factor), bg, col);
+            ImGui::EndGroup();
+        }
+        ImGui::SameLine();
+        ImGui::Dummy(ImVec2(32, 0));
+
+        ImGui::Dummy(ImVec2(0, 64));
+    }
+}
+
 void LauncherView::Update(const LauncherMVVM& mvvm)
 {
     auto win_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse
@@ -174,7 +228,6 @@ void LauncherView::Update(const LauncherMVVM& mvvm)
         }
 
         if (SecondaryButton("FOLDER")) {
-            m_file_browser->Open();
             if (OnFolderClicked) {
                 OnFolderClicked();
             }
@@ -199,9 +252,6 @@ void LauncherView::Update(const LauncherMVVM& mvvm)
         }
 
         if (SecondaryButton("INFO")) {
-            if (OnFolderClicked) {
-                OnFolderClicked();
-            }
         }
 
         ImGui::SetNextWindowPos(
@@ -211,7 +261,7 @@ void LauncherView::Update(const LauncherMVVM& mvvm)
 
         bool val = mvvm.keepPopup;
         if (ImGui::BeginPopupModal("ThePopup", &val, win_flags | ImGuiWindowFlags_AlwaysAutoResize)) {
-            FillPopupContent(mvvm);
+            FillPopupContent(mvvm, ImGui::GetMainViewport()->Size);
 
             ImGui::EndPopup();
         }
@@ -230,7 +280,7 @@ void LauncherView::Update(const LauncherMVVM& mvvm)
             spdlog::info("Selected file path: {}", path.string());
             m_file_browser->ClearSelected();
 
-            if(OnResourceSelected) {
+            if (OnResourceSelected) {
                 OnResourceSelected(path);
             }
         }
@@ -247,4 +297,9 @@ void LauncherView::ShowDownloadingPopup()
 void LauncherView::CloseDownloadingPopup()
 {
     ImGui::CloseCurrentPopup();
+}
+
+void LauncherView::ShowFileDialogPopup()
+{
+    m_file_browser->Open();
 }
