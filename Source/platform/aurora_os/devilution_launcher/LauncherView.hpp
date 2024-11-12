@@ -36,10 +36,12 @@ public:
     std::function<void()> OnDemoClicked;
     std::function<void()> OnFolderClicked;
     std::function<void()> OnInfoClicked;
+    std::function<void()> OnDownloadCanceled;
     std::function<void(std::filesystem::path)> OnResourceSelected;
-	
-	void FillPopupContent2(const LauncherMVVM &mvvm, ImVec2 winSize);
+
 private:
+    void DisplayDownloadPopup(const LauncherMVVM& mvvm, auto win_flags);
+    
     SDL_Renderer* m_renderer{nullptr};
     SDL_Surface* m_bg_surface{nullptr};
     SDL_Texture* m_bg_texture{nullptr};

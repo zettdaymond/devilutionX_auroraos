@@ -1,4 +1,3 @@
-#include "DPIHandler.hpp"
 #include "LauncherView.hpp"
 #include "imgui_internal.h"
 #include "spdlog/spdlog.h"
@@ -18,6 +17,12 @@ CMRC_DECLARE(assets);
 #include "thirdparty/FileBrowser.h"
 
 namespace {
+
+auto Tr(std::u8string_view str)
+{
+    return reinterpret_cast<const char*>(str.data());
+}
+
 ImVec2 MainButtonSize()
 {
     return ImVec2{160 * App::DPIHandler::get_scale(), 40 * App::DPIHandler::get_scale()};
@@ -28,26 +33,26 @@ ImVec2 SecondaryButtonSize()
     return MainButtonSize();
 }
 
-bool MainButton(std::string_view label)
+bool MainButton(std::u8string_view label)
 {
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, 0xFF02025C);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0xFF02025C);
     ImGui::PushStyleColor(ImGuiCol_Button, 0xFF00003B);
 
-    auto ret = ImGui::Button(label.data(), MainButtonSize());
+    auto ret = ImGui::Button(Tr(label), MainButtonSize());
 
     ImGui::PopStyleColor(3);
 
     return ret;
 }
 
-bool SecondaryButton(std::string_view label)
+bool SecondaryButton(std::u8string_view label)
 {
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, 0xFF111314);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0xFF111314);
     ImGui::PushStyleColor(ImGuiCol_Button, 0xFF0C0C0C);
 
-    auto ret = ImGui::Button(label.data(), SecondaryButtonSize());
+    auto ret = ImGui::Button(Tr(label), SecondaryButtonSize());
 
     ImGui::PopStyleColor(3);
 
@@ -63,6 +68,19 @@ ImVec2 GetButtonsBlockSize()
     return {buttonSizeX, buttonGroupSizeY};
 }
 
+bool DialogButton(std::u8string_view label)
+{
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, 0xFF02025C);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0xFF02025C);
+    ImGui::PushStyleColor(ImGuiCol_Button, 0xFF00003B);
+
+    auto ret = ImGui::SmallButton(Tr(label));
+
+    ImGui::PopStyleColor(3);
+
+    return ret;
+}
+
 } // namespace
 
 LauncherView::LauncherView(SDL_Renderer* renderer)
@@ -70,13 +88,15 @@ LauncherView::LauncherView(SDL_Renderer* renderer)
 {
     auto fs = cmrc::assets::get_filesystem();
 
+    ImGuiIO& io{ImGui::GetIO()};
+
     auto bg = fs.open("assets/bg.png");
     auto bg_rw = SDL_RWFromMem((void*)bg.begin(), bg.size());
     m_bg_surface = IMG_Load_RW(bg_rw, 0);
 
     m_bg_texture = SDL_CreateTextureFromSurface(m_renderer, m_bg_surface);
 
-    m_file_browser = std::make_unique<ImGui::FileBrowser>(ImGuiFileBrowserFlags_NoTitleBar);
+    m_file_browser = std::make_unique<ImGui::FileBrowser>();
     m_file_browser->SetTypeFilters({".mpq", ".MPQ"});
     m_file_browser->SetTitle("Choose diabdat.mpq");
     m_file_browser->SetWindowPos(0, 0);
@@ -85,87 +105,91 @@ LauncherView::LauncherView(SDL_Renderer* renderer)
 LauncherView::~LauncherView()
 {}
 
-void LauncherView::FillPopupContent(const LauncherMVVM& mvvm, ImVec2 winSize)
+void LauncherView::FillPopupContent(const LauncherMVVM& mvvm, ImVec2 size)
 {
     const float scaling_factor{App::DPIHandler::get_scale()};
-    
-    bool vertivalViewport = winSize.x < winSize.y;
 
-    if (vertivalViewport) {
-        
-    }
+    const auto downloadingBarHeight = 8 * scaling_factor;
+    const auto spacingHeight = 4;
+    auto textHeight = ImGui::CalcTextSize(Tr(u8"Зазрузка демо ресурсов...")).y;
+
     const ImU32 circularColor = 0xffffffff;
     const ImU32 col = 0xFF00003B;
     const ImU32 bg = 0xFF0C0C0C;
 
+    const auto leftMargin = std::min(size.x * 0.1, 32.0) * scaling_factor;
+    const auto contentWidth = size.x - (leftMargin * 2);
+    const auto contentHeight = textHeight + downloadingBarHeight + spacingHeight;
+    const auto topMargin = (size.y - contentHeight) * 0.65;
+
+    ImGui::Dummy(ImVec2(0, topMargin * 0.5));
+
     {
-        ImGui::Dummy(ImVec2(0, 64));
+        ImGui::BeginGroup();
 
-        ImGui::Dummy(ImVec2(32, 0));
+        ImGui::Dummy(ImVec2(leftMargin, 0));
         ImGui::SameLine();
-        ImGui::Spinner("##spinner", 24 * scaling_factor, 4 * scaling_factor, circularColor);
-        ImGui::SameLine();
-        ImGui::Dummy(ImVec2(8, 0));
-        ImGui::SameLine();
+        ImGui::Text("%s", Tr(u8"Зазрузка демо ресурсов..."));
 
-        {
-            ImGui::BeginGroup();
-            ImGui::Text("Downloading resources...");
-            ImGui::Spacing();
-            ImGui::Spacing();
-            ImGui::BufferingBar("##buffer_bar", mvvm.downloadValue, ImVec2(vertivalViewport ? (winSize.x * 0.75) : (winSize.x * 0.25), 6 * scaling_factor), bg, col);
-            ImGui::EndGroup();
+        ImGui::Dummy(ImVec2(0, 4 * scaling_factor));
+
+        ImGui::Dummy(ImVec2(leftMargin, 0));
+        ImGui::SameLine();
+        ImGui::BufferingBar("##buffer_bar", mvvm.downloadValue, ImVec2(contentWidth, 7 * scaling_factor), bg, col);
+
+        ImGui::EndGroup();
+    }
+
+    const auto cancelMargin = 16.0;
+    const auto cancelSizes = ImGui::CalcTextSize(Tr(u8"Отмена"));
+
+    ImGui::SetCursorPosX(size.x - cancelSizes.x - cancelMargin * 2.0);
+    ImGui::SetCursorPosY(size.y - cancelSizes.y - cancelMargin);
+
+    if (DialogButton(u8"Отмена")) {
+        if (OnDownloadCanceled) {
+            OnDownloadCanceled();
         }
-        ImGui::SameLine();
-        ImGui::Dummy(ImVec2(32, 0));
-
-        ImGui::Dummy(ImVec2(0, 64));
     }
 }
 
-void LauncherView::FillPopupContent2(const LauncherMVVM& mvvm, ImVec2 winSize)
+void LauncherView::DisplayDownloadPopup(const LauncherMVVM& mvvm, auto win_flags)
 {
     const float scaling_factor{App::DPIHandler::get_scale()};
-    
+
+    auto winSize = ImGui::GetMainViewport()->Size;
+
     bool verticalViewport = winSize.x < winSize.y;
-    
+
     ImVec2 size;
     if (verticalViewport) {
         size.x = winSize.x * 0.95;
-        size.y = size.x / 9.0 * 16.0;
+        size.y = size.x / 16.0 * 9.0;
+    } else {
+        size.x = winSize.x * 0.3;
+        size.y = size.x / 16.0 * 9.0;
     }
-    else {
-        size.x = winSize.x * 0.25;
-        size.y = size.x / 9.0 * 16.0;
+
+    size.x = std::min(size.x, 320.0f * scaling_factor);
+    size.y = std::min(size.y, 180.0f * scaling_factor);
+
+    ImVec2 pos = {
+       (winSize.x - size.x) * 0.5f,
+       (winSize.y - size.y) * 0.5f,
+    };
+    ImGui::SetNextWindowPos(pos);
+    ImGui::SetNextWindowSize(size);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    if (!ImGui::BeginPopupModal("ThePopup", nullptr, win_flags)) {
+        ImGui::PopStyleVar();
+        return;
     }
-    
-    const ImU32 circularColor = 0xffffffff;
-    const ImU32 col = 0xFF00003B;
-    const ImU32 bg = 0xFF0C0C0C;
 
-    {
-        ImGui::Dummy(ImVec2(0, 64));
+    FillPopupContent(mvvm, size);
+    ImGui::EndPopup();
 
-        ImGui::Dummy(ImVec2(32, 0));
-        ImGui::SameLine();
-        ImGui::Spinner("##spinner", 24 * scaling_factor, 4 * scaling_factor, circularColor);
-        ImGui::SameLine();
-        ImGui::Dummy(ImVec2(8, 0));
-        ImGui::SameLine();
-
-        {
-            ImGui::BeginGroup();
-            ImGui::Text("Downloading resources...");
-            ImGui::Spacing();
-            ImGui::Spacing();
-            ImGui::BufferingBar("##buffer_bar", mvvm.downloadValue, ImVec2(vertivalViewport ? (winSize.x * 0.75) : (winSize.x * 0.25), 6 * scaling_factor), bg, col);
-            ImGui::EndGroup();
-        }
-        ImGui::SameLine();
-        ImGui::Dummy(ImVec2(32, 0));
-
-        ImGui::Dummy(ImVec2(0, 64));
-    }
+    ImGui::PopStyleVar();
 }
 
 void LauncherView::Update(const LauncherMVVM& mvvm)
@@ -210,13 +234,13 @@ void LauncherView::Update(const LauncherMVVM& mvvm)
         }
 
         if (mvvm.readyForDiablo) {
-            if (MainButton("DIABLO")) {
+            if (MainButton(u8"DIABLO")) {
                 if (OnDiabloClicked) {
                     OnDiabloClicked();
                 }
             }
         } else {
-            if (SecondaryButton("DIABLO")) {
+            if (SecondaryButton(u8"DIABLO")) {
                 // do nothing
             }
         }
@@ -227,7 +251,8 @@ void LauncherView::Update(const LauncherMVVM& mvvm)
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + buttonsOffsetX);
         }
 
-        if (SecondaryButton("FOLDER")) {
+        if (SecondaryButton(u8"Папка")) {
+            m_file_browser->Open();
             if (OnFolderClicked) {
                 OnFolderClicked();
             }
@@ -239,7 +264,7 @@ void LauncherView::Update(const LauncherMVVM& mvvm)
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + buttonsOffsetX);
         }
 
-        if (SecondaryButton("DEMO")) {
+        if (SecondaryButton(u8"DEMO")) {
             if (OnDemoClicked) {
                 OnDemoClicked();
             }
@@ -251,20 +276,13 @@ void LauncherView::Update(const LauncherMVVM& mvvm)
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + buttonsOffsetX);
         }
 
-        if (SecondaryButton("INFO")) {
+        if (SecondaryButton(u8"INFO")) {
+            if (OnFolderClicked) {
+                OnFolderClicked();
+            }
         }
 
-        ImGui::SetNextWindowPos(
-           ImVec2(ImGui::GetMainViewport()->Size.x * 0.5f, ImGui::GetMainViewport()->Size.y * 0.5f),
-           0,
-           ImVec2(0.5f, 0.5f));
-
-        bool val = mvvm.keepPopup;
-        if (ImGui::BeginPopupModal("ThePopup", &val, win_flags | ImGuiWindowFlags_AlwaysAutoResize)) {
-            FillPopupContent(mvvm, ImGui::GetMainViewport()->Size);
-
-            ImGui::EndPopup();
-        }
+        DisplayDownloadPopup(mvvm, win_flags);
 
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, 0xFF02025C);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0xFF02025C);

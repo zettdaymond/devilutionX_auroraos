@@ -99,6 +99,11 @@ LauncherController::LauncherController(SDL_Renderer* renderer, std::filesystem::
     m_view->OnResourceSelected = [this](const auto& path) {
         OnResounrceSelected(path);
     };
+    
+    m_view->OnDownloadCanceled = [this]() {
+        m_zoeDownloader->stop();
+        m_view->CloseDownloadingPopup();
+    };
 }
 
 LauncherController::~LauncherController()
