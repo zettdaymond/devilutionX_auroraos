@@ -6,15 +6,12 @@ License:    Sustainable Use License
 URL:        https://github.com/diasurgical/devilutionX
 Source0:    %{name}-%{version}.tar.bz2
 
-Requires: libQt5Core.so.5
 Requires: libdbus-1.so.3
 Requires: libglib-2.0.so.0
 Requires: libaudioresource.so.1
 Requires: libwayland-client.so.0
 Requires: libz.so.1
 Requires: libbz2.so.1
-
-BuildRequires:  pkgconfig(Qt5Core)
 
 BuildRequires: gcc
 BuildRequires: cmake
@@ -79,8 +76,8 @@ BuildRequires: pulseaudio-devel
 %autosetup
 
 %build
-%cmake
-%ninja_build
+CXXFLAGS=-O0 %cmake
+CXXFLAGS=-O0 %ninja_build
 
 %install
 %ninja_install

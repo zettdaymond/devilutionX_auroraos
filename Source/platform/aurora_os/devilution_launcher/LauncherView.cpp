@@ -251,7 +251,7 @@ void LauncherView::Update(const LauncherMVVM& mvvm)
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + buttonsOffsetX);
         }
 
-        if (SecondaryButton(u8"Папка")) {
+        if (SecondaryButton(u8"РЕСУРСЫ")) {
             m_file_browser->Open();
             if (OnFolderClicked) {
                 OnFolderClicked();
@@ -264,7 +264,7 @@ void LauncherView::Update(const LauncherMVVM& mvvm)
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + buttonsOffsetX);
         }
 
-        if (SecondaryButton(u8"DEMO")) {
+        if (SecondaryButton(u8"ДЕМО")) {
             if (OnDemoClicked) {
                 OnDemoClicked();
             }
@@ -276,7 +276,7 @@ void LauncherView::Update(const LauncherMVVM& mvvm)
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + buttonsOffsetX);
         }
 
-        if (SecondaryButton(u8"INFO")) {
+        if (SecondaryButton(u8"ИНФО")) {
             if (OnFolderClicked) {
                 OnFolderClicked();
             }
