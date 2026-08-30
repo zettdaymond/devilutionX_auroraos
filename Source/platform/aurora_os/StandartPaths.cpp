@@ -52,6 +52,13 @@ std::optional<std::string> AuroraOsStandartPaths::GetUserDefinedMPQSearchPath()
     return dir.toString().toStdString();
 }
 
+void AuroraOsStandartPaths::SetUserDefinedMPQSearchPath(const std::string &path)
+{
+    QSettings s(QStringLiteral("org.diasurgical"), QStringLiteral("devilutionx"));
+
+    s.setValue("userDataDirectory", QString::fromStdString(path));
+}
+
 std::unique_ptr<AuroraOsStandartPaths::AppContext> AuroraOsStandartPaths::MakeAppContext(int argc, char** argv)
 {
     auto context = std::make_unique<AppContextImpl>();

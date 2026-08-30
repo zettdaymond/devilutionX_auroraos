@@ -26,7 +26,10 @@
 #   include "StandartPaths.hpp"
 #   include "DisplayBlankerController.hpp"
 #   include "Application.hpp"
+#   include "core/EngineLaunch.hpp"
 #   include "appfat.h"
+#   include <string>
+#   include <vector>
 #   define FUNC_EXPORT extern "C" __attribute__((visibility("default"))) int main
 
 namespace devilution {
@@ -74,7 +77,10 @@ FUNC_EXPORT(int argc, char **argv)
     devilution::DisplayBlankerController::Init();
     devilution::DisplayBlankerController::SetPreventDisplayBlanking(true);
 
-    std::array<char*, 2> new_argv;
+    // Аргументы движка, собранные из выбора пользователя в лаунчере.
+    // Должны жить до конца main — argv передаётся в DiabloMain.
+    std::vector<std::string> engineArgs;
+    std::vector<char *> engineArgv;
 
     if (SDL_Init(SDL_INIT_VIDEO) <= -1) {
         devilution::ErrSdl();
@@ -87,24 +93,19 @@ FUNC_EXPORT(int argc, char **argv)
     SDL_DestroyWindow(devilution::ghMainWnd);
     SDL_Quit();
 
-    if(launcherResult.success) {
-        if(launcherResult.action == App::ExitAction::LaunchDiablo
-           || launcherResult.action == App::ExitAction::LaunchHellfire)
-        {
-            if(!launcherResult.dataPath.empty()) {
-                devilution::AuroraOsStandartPaths::SetUserDefinedMPQSearchPath(launcherResult.dataPath.string());
-            }
+    if (launcherResult.success) {
+        if (launcher::WantsUserMpqPath(launcherResult.action) && !launcherResult.dataPath.empty()) {
+            devilution::AuroraOsStandartPaths::SetUserDefinedMPQSearchPath(launcherResult.dataPath.string());
         }
 
-        if(launcherResult.action == App::ExitAction::LaunchDemo) {
-            new_argv = { argv[0], (char*)"--spawn" };
-            argc = new_argv.size();
-            argv = new_argv.data();
-        }
-        else if(launcherResult.action == App::ExitAction::LaunchHellfire) {
-            new_argv = { argv[0], (char*)"--hellfire" };
-            argc = new_argv.size();
-            argv = new_argv.data();
+        engineArgs = launcher::EngineArgsFor(launcherResult.action);
+        if (!engineArgs.empty()) {
+            engineArgv.push_back(argv[0]);
+            for (const std::string &arg : engineArgs) {
+                engineArgv.push_back(const_cast<char *>(arg.c_str()));
+            }
+            argc = static_cast<int>(engineArgv.size());
+            argv = engineArgv.data();
         }
     }
 #endif

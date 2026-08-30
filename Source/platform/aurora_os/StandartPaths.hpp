@@ -26,6 +26,8 @@ public:
 
     static std::optional<std::string> GetUserDefinedMPQSearchPath();
 
+    static void SetUserDefinedMPQSearchPath(std::string const& path);
+
     static std::unique_ptr<AppContext> MakeAppContext(int argc, char** argv);
 };
 

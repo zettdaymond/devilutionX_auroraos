@@ -133,6 +133,9 @@ std::vector<std::string> GetMPQSearchPaths()
 #ifdef AURORA_OS
     paths.push_back(AuroraOsStandartPaths::GetBundledAssetsPath());
     paths.push_back(AuroraOsStandartPaths::GetAdditionalMPQSearchPath());
+    if(const auto& udpath = AuroraOsStandartPaths::GetUserDefinedMPQSearchPath()){
+        paths.push_back(*udpath);
+    }
 #endif
 	if (paths[0] == paths[1] || (paths.size() == 3 && (paths[0] == paths[2] || paths[1] == paths[2])))
 		paths.pop_back();

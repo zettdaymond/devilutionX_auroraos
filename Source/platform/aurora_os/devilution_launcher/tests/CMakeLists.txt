@@ -13,6 +13,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 add_executable(launcher_tests
+    EngineLaunchTests.cpp
     GameFilesTests.cpp
     StoreTests.cpp
 )

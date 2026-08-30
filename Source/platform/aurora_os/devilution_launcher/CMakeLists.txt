@@ -130,6 +130,7 @@ cmrc_add_resource_library(launcher_assets
 # no Qt). Shared by the desktop executable and unit tests.
 # ---------------------------------------------------------------------------
 set(LAUNCHER_CORE_SOURCES
+    core/EngineLaunch.cpp
     core/GameFiles.cpp
     core/Store.cpp
     services/ConfigService.cpp
