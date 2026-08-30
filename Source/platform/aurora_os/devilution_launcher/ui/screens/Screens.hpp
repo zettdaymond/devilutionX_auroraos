@@ -4,11 +4,13 @@
 
 namespace launcher::ui::screens {
 
+using widgets::BackgroundArt;
 using widgets::Dispatcher;
 
-/// Main screen: game cards (or first-run hero) plus optional
-/// Russian-voice-pack offer.
-void Home(const LauncherState &state, const Dispatcher &dispatch);
+/// Main screen: featured-game hero panel (web "key art" banner) plus a
+/// shelf of the remaining modes, or the first-run hero when no game
+/// files are present.
+void Home(const LauncherState &state, const Dispatcher &dispatch, const BackgroundArt &art);
 
 /// Game data management: folder picker, file checklist, deletions,
 /// free space.

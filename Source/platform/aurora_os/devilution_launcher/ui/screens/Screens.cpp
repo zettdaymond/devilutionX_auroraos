@@ -19,6 +19,17 @@ namespace launcher::ui::screens {
 
 namespace {
 
+/// Per-mode visual identity: accent color and artwork crop (uv).
+struct GameStyle {
+	ImVec4 accent;
+	ImVec2 uv0;
+	ImVec2 uv1;
+};
+
+const GameStyle kDiabloStyle { ImVec4(0.545F, 0.10F, 0.06F, 1.0F), ImVec2(0.04F, 0.04F), ImVec2(0.72F, 0.86F) };
+const GameStyle kHellfireStyle { ImVec4(0.70F, 0.39F, 0.10F, 1.0F), ImVec2(0.30F, 0.0F), ImVec2(1.0F, 0.80F) };
+const GameStyle kDemoStyle { ImVec4(0.42F, 0.36F, 0.20F, 1.0F), ImVec2(0.14F, 0.20F), ImVec2(0.86F, 0.95F) };
+
 std::string PluralFiles(size_t count)
 {
 	if (count % 10 == 1 && count % 100 != 11) {
@@ -30,132 +41,196 @@ std::string PluralFiles(size_t count)
 	return std::to_string(count) + " файлов";
 }
 
-void RenderHero(const LauncherState &state, const Dispatcher &dispatch)
+// ---------------------------------------------------------------------------
+// First run: no game files at all.
+// ---------------------------------------------------------------------------
+
+void RenderFirstRun(const LauncherState &state, const Dispatcher &dispatch, const BackgroundArt &art)
 {
 	const float width = ImGui::GetContentRegionAvail().x;
+	const float height = ImGui::GetContentRegionAvail().y;
+	const float heroHeight = std::min(height * 0.62F, Scale::px(17.0F));
 
-	ImGui::Dummy(ImVec2(0, Scale::px(2.0F)));
-	Theme::pushFont(FontRole::Heading);
-	widgets::CenteredText("DIABLO", ColorRole::TextHeading);
-	Theme::popFont();
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextBody));
-	widgets::CenteredText("DevilutionX для Aurora OS");
-	ImGui::PopStyleColor();
+	widgets::HeroPanel("DEVILUTIONX ДЛЯ AURORA OS", "DIABLO",
+	    "Файлы оригинальной игры не найдены.\nСкопируйте DIABDAT.MPQ с диска или купите на GoG,\nлибо скачайте бесплатное демо.",
+	    art, kDiabloStyle.uv0, kDiabloStyle.uv1, kDiabloStyle.accent, ImVec2(width, heroHeight),
+	    {
+	        widgets::HeroAction { "Скачать демо", true, [&dispatch] {
+		                             dispatch(intent::UiOpenDialog { Dialog::ConfirmDownloadDemo });
+	                             } },
+	        widgets::HeroAction { "Выбрать файлы", false, [&dispatch] {
+		                             dispatch(intent::SelectDataFolder {});
+	                             } },
+	    });
 
-	ImGui::Dummy(ImVec2(0, Scale::px(1.6F)));
-
-	const ImVec2 buttonSize(std::min(width, Scale::px(20.0F)), Scale::px(2.6F));
-	widgets::CenteredText("Файлы оригинальной игры не найдены.");
 	ImGui::Dummy(ImVec2(0, Scale::px(0.6F)));
-	widgets::IconButton(icons::Folder, "Выбрать файлы игры", false, buttonSize, [&dispatch] {
-		dispatch(intent::SelectDataFolder {});
-	});
-	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
-	widgets::CenteredText("или");
-	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
-	widgets::IconButton(icons::Download, "Скачать бесплатное демо", true, buttonSize, [&dispatch] {
-		dispatch(intent::UiOpenDialog { Dialog::ConfirmDownloadDemo });
-	});
-
-	ImGui::Dummy(ImVec2(0, Scale::px(1.0F)));
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextDim));
-	const char *hint = "Для полной версии скопируйте DIABDAT.MPQ с диска\nили купите игру на GoG.com. Для Hellfire нужны hellfire.mpq,\nhfmonk.mpq, hfmusic.mpq и hfvoice.mpq.";
-	widgets::CenteredText(hint);
+	ImGui::TextWrapped("%s",
+	    "Для полной версии скопируйте DIABDAT.MPQ с диска\nили купите игру на GoG.com. Для Hellfire нужны hellfire.mpq,\nhfmonk.mpq, hfmusic.mpq и hfvoice.mpq.");
 	ImGui::PopStyleColor();
 }
 
-void RenderCardRow(const LauncherState &state, const Dispatcher &dispatch)
+// ---------------------------------------------------------------------------
+// Home with detected files: featured hero + shelf.
+// ---------------------------------------------------------------------------
+
+struct Featured {
+	ExitAction game;
+	const char *title;
+	const char *eyebrow;
+	std::string status;
+	bool playable;
+	const GameStyle *style;
+};
+
+struct ShelfItem {
+	ExitAction game;
+	const char *title;
+	std::string status;
+	bool playable;
+	const char *icon;
+	const GameStyle *style;
+};
+
+void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, const BackgroundArt &art)
 {
+	const float width = ImGui::GetContentRegionAvail().x;
+	const float height = ImGui::GetContentRegionAvail().y;
 	const bool portrait = Scale::portrait();
-	const float available = ImGui::GetContentRegionAvail().x;
-	const float cardWidth = portrait
-	    ? available
-	    : std::min(available * 0.32F, Scale::px(22.0F));
-	const ImVec2 cardSize(cardWidth, Scale::px(4.6F));
 
-	// Status lines
-	const std::string diabloStatus = state.diablo.available ? "Готово к запуску" : "Нужен DIABDAT.MPQ";
-	std::string hellfireStatus;
-	if (state.hellfire.available) {
-		hellfireStatus = "Готово к запуску";
-	} else if (state.diablo.available) {
-		hellfireStatus = "Не хватает: " + PluralFiles(state.hellfire.missingFiles.size());
+	// Pick the featured game: the first launchable mode.
+	Featured featured;
+	if (state.diablo.available) {
+		featured = { ExitAction::LaunchDiablo, "DIABLO", "ГОТОВО К ЗАПУСКУ", "Оригинальный Diablo", true,
+			&kDiabloStyle };
+	} else if (state.hellfire.available) {
+		featured = { ExitAction::LaunchHellfire, "HELLFIRE", "ГОТОВО К ЗАПУСКУ", "Официальное дополнение", true,
+			&kHellfireStyle };
+	} else if (state.demo.available) {
+		featured = { ExitAction::LaunchDemo, "DEMO", "ДЕМО-ВЕРСИЯ", "Бесплатная shareware-версия Diablo", true,
+			&kDemoStyle };
 	} else {
-		hellfireStatus = "Нужны файлы Diablo и Hellfire";
-	}
-	const std::string demoStatus = state.demo.available
-	    ? "Бесплатная демо-версия"
-	    : std::string("Скачать · ") + FormatBytes(FileSpecOf(KnownFile::Spawn).expectedSizeBytes);
-
-	// One title size for the whole row, fitted to the longest title
-	// ("HELLFIRE") so all cards share the same baseline.
-	const float iconSize = std::min(Scale::px(2.4F), cardSize.y * 0.62F);
-	const float titleMaxWidth = cardWidth - iconSize - Scale::px(2.6F);
-	const float uniformTitleSize = widgets::FitFontSizeFor(FontRole::Heading, Scale::px(2.0F), "HELLFIRE",
-	    titleMaxWidth, Scale::px(0.95F));
-
-	if (portrait) {
-		widgets::GameCard("DIABLO", diabloStatus.c_str(), icons::Fire, state.diablo.available, true, cardSize,
-		    uniformTitleSize,
-		    [&dispatch] { dispatch(intent::LaunchGame { ExitAction::LaunchDiablo }); });
-		ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
-		widgets::GameCard("HELLFIRE", hellfireStatus.c_str(), icons::Gamepad, state.hellfire.available, true,
-		    cardSize, uniformTitleSize,
-		    [&dispatch] { dispatch(intent::LaunchGame { ExitAction::LaunchHellfire }); });
-		ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
-		widgets::GameCard("DEMO", demoStatus.c_str(), icons::Download, true, state.demo.available, cardSize,
-		    uniformTitleSize,
-		    [&dispatch] { dispatch(intent::LaunchGame { ExitAction::LaunchDemo }); });
-		return;
+		featured = { ExitAction::LaunchHellfire, "HELLFIRE", "ТРЕБУЮТСЯ ФАЙЛЫ",
+			"Не хватает: " + PluralFiles(state.hellfire.missingFiles.size()), false, &kHellfireStyle };
 	}
 
-	ImGui::BeginGroup();
-	widgets::GameCard("DIABLO", diabloStatus.c_str(), icons::Fire, state.diablo.available, true, cardSize,
-	    uniformTitleSize,
-	    [&dispatch] { dispatch(intent::LaunchGame { ExitAction::LaunchDiablo }); });
-	ImGui::SameLine(0, Scale::px(0.5F));
-	widgets::GameCard("HELLFIRE", hellfireStatus.c_str(), icons::Gamepad, state.hellfire.available, true, cardSize,
-	    uniformTitleSize,
-	    [&dispatch] { dispatch(intent::LaunchGame { ExitAction::LaunchHellfire }); });
-	ImGui::SameLine(0, Scale::px(0.5F));
-	widgets::GameCard("DEMO", demoStatus.c_str(), icons::Download, true, state.demo.available, cardSize,
-	    uniformTitleSize,
-	    [&dispatch] { dispatch(intent::LaunchGame { ExitAction::LaunchDemo }); });
-	ImGui::EndGroup();
-}
+	ShelfItem diabloTile { ExitAction::LaunchDiablo, "DIABLO",
+		state.diablo.available ? "Готово к запуску" : "Нужен DIABDAT.MPQ", state.diablo.available, icons::Fire,
+		&kDiabloStyle };
+	ShelfItem hellfireTile { ExitAction::LaunchHellfire, "HELLFIRE",
+		state.hellfire.available ? "Готово к запуску"
+		    : (state.diablo.available ? "Не хватает: " + PluralFiles(state.hellfire.missingFiles.size())
+		                              : "Нужны файлы Diablo и Hellfire"),
+		state.hellfire.available, icons::Gamepad, &kHellfireStyle };
+	ShelfItem demoTile { ExitAction::LaunchDemo, "DEMO",
+		state.demo.available ? "Бесплатная демо-версия"
+		    : "Скачать · " + FormatBytes(FileSpecOf(KnownFile::Spawn).expectedSizeBytes),
+		true, icons::Download, &kDemoStyle };
 
-void RenderRuVoiceOffer(const LauncherState &state, const Dispatcher &dispatch)
-{
+	const bool diabloFeatured = (featured.game == ExitAction::LaunchDiablo && featured.playable);
+	const bool hellfireFeatured = (featured.game == ExitAction::LaunchHellfire && featured.playable);
+	const bool demoFeatured = (featured.game == ExitAction::LaunchDemo && featured.playable);
+
+	const float heroHeight = portrait ? std::min(height * 0.52F, Scale::px(14.0F)) : Scale::px(11.0F);
+	widgets::HeroPanel(featured.eyebrow, featured.title, featured.status.c_str(), art, featured.style->uv0,
+	    featured.style->uv1, featured.style->accent, ImVec2(width, heroHeight),
+	    {
+	        widgets::HeroAction { featured.playable ? "Играть" : "Выбрать папку", true, [&dispatch, featured] {
+		                             if (featured.playable) {
+			                             dispatch(intent::LaunchGame { featured.game });
+		                             } else {
+			                             dispatch(intent::SelectDataFolder {});
+		                             }
+	                             } },
+	    });
+
+	ImGui::Dummy(ImVec2(0, Scale::px(0.8F)));
+
+	// Shelf header.
+	ImGui::PushFont(Theme::font(FontRole::BodyBold));
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::GoldBright));
+	ImGui::TextUnformatted("ДРУГИЕ РЕЖИМЫ");
+	ImGui::PopStyleColor();
+	ImGui::PopFont();
+	ImGui::Dummy(ImVec2(0, Scale::px(0.3F)));
+
+	auto renderTile = [&](const ShelfItem &item) {
+		const ImVec2 tileSize(portrait ? width : width * 0.5F - Scale::px(0.25F), Scale::px(4.2F));
+		widgets::GameTile(item.title, item.status.c_str(), item.icon, item.playable, item.style->accent, tileSize,
+		    [&dispatch, item] { dispatch(intent::LaunchGame { item.game }); });
+	};
+
+	if (!diabloFeatured) {
+		renderTile(diabloTile);
+		if (!portrait) {
+			ImGui::SameLine(0, Scale::px(0.5F));
+		} else {
+			ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
+		}
+	}
+	if (!hellfireFeatured) {
+		renderTile(hellfireTile);
+		if (!portrait) {
+			ImGui::SameLine(0, Scale::px(0.5F));
+		} else {
+			ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
+		}
+	}
+	if (!demoFeatured) {
+		renderTile(demoTile);
+	}
+
+	// Russian voice-pack offer as a slim banner.
 	if (state.diablo.available && !state.russianVoiceInstalled) {
-		ImGui::Dummy(ImVec2(0, Scale::px(0.8F)));
-		const float width = ImGui::GetContentRegionAvail().x;
-		const ImVec2 buttonSize(width, Scale::px(2.2F));
-		widgets::IconButton(icons::Music, "Скачать русскую озвучку (~150 МБ)", false, buttonSize, [&dispatch] {
+		ImGui::Dummy(ImVec2(0, Scale::px(0.6F)));
+		const ImVec2 bannerSize(width, Scale::px(2.4F));
+		if (ImGui::InvisibleButton("ruvoice", bannerSize)) {
 			dispatch(intent::UiOpenDialog { Dialog::ConfirmDownloadRu });
-		});
+		}
+		ImDrawList *draw = ImGui::GetWindowDrawList();
+		const ImVec2 min = ImGui::GetItemRectMin();
+		const ImVec2 max = ImGui::GetItemRectMax();
+		const bool hovered = ImGui::IsItemHovered();
+		draw->AddRectFilled(min, max,
+		    Theme::colorU32(hovered ? ColorRole::PanelHover : ColorRole::Panel), Scale::px(0.35F));
+		draw->AddRect(min, max, Theme::colorU32(ColorRole::GoldDim), Scale::px(0.35F), 0, Scale::px(0.06F));
+		ImGui::PushFont(Theme::font(FontRole::IconBig));
+		const ImVec2 iconSize = ImGui::CalcTextSize(icons::Music);
+		ImGui::PopFont();
+		ImGui::PushFont(Theme::font(FontRole::IconBig));
+		draw->AddText(ImVec2(min.x + Scale::px(0.7F), min.y + (bannerSize.y - iconSize.y) * 0.5F),
+		    Theme::colorU32(ColorRole::GoldBright), icons::Music);
+		ImGui::PopFont();
+		draw->AddText(Theme::font(FontRole::Body), Scale::px(0.95F),
+		    ImVec2(min.x + Scale::px(2.6F), min.y + (bannerSize.y - Scale::px(1.1F)) * 0.5F),
+		    Theme::colorU32(ColorRole::TextBody),
+		    "Русская озвучка и тексты · ru.mpq");
+		ImGui::PushFont(Theme::font(FontRole::IconBig));
+		const ImVec2 chevSize = ImGui::CalcTextSize(icons::Play);
+		ImGui::PopFont();
+		ImGui::PushFont(Theme::font(FontRole::IconBig));
+		draw->AddText(ImVec2(max.x - chevSize.x - Scale::px(0.7F), min.y + (bannerSize.y - chevSize.y) * 0.5F),
+		    Theme::colorU32(ColorRole::GoldBright), icons::Play);
+		ImGui::PopFont();
 	}
 }
 
 } // namespace
 
-void Home(const LauncherState &state, const Dispatcher &dispatch)
+void Home(const LauncherState &state, const Dispatcher &dispatch, const BackgroundArt &art)
 {
 	if (!state.hasAnyFiles()) {
-		RenderHero(state, dispatch);
+		RenderFirstRun(state, dispatch, art);
 		return;
 	}
 
 	// Nudge the block towards the vertical center of the content area.
-	const float cardHeight = Scale::px(4.6F);
-	const float gap = Scale::px(0.4F);
-	const float ruOffer = (state.diablo.available && !state.russianVoiceInstalled) ? Scale::px(3.0F) : 0.0F;
-	const float blockHeight = Scale::portrait() ? cardHeight * 3.0F + gap * 2.0F + ruOffer
-	                                            : cardHeight + ruOffer;
-	const float free = ImGui::GetContentRegionAvail().y - blockHeight;
-	ImGui::Dummy(ImVec2(0, std::max(free * 0.45F, Scale::px(0.8F))));
+	const float heroH = Scale::portrait() ? Scale::px(14.0F) : Scale::px(11.0F);
+	const float shelfH = Scale::px(4.2F) * 2.0F + Scale::px(3.5F);
+	const float free = ImGui::GetContentRegionAvail().y - (heroH + shelfH);
+	ImGui::Dummy(ImVec2(0, std::max(free * 0.25F, Scale::px(0.5F))));
 
-	RenderCardRow(state, dispatch);
-	RenderRuVoiceOffer(state, dispatch);
+	RenderHeroAndShelf(state, dispatch, art);
 }
 
 namespace {
@@ -208,7 +283,7 @@ void Data(const LauncherState &state, const Dispatcher &dispatch)
 {
 	const float width = ImGui::GetContentRegionAvail().x;
 
-	Theme::pushFont(FontRole::BodyBold);
+	ImGui::PushFont(Theme::font(FontRole::BodyBold));
 	ImGui::TextUnformatted("Папка с файлами игры");
 	ImGui::PopFont();
 
@@ -230,7 +305,7 @@ void Data(const LauncherState &state, const Dispatcher &dispatch)
 	    ImGui::GetCursorScreenPos() + ImVec2(width, 0), 0.6F);
 	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
 
-	Theme::pushFont(FontRole::BodyBold);
+	ImGui::PushFont(Theme::font(FontRole::BodyBold));
 	ImGui::TextUnformatted("Файлы игры");
 	ImGui::PopFont();
 	RenderChecklist(state, dispatch);
@@ -263,13 +338,13 @@ void About(const LauncherState &)
 	    ImGui::GetCursorScreenPos() + ImVec2(ImGui::GetContentRegionAvail().x, 0), 0.6F);
 	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
 
-	Theme::pushFont(FontRole::BodyBold);
+	ImGui::PushFont(Theme::font(FontRole::BodyBold));
 	ImGui::TextUnformatted("Версия");
 	ImGui::PopFont();
 	ImGui::Text("DevilutionX %s (порт для Aurora OS)", LAUNCHER_APP_VERSION);
 
 	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
-	Theme::pushFont(FontRole::BodyBold);
+	ImGui::PushFont(Theme::font(FontRole::BodyBold));
 	ImGui::TextUnformatted("Ссылки");
 	ImGui::PopFont();
 	ImGui::Text("%s  github.com/diasurgical/DevilutionX", icons::Globe);
@@ -279,7 +354,7 @@ void About(const LauncherState &)
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextDim));
 	ImGui::TextWrapped(
 	    "Лицензия: Sustainable Use License — использование в некоммерческих целях. "
-	    "Диablo, Blizzard Entertainment — товарные знаки Blizzard Entertainment, Inc. "
+	    "Diablo, Blizzard Entertainment — товарные знаки Blizzard Entertainment, Inc. "
 	    "Порт не связан с Blizzard и не одобрен ею.");
 	ImGui::PopStyleColor();
 }

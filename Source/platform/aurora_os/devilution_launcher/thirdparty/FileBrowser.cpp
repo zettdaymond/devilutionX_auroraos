@@ -101,17 +101,18 @@ FileBrowser::FileBrowser(ImGuiFileBrowserFlags flags, std::filesystem::path defa
     bottomPanelHeight_ = ImGui::GetFrameHeight() * 2.5f;
 
 #ifdef _WIN32
-    // Убедимся, что DRIVES_PATH инициализирован корректно
-    if (defaultDirectory.empty()) {
+    // ВНИМАНИЕ: параметр уже перемещён в defaultDirectory_ выше, поэтому
+    // все проверки делаем по члену, а не по опустошённому параметру.
+    if (defaultDirectory_.empty()) {
         defaultDirectory_ = DRIVES_PATH;
-    } else if (defaultDirectory == DRIVES_PATH) {
+    } else if (defaultDirectory_ == DRIVES_PATH) {
         // Уже установлено
-    } else if (std::filesystem::exists(defaultDirectory)) {
+    } else if (std::filesystem::exists(defaultDirectory_)) {
         // Нормализуем путь
-        defaultDirectory_ = std::filesystem::absolute(defaultDirectory);
+        defaultDirectory_ = std::filesystem::absolute(defaultDirectory_);
     }
 #else
-    if (defaultDirectory.empty()) {
+    if (defaultDirectory_.empty()) {
         defaultDirectory_ = std::filesystem::current_path();
     }
 #endif
@@ -339,7 +340,8 @@ void FileBrowser::Display()
     const float subtitleBarHeight = ImGui::GetFontSize() * 1.5f;
     RenderSubHeader(titleBarHeight, subtitleBarHeight);
 
-    ImGui::SetCursorPosY(titleBarHeight + subtitleBarHeight); // Сдвигаем контент ниже
+    const float quickRowHeight = RenderQuickAccessRow(titleBarHeight + subtitleBarHeight);
+    ImGui::SetCursorPosY(titleBarHeight + subtitleBarHeight + quickRowHeight); // Сдвигаем контент ниже
 
     // ====================== РАСЧЕТ РАЗМЕРОВ ======================
     constexpr static auto kForceBottomPanelLandscapeMode = true;
@@ -1225,10 +1227,10 @@ void FileBrowser::RenderCompactView(float height)
 
     // Кнопки в компактном режиме
     const float buttonHeight = ImGui::GetFontSize() * 2.0f;
-    if (ImGui::Button("Cancel", ImVec2(-1, buttonHeight))) {
+    if (ImGui::Button("Отмена", ImVec2(-1, buttonHeight))) {
         CloseCurrentPopup();
     }
-    if (ImGui::Button("Select", ImVec2(-1, buttonHeight))) {
+    if (ImGui::Button("Выбрать", ImVec2(-1, buttonHeight))) {
         ConfirmSelection();
     }
 }
@@ -1297,21 +1299,21 @@ void FileBrowser::RenderBottomPanel(float height, bool forceLandscapeMode)
     if (landscape) {
         const float buttonWidth = (ImGui::GetContentRegionAvail().x - padding) / 2.0f;
 
-        if (ImGui::Button("Cancel", ImVec2(buttonWidth, buttonHeight))) {
+        if (ImGui::Button("Отмена", ImVec2(buttonWidth, buttonHeight))) {
             CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Select", ImVec2(buttonWidth, buttonHeight))) {
+        if (ImGui::Button("Выбрать", ImVec2(buttonWidth, buttonHeight))) {
             ConfirmSelection();
         }
     } else {
         const float buttonWidth = ImGui::GetContentRegionAvail().x;
 
-        if (ImGui::Button("Cancel", ImVec2(buttonWidth, buttonHeight))) {
+        if (ImGui::Button("Отмена", ImVec2(buttonWidth, buttonHeight))) {
             CloseCurrentPopup();
         }
         ImGui::Dummy(ImVec2(0, padding));
-        if (ImGui::Button("Select", ImVec2(buttonWidth, buttonHeight))) {
+        if (ImGui::Button("Выбрать", ImVec2(buttonWidth, buttonHeight))) {
             ConfirmSelection();
         }
     }
@@ -1440,6 +1442,74 @@ void FileBrowser::RenderViewSettingsPopup()
 
 void FileBrowser::RenderSubHeader(float titleBarHeight, float subHeaderHeight) {
     RenderAdaptivePath(titleBarHeight, subHeaderHeight);
+}
+
+float FileBrowser::RenderQuickAccessRow(float yTop) {
+    namespace fs = std::filesystem;
+
+    fs::path home;
+#ifdef _WIN32
+    if (const char *profile = std::getenv("USERPROFILE")) {
+        home = fs::path(profile);
+    }
+#else
+    if (const char *h = std::getenv("HOME")) {
+        home = fs::path(h);
+    }
+#endif
+
+    struct QuickItem {
+        std::string label;
+        fs::path path;
+    };
+    std::vector<QuickItem> items;
+    if (!home.empty()) {
+        items.push_back({ "Домой", home });
+        const fs::path docs = home / "Documents";
+        if (fs::exists(docs)) {
+            items.push_back({ "Документы", docs });
+        }
+        const fs::path downloads = home / "Downloads";
+        if (fs::exists(downloads)) {
+            items.push_back({ "Загрузки", downloads });
+        }
+    }
+#ifdef _WIN32
+    items.push_back({ "Диски", DRIVES_PATH });
+#else
+    items.push_back({ "Корень", fs::path("/") });
+#endif
+
+    if (items.empty()) {
+        return 0.0f;
+    }
+
+    const float rowHeight = ImGui::GetFontSize() * 1.9f;
+    ImGui::SetCursorPosY(yTop);
+    ImGui::SetCursorPosX(ImGui::GetStyle().WindowPadding.x);
+
+    const ImVec2 chipSize(ImGui::GetFontSize() * 5.2f, ImGui::GetFontSize() * 1.45f);
+    for (const QuickItem &item : items) {
+        const bool active = (currentDirectory_ == item.path);
+        if (active) {
+            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(139, 26, 16, 220));
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(232, 199, 126, 255));
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(26, 15, 10, 220));
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(216, 200, 168, 255));
+        }
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ImGui::GetFontSize() * 0.35f);
+        if (ImGui::Button(item.label.c_str(), chipSize)) {
+            SetDirectory(item.path);
+        }
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(2);
+        ImGui::SameLine(0, ImGui::GetFontSize() * 0.3f);
+    }
+    // Завершаем ряд: без NewLine() X-курсор остаётся справа и список
+    // файлов ниже получает ширину от конца чипов.
+    ImGui::NewLine();
+    return rowHeight;
 }
 
 bool FileBrowser::IsAtRoot() const {

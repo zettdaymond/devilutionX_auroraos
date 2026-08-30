@@ -134,6 +134,8 @@ private:
     void RenderCustomTitleBar(float height);
     void RenderViewSettingsPopup();
     void RenderSubHeader(float titleBarHeight, float subHeaderHeight);
+    // Ряд быстрых переходов: Домой / Документы / Загрузки / Диски
+    float RenderQuickAccessRow(float yTop);
     bool IsAtRoot() const; // Новая функция проверки корня
     bool IsDrivesView() const; // Проверка режима просмотра дисков
     void NavigateUp(); // Новая функция навигации вверх

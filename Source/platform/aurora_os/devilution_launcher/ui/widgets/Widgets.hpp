@@ -13,30 +13,49 @@ namespace launcher::ui::widgets {
 
 using Dispatcher = std::function<void(Intent)>;
 
-/// One launchable game entry: an ornate panel with icon, title and a
-/// status line. The whole panel acts as a button.
+/// Artwork shared with the view (the launcher background texture).
+struct BackgroundArt {
+	void *texture = nullptr;
+	ImVec2 size { 0.0F, 0.0F };
+};
+
+/// A call-to-action button for hero panels.
+struct HeroAction {
+	const char *label = nullptr;
+	bool primary = false;                 // gold gradient vs outlined
+	std::function<void()> onClick;
+};
+
+/// Featured-game hero panel: artwork with a bottom gradient (web-style
+/// "key art" banner), eyebrow label, large title, status line and up to
+/// two CTA buttons. The whole panel is clickable only via its buttons.
 ///
-/// @param title     latin title (rendered with the Exocet heading font)
-/// @param status    status line under the title
-/// @param icon      FontAwesome icon for the card
-/// @param available whether the game can start (locked look otherwise)
-/// @param titleSize uniform title size for the whole row (0 = auto-fit)
-/// @param onClick   invoked when the card is tapped
-void GameCard(const char *title, const char *status, const char *icon, bool available,
-    bool showPlayBadge, const ImVec2 &size, float titleSize, const std::function<void()> &onClick);
+/// @param uv0/uv1  crop of the artwork to show (normalized)
+/// @param tint     per-game accent mixed over the artwork
+void HeroPanel(const char *eyebrow, const char *title, const char *status, const BackgroundArt &art,
+    const ImVec2 &uv0, const ImVec2 &uv1, const ImVec4 &tint, const ImVec2 &size,
+    std::initializer_list<HeroAction> actions);
 
-/// Largest font size (<= startSize) for `text` in the given font role
-/// that still fits maxWidth, not going below minSize.
-float FitFontSizeFor(FontRole role, float startSize, const char *text, float maxWidth, float minSize);
+/// Compact shelf tile: icon in a tinted chip, title + status, trailing
+/// play/lock indicator.
+void GameTile(const char *title, const char *status, const char *icon, bool available,
+    const ImVec4 &accent, const ImVec2 &size, const std::function<void()> &onClick);
 
-/// Secondary button with icon, e.g. "Выбрать папку".
+/// Gold gradient button with dark bold text — the primary action.
+void PrimaryButton(const char *label, const ImVec2 &size, const std::function<void()> &onClick);
+
+/// Outlined button with gold text — the secondary action.
+void GhostButton(const char *icon, const char *label, const ImVec2 &size,
+    const std::function<void()> &onClick);
+
+/// Secondary button with icon (kept for screens/dialogs).
 void IconButton(const char *icon, const char *label, bool accent, const ImVec2 &size,
     const std::function<void()> &onClick);
 
 /// Text with a given role color, centered in the current content width.
 void CenteredText(const char *text, ColorRole role = ColorRole::TextBody);
 
-/// Status bullet: green check or dim cross + text.
+/// Status bullet: green check or dim cross + text + wrapped detail.
 void FileStatusLine(bool present, const char *text, const char *detail);
 
 } // namespace launcher::ui::widgets

@@ -19,9 +19,26 @@ namespace launcher::ui {
 LauncherView::LauncherView(float dpiScale)
     : m_dpiScale(dpiScale)
 {
+	// Start browsing from the user's home directory — the most likely
+	// place for transferred MPQ files (~/Documents, ~/Downloads).
+	std::filesystem::path startDir;
+#ifdef _WIN32
+	if (const char *profile = std::getenv("USERPROFILE")) {
+		startDir = profile;
+	}
+#else
+	if (const char *home = std::getenv("HOME")) {
+		startDir = home;
+	}
+#endif
+	if (startDir.empty() || !std::filesystem::is_directory(startDir)) {
+		startDir = std::filesystem::current_path();
+	}
+
 	m_fileBrowser = std::make_unique<ImGui::FileBrowser>(
 	    ImGuiFileBrowserFlags_Fullscreen | ImGuiFileBrowserFlags_NoResize | ImGuiFileBrowserFlags_NoMove
-	    | ImGuiFileBrowserFlags_NoTitleBar);
+	    | ImGuiFileBrowserFlags_NoTitleBar,
+	    startDir);
 	m_fileBrowser->SetTypeFilters({ "*.mpq", "*.MPQ" });
 	m_fileBrowser->SetTitle("Выберите DIABDAT.MPQ");
 	m_fileBrowser->SetMobileBehavior(true);
@@ -49,12 +66,12 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	ImGui::SetNextWindowViewport(viewport->ID);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
+	// The root is a transparent layout container: NoInputs keeps it from
+	// covering the navbar and stealing clicks when ImGui reorders windows
+	// (children of a NoInputs window remain interactive on their own).
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove
 	    | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus
-	    | ImGuiWindowFlags_NoBackground;
-	if (state.downloadInProgress()) {
-		flags |= ImGuiWindowFlags_NoInputs;
-	}
+	    | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs;
 
 	ImGui::Begin("##launcher-root", nullptr, flags);
 	RenderBackground();
@@ -135,8 +152,8 @@ void LauncherView::RenderNavBar(const LauncherState &state, const Dispatcher &di
 	const float buttonWidth = ImGui::GetContentRegionAvail().x / std::size(items);
 	for (const NavItem &item : items) {
 		const bool selected = (state.screen == item.screen);
-		ImGui::PushStyleColor(ImGuiCol_Button, Theme::color(selected ? ColorRole::Red : ColorRole::Panel));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Theme::color(ColorRole::RedHover));
+		ImGui::PushStyleColor(ImGuiCol_Button, Theme::color(selected ? ColorRole::Red : ColorRole::Bg));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Theme::color(selected ? ColorRole::RedHover : ColorRole::Panel));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, Theme::color(ColorRole::RedPressed));
 		ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(selected ? ColorRole::GoldBright : ColorRole::TextBody));
 
@@ -155,9 +172,10 @@ void LauncherView::RenderNavBar(const LauncherState &state, const Dispatcher &di
 
 void LauncherView::RenderScreen(const LauncherState &state, const Dispatcher &dispatch)
 {
+	const widgets::BackgroundArt art { m_backgroundTexture, m_backgroundTextureSize };
 	switch (state.screen) {
 	case Screen::Home:
-		screens::Home(state, dispatch);
+		screens::Home(state, dispatch, art);
 		break;
 	case Screen::Data:
 		screens::Data(state, dispatch);
