@@ -132,17 +132,17 @@ private:
     void RenderCompactView(float height);
     void RenderBottomPanel(float height, bool forceLandscapeMode = false);
     void RenderCustomTitleBar(float height);
-    void RenderViewSettingsPopup();
     void RenderSubHeader(float titleBarHeight, float subHeaderHeight);
     // Ряд быстрых переходов: Домой / Документы / Загрузки / Диски
     float RenderQuickAccessRow(float yTop);
+    // Кликабельные сегменты пути (замена кнопке "наверх")
+    void RenderBreadcrumb(float yTop, float height);
     bool IsAtRoot() const; // Новая функция проверки корня
     bool IsDrivesView() const; // Проверка режима просмотра дисков
     void NavigateUp(); // Новая функция навигации вверх
     bool IsDriveRoot() const;
     bool IsFileSystemRoot() const;
     // Методы
-    void RenderAdaptivePath(float titleBarHeight, float subHeaderHeight);
     void UpdateFullPathCache() const;
     float Scale(float value) const;
     ImVec2 Scale(ImVec2 vec) const;
@@ -208,7 +208,6 @@ private:
     float touchStartTime_ = 0.0;
     float touchStartScrollY_ = 0.0f;
     MobileScrollState scrollState_ = MobileScrollState::Idle;
-    bool showViewSettingsPopup = false;
 
     // Для адаптивного пути
     mutable std::string cachedFullPath_;

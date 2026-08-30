@@ -115,6 +115,9 @@ AppResult Application::run()
 	if (m_initialScreen.has_value()) {
 		m_store->dispatch(launcher::intent::UiNavigate { *m_initialScreen });
 	}
+	if (m_initialBrowser) {
+		m_store->dispatch(launcher::intent::SelectDataFolder {});
+	}
 
 	auto dispatch = [this](launcher::Intent intent) {
 		m_store->dispatch(std::move(intent));

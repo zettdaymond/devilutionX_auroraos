@@ -226,6 +226,12 @@ void LauncherView::RenderFileBrowser(const LauncherState &state, const Dispatche
 
 	m_fileBrowser->Display();
 
+	// The browser closed itself (Отмена / × / Esc) — sync the state,
+	// otherwise the block above would immediately reopen it.
+	if (state.fileBrowserOpen && !m_fileBrowser->IsOpened()) {
+		dispatch(intent::CancelFolderSelection {});
+	}
+
 	if (m_fileBrowser->HasSelected()) {
 		const std::filesystem::path selected = m_fileBrowser->GetSelected();
 		m_fileBrowser->ClearSelected();

@@ -34,6 +34,8 @@ struct SelectDataFolder {};
 struct DataFolderSelected {
 	std::filesystem::path dir;
 };
+/// The user closed the file browser without choosing a folder.
+struct CancelFolderSelection {};
 /// Re-scan all candidate folders (after external changes, downloads, deletions).
 struct RescanFiles {};
 /// Delete a previously downloaded file (spawn.mpq / ru.mpq).
@@ -74,6 +76,7 @@ using Intent = std::variant<
     intent::UiDismissToast,
     intent::SelectDataFolder,
     intent::DataFolderSelected,
+    intent::CancelFolderSelection,
     intent::RescanFiles,
     intent::DeleteDownloadedFile,
     intent::LaunchGame,

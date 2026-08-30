@@ -6,6 +6,9 @@
 
 #include <unordered_map>
 
+#include <functional>
+#include <vector>
+
 #include <ranges>
 
 // Иконки FontAwesome
@@ -412,7 +415,7 @@ std::string FileBrowser::GetCurrentFolderDisplayName() const
 {
     // Режим просмотра дисков
     if (IsDrivesView()) {
-        return "My Computer";
+        return "Мой компьютер";
     }
 
 #ifdef _WIN32
@@ -637,19 +640,26 @@ void FileBrowser::RenderListView(float height)
         ImVec2 itemMin = ImGui::GetItemRectMin();
         ImVec2 itemMax = ImGui::GetItemRectMax();
 
-        const float iconWidth = ImGui::CalcTextSize(icon).x;
-        const float iconHeight = ImGui::CalcTextSize(icon).y;
+        // Иконки — в меру строки (иконный шрифт крупный сам по себе)
+        const float iconSize = itemHeight_ * 0.52f;
+        const float iconWidth = iconSize;
+        const float iconHeight = iconSize;
 
         // Рассчет позиций
         const float iconX = itemMin.x + horizontalPadding;
-        const float iconY = itemMin.y + verticalOffset;
+        const float iconY = itemMin.y + (itemHeight_ - iconSize) * 0.5f;
 
         // Bounding box для иконки
         const ImVec2 iconMin(iconX, itemMin.y);
         const ImVec2 iconMax(iconX + iconWidth, itemMin.y + itemHeight_);
 
         // Рендеринг иконки
-        ImGui::GetWindowDrawList()->AddText(ImVec2(iconX, iconY), ImGui::GetColorU32(ImGuiCol_Text), icon);
+        ImGui::GetWindowDrawList()->AddText(
+            iconFont ? iconFont : ImGui::GetFont(),
+            iconSize,
+            ImVec2(iconX, iconY),
+            ImGui::GetColorU32(ImGuiCol_Text),
+            icon);
 
         if (iconFont) {
             ImGui::PopFont();
@@ -1296,26 +1306,44 @@ void FileBrowser::RenderBottomPanel(float height, bool forceLandscapeMode)
     const float verticalOffset = (height - (landscape ? buttonHeight : buttonHeight * 2 + padding)) / 2;
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + verticalOffset);
 
+    // Кнопки в стилистике лаунчера: «Выбрать» — золотая основная,
+    // «Отмена» — контурная второстепенная.
+    auto styledButton = [](const char *label, float width, float height, bool primary,
+                           const std::function<void()> &onClick) {
+        if (primary) {
+            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(199, 165, 104, 255));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(232, 199, 126, 255));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(138, 109, 59, 255));
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(38, 18, 7, 255));
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(14, 9, 6, 235));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(42, 23, 16, 235));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(94, 16, 9, 235));
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(232, 199, 126, 255));
+            ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(138, 109, 59, 255));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+        }
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, height * 0.22f);
+        if (ImGui::Button(label, ImVec2(width, height))) {
+            onClick();
+        }
+        ImGui::PopStyleVar();
+        if (!primary) {
+            ImGui::PopStyleVar();
+        }
+        ImGui::PopStyleColor(primary ? 4 : 5);
+    };
+
     if (landscape) {
         const float buttonWidth = (ImGui::GetContentRegionAvail().x - padding) / 2.0f;
-
-        if (ImGui::Button("Отмена", ImVec2(buttonWidth, buttonHeight))) {
-            CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Выбрать", ImVec2(buttonWidth, buttonHeight))) {
-            ConfirmSelection();
-        }
+        styledButton("Отмена", buttonWidth, buttonHeight, false, [] { CloseCurrentPopup(); });
+        ImGui::SameLine(0, padding);
+        styledButton("Выбрать", buttonWidth, buttonHeight, true, [this] { ConfirmSelection(); });
     } else {
         const float buttonWidth = ImGui::GetContentRegionAvail().x;
-
-        if (ImGui::Button("Отмена", ImVec2(buttonWidth, buttonHeight))) {
-            CloseCurrentPopup();
-        }
+        styledButton("Выбрать", buttonWidth, buttonHeight, true, [this] { ConfirmSelection(); });
         ImGui::Dummy(ImVec2(0, padding));
-        if (ImGui::Button("Выбрать", ImVec2(buttonWidth, buttonHeight))) {
-            ConfirmSelection();
-        }
+        styledButton("Отмена", buttonWidth, buttonHeight, false, [] { CloseCurrentPopup(); });
     }
 
     ImGui::EndChild();
@@ -1325,123 +1353,142 @@ void FileBrowser::RenderCustomTitleBar(float height) {
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     ImVec2 windowPos = ImGui::GetWindowPos();
     ImVec2 windowSize = ImGui::GetWindowSize();
+    const float pad = Scale(14.0f);
 
-           // Фон заголовка
-    drawList->AddRectFilled(
-        windowPos,
-        ImVec2(windowPos.x + windowSize.x, windowPos.y + height),
-        ImGui::GetColorU32(ImVec4(0.15f, 0.05f, 0.05f, 1.0f))
-        );
-
-           // Разделительная линия
-    drawList->AddLine(
-        ImVec2(windowPos.x, windowPos.y + height),
-        ImVec2(windowPos.x + windowSize.x, windowPos.y + height),
-        ImGui::GetColorU32(ImVec4(0.6f, 0.1f, 0.1f, 1.0f)),
-        2.0f
-        );
-
-           // Кнопка "назад"
-    const float buttonSize = height * 0.7f;
-    const float padding = height * 0.15f;
-    ImGui::SetCursorPos(ImVec2(padding, (height - buttonSize) * 0.5f));
-    if (ImGui::Button(ICON_FA_ARROW_LEFT, ImVec2(buttonSize, buttonSize))) {
-        NavigateUp();
+    // Заголовок слева, шрифтом дизайн-системы
+    ImFont* titleFont = launcher::ui::Theme::font(launcher::ui::FontRole::BodyBold);
+    const float titleSize = ImGui::GetFontSize() * 1.25f;
+    const ImVec2 textSize = titleFont
+        ? titleFont->CalcTextSizeA(titleSize, FLT_MAX, 0.0f, title_.c_str())
+        : ImGui::CalcTextSize(title_.c_str());
+    if (titleFont) {
+        drawList->AddText(titleFont, titleSize,
+            ImVec2(windowPos.x + pad, windowPos.y + (height - textSize.y) * 0.5f),
+            ImGui::GetColorU32(ImVec4(0.910f, 0.780f, 0.494f, 1.0f)),
+            title_.c_str());
+    } else {
+        drawList->AddText(
+            ImVec2(windowPos.x + pad, windowPos.y + (height - textSize.y) * 0.5f),
+            ImGui::GetColorU32(ImVec4(0.910f, 0.780f, 0.494f, 1.0f)),
+            title_.c_str());
     }
 
-    // Заголовок по центру
-    std::string displayTitle = title_;
-    ImVec2 textSize = ImGui::CalcTextSize(displayTitle.c_str());
-    ImVec2 textPos(
-        windowPos.x + (windowSize.x - textSize.x) * 0.5f,
-        windowPos.y + (height - textSize.y) * 0.5f
-        );
-    drawList->AddText(
-        textPos,
-        ImGui::GetColorU32(ImVec4(0.86f, 0.77f, 0.62f, 1.0f)),
-        displayTitle.c_str()
-        );
-
-    const auto menuButtonPosX = windowSize.x - buttonSize - padding;
-
-    // Кнопка меню (три точки) справа
-    ImGui::SetCursorPos(ImVec2(
-        menuButtonPosX,
-        (height - buttonSize) * 0.5f
-        ));
-    if (ImGui::Button(ICON_FA_ELLIPSIS_V, ImVec2(buttonSize, buttonSize))) {
-        showViewSettingsPopup = true;
+    // Крестик справа — закрыть без выбора. Глиф рисуем IconBig-шрифтом
+    // напрямую (merged-иконки в основном шрифте не везде надёжны).
+    const float buttonSize = height * 0.62f;
+    ImGui::SetCursorPos(ImVec2(windowSize.x - buttonSize - pad * 0.6f, (height - buttonSize) * 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(42, 23, 16, 200));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(94, 16, 9, 220));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, buttonSize * 0.3f);
+    if (ImGui::Button("##browser-close", ImVec2(buttonSize, buttonSize))) {
+        CloseCurrentPopup();
     }
-
-    // Всплывающее меню
-    if (showViewSettingsPopup) {
-        ImGui::OpenPopup("##ViewSettingsPopup");
-        showViewSettingsPopup = false;
+    const ImVec2 btnMin = ImGui::GetItemRectMin();
+    const ImVec2 btnMax = ImGui::GetItemRectMax();
+    ImFont *closeIconFont = launcher::ui::Theme::font(launcher::ui::FontRole::IconBig);
+    if (closeIconFont != nullptr) {
+        const float glyphSize = buttonSize * 0.6f;
+        const char *closeGlyph = "ï" /* U+F00D */;
+        const ImVec2 glyphSizeVec = closeIconFont->CalcTextSizeA(glyphSize, FLT_MAX, 0.0f, closeGlyph);
+        drawList->AddText(closeIconFont, glyphSize,
+            ImVec2((btnMin.x + btnMax.x - glyphSizeVec.x) * 0.5f, (btnMin.y + btnMax.y - glyphSizeVec.y) * 0.5f),
+            ImGui::GetColorU32(ImVec4(0.847f, 0.784f, 0.659f, 1.0f)),
+            closeGlyph);
     }
-    RenderViewSettingsPopup();
-}
-
-void FileBrowser::RenderViewSettingsPopup()
-{
-    ImVec2 windowPos = ImGui::GetWindowPos();
-    ImVec2 windowSize = ImGui::GetWindowSize();
-    const float titleBarHeight = ImGui::GetFontSize() * 2.5f;
-
-    // Позиция меню - справа под кнопкой
-    ImGui::SetNextWindowPos(ImVec2(windowPos.x + windowSize.x - Scale(200.0f), windowPos.y + titleBarHeight));
-
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, Scale(ImVec2(10, 10)));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, Scale(ImVec2(10, 10)));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, Scale(5.0f));
-    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.06f, 0.06f, 0.98f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.3f, 0.1f, 0.1f, 1.0f));
-
-    if (ImGui::BeginPopup("##ViewSettingsPopup", ImGuiWindowFlags_NoMove)) {
-        // Заголовок меню
-        ImGui::TextColored(ImVec4(0.86f, 0.77f, 0.62f, 1.0f), "VIEW SETTINGS");
-        ImGui::Separator();
-
-        // Пункт для скрытых файлов
-        if (ImGui::MenuItem("Show Hidden Files", nullptr, showHiddenFiles_)) {
-            showHiddenFiles_ = !showHiddenFiles_;
-            UpdateFileRecords();
-        }
-
-        // Подменю для режима просмотра
-        if (ImGui::BeginMenu("View Mode")) {
-            if (ImGui::MenuItem("List View", nullptr, viewMode_ == ViewMode_List)) {
-                viewMode_ = ViewMode_List;
-            }
-            if (ImGui::MenuItem("Grid View", nullptr, viewMode_ == ViewMode_Grid)) {
-                viewMode_ = ViewMode_Grid;
-            }
-            ImGui::EndMenu();
-        }
-
-        // Раздел фильтров (если есть)
-        if (!typeFilters_.empty()) {
-            ImGui::Separator();
-            ImGui::TextColored(ImVec4(0.86f, 0.77f, 0.62f, 1.0f), "FILE TYPE");
-
-            for (size_t i = 0; i < typeFilters_.size(); ++i) {
-                bool isSelected = (typeFilterIndex_ == i);
-                if (ImGui::MenuItem(typeFilters_[i].c_str(), nullptr, isSelected)) {
-                    typeFilterIndex_ = static_cast<unsigned int>(i);
-                    UpdateFileRecords();
-                }
-            }
-        }
-
-        ImGui::EndPopup();
-    }
-
+    ImGui::PopStyleVar();
     ImGui::PopStyleColor(3);
-    ImGui::PopStyleVar(3);
+
+    // Золотой разделитель с затухающими краями
+    launcher::ui::Theme::drawDivider(
+        ImVec2(windowPos.x + pad, windowPos.y + height - Scale(1.0f)),
+        ImVec2(windowPos.x + windowSize.x - pad, windowPos.y + height - Scale(1.0f)),
+        0.6f);
 }
 
 void FileBrowser::RenderSubHeader(float titleBarHeight, float subHeaderHeight) {
-    RenderAdaptivePath(titleBarHeight, subHeaderHeight);
+    RenderBreadcrumb(titleBarHeight, subHeaderHeight);
+}
+
+void FileBrowser::RenderBreadcrumb(float yTop, float height) {
+    // Сегменты пути: клик по сегменту открывает соответствующую папку.
+    // Заменяет кнопку "наверх" — навигация по положению в иерархии,
+    // а не "назад в историю".
+    struct Segment {
+        std::string label;
+        std::filesystem::path path;
+    };
+    std::vector<Segment> segments;
+
+    if (IsDrivesView()) {
+        segments.push_back({ "Мой компьютер", DRIVES_PATH });
+    } else {
+        std::filesystem::path acc;
+        for (const auto &part : currentDirectory_) {
+            // На Windows корень распадается на "C:" и "\\" — склеиваем их
+            // в один сегмент, иначе получается "C: › C:".
+            if (part == "\\" || part == "/") {
+                acc = acc / part;
+                if (!segments.empty()) {
+                    segments.back().path = acc;
+                }
+                continue;
+            }
+            acc = acc.empty() ? part : acc / part;
+            std::string label = part.string();
+            if (!label.empty()) {
+                segments.push_back({ label, acc });
+            }
+        }
+        if (segments.empty()) {
+            segments.push_back({ currentDirectory_.string(), currentDirectory_ });
+        }
+    }
+
+    // Если сегменты не влезают — показываем "…" (переход к диску) + хвост.
+    const float pad = Scale(14.0f);
+    const float avail = ImGui::GetWindowSize().x - pad * 2.0F;
+    const float sepW = ImGui::CalcTextSize("›").x + Scale(8.0F) * 2.0F;
+    float total = 0.0F;
+    for (const auto &seg : segments) {
+        total += ImGui::CalcTextSize(seg.label.c_str()).x + Scale(16.0F) + sepW;
+    }
+    size_t first = 0;
+    bool ellipsis = false;
+    while (total > avail && segments.size() - first > 2) {
+        total -= ImGui::CalcTextSize(segments[first].label.c_str()).x + Scale(16.0F) + sepW;
+        ++first;
+        ellipsis = true;
+    }
+
+    const float chipH = height * 0.78F;
+    ImGui::SetCursorPos(ImVec2(pad, yTop + (height - chipH) * 0.5F));
+
+    auto chip = [&](const std::string &label, const std::filesystem::path &path, bool current) {
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(42, 23, 16, 200));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(94, 16, 9, 220));
+        ImGui::PushStyleColor(ImGuiCol_Text, current ? IM_COL32(232, 199, 126, 255) : IM_COL32(170, 155, 125, 255));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, chipH * 0.3F);
+        if (ImGui::Button(label.c_str(), ImVec2(ImGui::CalcTextSize(label.c_str()).x + Scale(16.0F), chipH))) {
+            SetDirectory(path);
+        }
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(4);
+        ImGui::SameLine(0, Scale(8.0F));
+        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(110, 96, 70, 255));
+        ImGui::TextUnformatted("›");
+        ImGui::PopStyleColor();
+        ImGui::SameLine(0, Scale(8.0F));
+    };
+
+    if (ellipsis) {
+        chip("…", segments.front().path, false);
+    }
+    for (size_t i = first; i < segments.size(); ++i) {
+        chip(segments[i].label, segments[i].path, i + 1 == segments.size());
+    }
+    ImGui::NewLine();
 }
 
 float FileBrowser::RenderQuickAccessRow(float yTop) {
@@ -1592,105 +1639,6 @@ void FileBrowser::UpdateFullPathCache() const {
 #endif
 
     fullPathWidth_ = ImGui::CalcTextSize(cachedFullPath_.c_str()).x;
-}
-
-void FileBrowser::RenderAdaptivePath(float titleBarHeight, float subHeaderHeight) {
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    ImVec2 windowPos = ImGui::GetWindowPos();
-    ImVec2 windowSize = ImGui::GetWindowSize();
-    const float padding = Scale(16.0f);
-
-           // Позиция подзаголовка
-    ImVec2 subHeaderPos(
-        windowPos.x,
-        windowPos.y + titleBarHeight
-        );
-
-           // Область для пути (с возможностью скролла)
-    ImVec2 pathAreaMin(subHeaderPos.x + padding, subHeaderPos.y);
-    ImVec2 pathAreaMax(
-        subHeaderPos.x + windowSize.x - padding,
-        subHeaderPos.y + subHeaderHeight
-        );
-    const float pathAreaWidth = pathAreaMax.x - pathAreaMin.x;
-
-           // Обновляем кэш пути
-    UpdateFullPathCache();
-
-    // Обработка скролла
-    ImGuiIO& io = ImGui::GetIO();
-    const bool isPathHovered = ImGui::IsWindowHovered() &&
-        ImRect(pathAreaMin, pathAreaMax).Contains(io.MousePos);
-
-    if (isPathHovered && io.MouseDown[0] && !isPathDragging_) {
-        isPathDragging_ = true;
-        pathDragStartPos_ = io.MousePos;
-        pathDragStartOffset_ = pathScrollOffset_;
-    }
-
-    if (isPathDragging_ && io.MouseDown[0]) {
-        const float dragDelta = pathDragStartPos_.x - io.MousePos.x;
-        pathScrollOffset_ = pathDragStartOffset_ + dragDelta;
-    } else {
-        isPathDragging_ = false;
-    }
-
-    // Ограничение скролла
-    const float maxScroll = std::max(0.0f, fullPathWidth_ - pathAreaWidth);
-    pathScrollOffset_ = ImClamp(pathScrollOffset_, 0.0f, maxScroll);
-
-    // Рисуем путь с обрезкой
-    drawList->PushClipRect(pathAreaMin, pathAreaMax, true);
-
-    // Позиция текста (с учетом скролла)
-    ImVec2 textPos(
-        pathAreaMin.x - pathScrollOffset_,
-        pathAreaMin.y + (subHeaderHeight - ImGui::GetTextLineHeight()) * 0.5f
-        );
-
-    // Основной текст пути
-    drawList->AddText(
-        textPos,
-        ImGui::GetColorU32(ImVec4(0.86f, 0.77f, 0.62f, 0.8f)),
-        cachedFullPath_.c_str()
-        );
-
-    // Визуальные индикаторы скролла
-    if (fullPathWidth_ > pathAreaWidth) {
-        // Левый индикатор (если есть контент слева)
-        if (pathScrollOffset_ > 0) {
-            drawList->AddRectFilledMultiColor(
-                pathAreaMin,
-                ImVec2(pathAreaMin.x + 20, pathAreaMax.y),
-                ImGui::GetColorU32(ImVec4(0.12f, 0.06f, 0.06f, 1.0f)),
-                ImGui::GetColorU32(ImVec4(0.12f, 0.06f, 0.06f, 0.0f)),
-                ImGui::GetColorU32(ImVec4(0.12f, 0.06f, 0.06f, 0.0f)),
-                ImGui::GetColorU32(ImVec4(0.12f, 0.06f, 0.06f, 1.0f))
-                );
-        }
-
-        // Правый индикатор (если есть контент справа)
-        if (pathScrollOffset_ < maxScroll) {
-            drawList->AddRectFilledMultiColor(
-                ImVec2(pathAreaMax.x - 20, pathAreaMin.y),
-                pathAreaMax,
-                ImGui::GetColorU32(ImVec4(0.12f, 0.06f, 0.06f, 0.0f)),
-                ImGui::GetColorU32(ImVec4(0.12f, 0.06f, 0.06f, 1.0f)),
-                ImGui::GetColorU32(ImVec4(0.12f, 0.06f, 0.06f, 1.0f)),
-                ImGui::GetColorU32(ImVec4(0.12f, 0.06f, 0.06f, 0.0f))
-                );
-        }
-    }
-
-    drawList->PopClipRect();
-
-    // Разделительная линия внизу подзаголовка
-    drawList->AddLine(
-        ImVec2(windowPos.x, pathAreaMax.y),
-        ImVec2(windowPos.x + windowSize.x, pathAreaMax.y),
-        ImGui::GetColorU32(ImVec4(0.6f, 0.1f, 0.1f, 1.0f)),
-        1.0f
-        );
 }
 
 void FileBrowser::SetTypeFilters(const std::vector<std::string>& typeFilters) {

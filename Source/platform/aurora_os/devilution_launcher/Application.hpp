@@ -50,6 +50,9 @@ public:
 	/// Override the first screen (desktop development aid).
 	void setInitialScreen(launcher::Screen screen) { m_initialScreen = screen; }
 
+	/// Open the MPQ folder browser on startup (desktop development aid).
+	void setInitialBrowser(bool open) { m_initialBrowser = open; }
+
 	void stop();
 	void on_event(const SDL_WindowEvent &event);
 
@@ -73,6 +76,7 @@ private:
 	bool m_running { true };
 	bool m_minimized { false };
 	std::optional<launcher::Screen> m_initialScreen;
+	bool m_initialBrowser = false;
 };
 
 } // namespace App

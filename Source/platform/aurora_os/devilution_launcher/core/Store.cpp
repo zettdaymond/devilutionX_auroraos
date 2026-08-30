@@ -175,6 +175,12 @@ void Store::reduceIntent<intent::RescanFiles>(const intent::RescanFiles &)
 }
 
 template <>
+void Store::reduceIntent<intent::CancelFolderSelection>(const intent::CancelFolderSelection &)
+{
+	m_state.fileBrowserOpen = false;
+}
+
+template <>
 void Store::reduceIntent<intent::DeleteDownloadedFile>(const intent::DeleteDownloadedFile &i)
 {
 	if (m_state.downloadInProgress()) {

@@ -32,6 +32,7 @@ namespace {
 struct Args {
 	std::optional<std::string> mockScenario;
 	std::optional<launcher::Screen> screen;
+	bool openBrowser = false;
 	int windowWidth = 540;
 	int windowHeight = 960;
 };
@@ -52,6 +53,8 @@ Args ParseArgs(int argc, char **argv)
 			} else if (value == "about") {
 				args.screen = launcher::Screen::About;
 			}
+		} else if (arg == "--open-browser") {
+			args.openBrowser = true;
 		} else if (arg.rfind("--window=", 0) == 0) {
 			const std::string value = arg.substr(std::strlen("--window="));
 			if (const char *x = std::strchr(value.c_str(), 'x'); x != nullptr) {
@@ -113,6 +116,9 @@ int main(int argc, char **argv)
 	    : std::make_unique<App::Application>(window, "org.diasurgical", "devilutionx");
 	if (args.screen.has_value()) {
 		app->setInitialScreen(*args.screen);
+	}
+	if (args.openBrowser) {
+		app->setInitialBrowser(true);
 	}
 
 	const App::AppResult result = app->run();
