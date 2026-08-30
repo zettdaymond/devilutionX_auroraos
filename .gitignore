@@ -463,3 +463,6 @@ uwp-project/Assets/gendata
 uwp-project/Assets/ui_art
 !uwp-project/devilutionX_TemporaryKey.pfx
 /.s390x-ccache/
+
+# Launcher desktop dev build
+build-desktop/
