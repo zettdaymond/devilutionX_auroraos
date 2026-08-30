@@ -1,49 +1,78 @@
 #pragma once
 
 #include <SDL2/SDL.h>
+#include <imgui.h>
+
+#include "core/AppResult.hpp"
+#include "core/LauncherState.hpp"
+#include "services/ServiceFactory.hpp"
 
 #include <memory>
+#include <optional>
 #include <string>
-#include <vector>
+
+namespace launcher {
+class Store;
+}
+
+namespace launcher::ui {
+class LauncherView;
+}
 
 namespace App {
 
-enum class ExitStatus : int {
-    SUCCESS = 0,
-    FAILURE = 1,
-};
+using launcher::AppResult;
+using launcher::ExitAction;
 
+/// Owns the SDL renderer, the ImGui context and the MVI trio
+/// (Store + LauncherView over a ServiceBundle), and runs the launcher
+/// UI loop until the user starts a game or closes the window.
+///
+/// Two constructors:
+/// - (window, company, app) builds real platform services (used by the
+///   game entry point in Source/main.cpp);
+/// - (window, services) accepts an externally composed bundle, e.g.
+///   mock scenarios on the desktop.
 class Application {
 public:
-    explicit Application(SDL_Window* window, std::string const& company_namespace, std::string const& app_name);
-    ~Application();
+	Application(SDL_Window *window, const std::string &companyNamespace, const std::string &appName);
+	Application(SDL_Window *window, launcher::ServiceBundle services);
+	~Application();
 
-    Application(const Application&) = delete;
-    Application(Application&&) = delete;
-    Application& operator=(Application other) = delete;
-    Application& operator=(Application&& other) = delete;
+	Application(const Application &) = delete;
+	Application(Application &&) = delete;
+	Application &operator=(const Application &) = delete;
+	Application &operator=(Application &&) = delete;
 
-    ExitStatus run();
-    void stop();
+	/// Runs the UI loop; returns what to launch.
+	[[nodiscard]] AppResult run();
 
-    void on_event(const SDL_WindowEvent& event);
-    void on_minimize();
-    void on_shown();
-    void on_close();
+	/// Override the first screen (desktop development aid).
+	void setInitialScreen(launcher::Screen screen) { m_initialScreen = screen; }
+
+	void stop();
+	void on_event(const SDL_WindowEvent &event);
 
 private:
-    ExitStatus m_exit_status{ExitStatus::SUCCESS};
-    SDL_Window* m_window{nullptr};
-    std::string m_company_namespace;
-    std::string m_app_name;
+	/// Common SDL/ImGui bootstrap. Returns false on failure.
+	bool setup();
 
-    SDL_Renderer* m_renderer{nullptr};
+	SDL_Window *m_window { nullptr };
+	SDL_Renderer *m_renderer { nullptr };
 
-    bool m_running{true};
-    bool m_minimized{false};
-    bool m_show_some_panel{true};
-    bool m_show_debug_panel{false};
-    bool m_show_demo_panel{false};
+	std::string m_companyNamespace;
+	std::string m_appName;
+
+	launcher::ServiceBundle m_services;
+	std::unique_ptr<launcher::Store> m_store;
+	std::unique_ptr<launcher::ui::LauncherView> m_view;
+
+	SDL_Texture *m_backgroundTexture { nullptr };
+	ImVec2 m_backgroundSize { 0.0F, 0.0F };
+
+	bool m_running { true };
+	bool m_minimized { false };
+	std::optional<launcher::Screen> m_initialScreen;
 };
 
 } // namespace App

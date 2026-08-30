@@ -2,7 +2,9 @@
 
 #include "imgui_internal.h"
 
-#include "FontStorage.hpp"
+#include "ui/Theme.hpp"
+
+#include <unordered_map>
 
 #include <ranges>
 
@@ -285,6 +287,18 @@ void FileBrowser::Open()
     lastDirectory_ = currentDirectory_;
 }
 
+void FileBrowser::Close()
+{
+    shouldOpen_ = false;
+    shouldClose_ = true;
+    ClearSelected();
+}
+
+bool FileBrowser::IsOpened() const noexcept
+{
+    return isOpened_;
+}
+
 void FileBrowser::Display()
 {
     PushID(this);
@@ -296,6 +310,9 @@ void FileBrowser::Display()
 
     if (shouldOpen_) {
         OpenPopup(openLabel_.c_str());
+    }
+    if (shouldClose_) {
+        CloseCurrentPopup();
     }
     isOpened_ = false;
 
@@ -585,7 +602,7 @@ void FileBrowser::RenderListView(float height)
 
     const auto& records = filteredRecords_.empty() ? fileRecords_ : filteredRecords_;
 
-    auto iconFont = FontStorage::getFont("largeIconFont");
+    auto iconFont = launcher::ui::Theme::font(launcher::ui::FontRole::IconBig);
 
     for (int i = 0; i < records.size(); i++) {
         const auto& rsc = records[i];
@@ -737,7 +754,7 @@ void FileBrowser::RenderGridView(float height)
             const float iconY = itemMin.y + verticalPadding;
 
             // Рисуем иконку
-            auto largeIconFont = FontStorage::getFont("largeIconFont");
+            auto largeIconFont = launcher::ui::Theme::font(launcher::ui::FontRole::IconBig);
             if (largeIconFont) {
                 ImGui::PushFont(largeIconFont);
             }

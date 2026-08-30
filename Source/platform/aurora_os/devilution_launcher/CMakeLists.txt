@@ -1,77 +1,21 @@
 cmake_minimum_required(VERSION 3.19)
 
-include(FetchContent)
-include(CMakeRC.cmake)
+project(devilution_launcher LANGUAGES CXX)
 
-if(LAUNCHER_DESKTOP)
+option(LAUNCHER_DESKTOP "Build the standalone desktop launcher executable" OFF)
+option(LAUNCHER_TESTS "Build launcher unit tests" ${LAUNCHER_DESKTOP})
 
-  set(CMAKE_CXX_STANDARD 23)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-  # FetchContent_Declare(
-  #           fmt
-  #           URL https://github.com/fmtlib/fmt/releases/download/11.2.0/fmt-11.2.0.zip
-  #           DOWNLOAD_EXTRACT_TIMESTAMP true
-  #           OVERRIDE_FIND_PACKAGE
-  # )
-
-  # FetchContent_MakeAvailable(fmt)
-
-  # FetchContent_Declare(
-  #     zlib
-  #     GIT_REPOSITORY "https://github.com/madler/zlib.git"
-  #     FIND_PACKAGE_ARGS NAMES ZLIB
-  # )
-  # FetchContent_MakeAvailable(zlib)
-  # add_library(ZLIB::ZLIB ALIAS zlibstatic)
-
-
-  # FetchContent_Declare(
-  #         SDL2
-  #         GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-  #         GIT_TAG release-2.26.3
-  #         GIT_SHALLOW TRUE
-  #         GIT_PROGRESS TRUE
-  # )
-  # FetchContent_MakeAvailable(SDL2)
-
-  find_package(SDL2)
-
-  # FetchContent_Declare(
-  #   ssl_content
-  #   URL      https://github.com/janbar/openssl-cmake/archive/refs/tags/1.1.1k-20210430.tar.gz
-  #   URL_HASH MD5=f4294e5de7ebb20f9a695155660f1afd
-  #   DOWNLOAD_EXTRACT_TIMESTAMP true
-  # )
-  # FetchContent_MakeAvailable(ssl_content)
-  # add_library(OpenSSL::SSL ALIAS ssl)
-  # add_library(OpenSSL::Crypto ALIAS crypto)
-
-
-  # FetchContent_Declare(curl
-  #     URL https://curl.se/download/curl-8.5.0.tar.gz
-  #     DOWNLOAD_EXTRACT_TIMESTAMP true
-  #     OVERRIDE_FIND_PACKAGE # this one
-  # )
-
-  # FetchContent_MakeAvailable(curl)
-
-  find_package(CURL REQUIRED)
-
-  FetchContent_Declare(SDL2_image
-      URL https://github.com/libsdl-org/SDL_image/archive/refs/tags/release-2.8.8.zip
-      DOWNLOAD_EXTRACT_TIMESTAMP true
-      OVERRIDE_FIND_PACKAGE
-  )
-  FetchContent_MakeAvailable(SDL2_image)
-
-  find_package(SDL2_image REQUIRED)
-
-  add_library(SDL2::SDL2_image ALIAS SDL2::image)
-
-else()
+if(NOT LAUNCHER_DESKTOP)
+  # Part of the devilutionX Aurora OS build: use the project helpers.
   include(functions/FetchContent_MakeAvailableExcludeFromAll)
 endif()
+
+include(FetchContent)
+include(CMakeRC.cmake)
 
 cmake_policy(SET CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
@@ -79,45 +23,70 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(ZOE_BUILD_SHARED_LIBS OFF)
 set(ZOE_BUILD_TESTS OFF)
 set(SPDLOG_NO_EXCEPTIONS ON)
-# set(BUILD_SHARED_LIBS OFF)
-# set(SPDLOG_FMT_EXTERNAL ON)
+set(BUILD_SHARED_LIBS OFF)
 set(SPDLOG_BUILD_SHARED OFF)
 
 FetchContent_Declare(
   imgui
-  GIT_REPOSITORY "https://github.com/ocornut/imgui.git"
+  GIT_REPOSITORY "https://github.com/ocornut/imgui"
   GIT_TAG 44aa9a4b3a6f27d09a4eb5770d095cbd376dfc4b # Branch: docking, date: 10.09.2024, 04:29 GMT+2
+  GIT_SHALLOW
   EXCLUDE_FROM_ALL
 )
 FetchContent_MakeAvailable(imgui)
 
 FetchContent_Declare(
   spdlog
-  URL https://github.com/gabime/spdlog/archive/refs/tags/v1.15.3.zip
-  DOWNLOAD_EXTRACT_TIMESTAMP true
-  EXCLUDE_FROM_ALL
+  GIT_REPOSITORY "https://github.com/gabime/spdlog"
+  GIT_TAG v1.14.1
+  GIT_SHALLOW
 )
 FetchContent_MakeAvailable(spdlog)
 
 FetchContent_Declare(
   zoe
   GIT_REPOSITORY "https://github.com/winsoft666/zoe"
-  GIT_TAG v3.2
+  GIT_TAG v3.6
   EXCLUDE_FROM_ALL
 )
-
 FetchContent_MakeAvailable(zoe)
+# zoe's own CMakeLists points at ${CMAKE_SOURCE_DIR}/include, which is
+# wrong when zoe is embedded via FetchContent — fix the include path
+# explicitly and expose a namespaced alias.
+target_include_directories(zoe PUBLIC "$<BUILD_INTERFACE:${zoe_SOURCE_DIR}/include>")
+if(NOT TARGET zoe::zoe)
+  add_library(zoe::zoe ALIAS zoe)
+endif()
 
 FetchContent_Declare(
   tomlplusplus
-  GIT_REPOSITORY "https://github.com/marzer/tomlplusplus.git"
+  GIT_REPOSITORY "https://github.com/marzer/tomlplusplus"
   GIT_TAG v3.4.0
   GIT_SHALLOW
   EXCLUDE_FROM_ALL
 )
-
 FetchContent_MakeAvailable(tomlplusplus)
 
+if(LAUNCHER_DESKTOP)
+  # CONFIG mode picks the shared import library (SDL2.dll.a). SDL2_image
+  # is built shared as well: its static flavor links the separate
+  # SDL2::SDL2-static target (libSDL2.a), and linking both static and
+  # shared SDL2 into one binary produces duplicate-symbol errors.
+  find_package(SDL2 CONFIG REQUIRED)
+  find_package(CURL REQUIRED)
+
+  FetchContent_Declare(SDL2_image
+      URL https://github.com/libsdl-org/SDL_image/archive/refs/tags/release-2.8.8.zip
+      DOWNLOAD_EXTRACT_TIMESTAMP true
+      OVERRIDE_FIND_PACKAGE
+  )
+  set(BUILD_SHARED_LIBS ON)
+  FetchContent_MakeAvailable(SDL2_image)
+  set(BUILD_SHARED_LIBS OFF)
+  if(NOT TARGET SDL2::SDL2_image)
+    add_library(SDL2::SDL2_image ALIAS SDL2_image)
+  endif()
+endif()
 
 add_library(imgui STATIC
   ${imgui_SOURCE_DIR}/imgui.cpp ${imgui_SOURCE_DIR}/imgui.h
@@ -128,7 +97,6 @@ add_library(imgui STATIC
   ${imgui_SOURCE_DIR}/imstb_truetype.h
 
   ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp
-  # ${imgui_SOURCE_DIR}/misc/freetype/imgui_freetype.cpp
 
   ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.h ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
   ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer2.h ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer2.cpp)
@@ -137,7 +105,6 @@ target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR})
 target_compile_features(imgui PRIVATE cxx_std_20)
 target_compile_definitions(imgui PUBLIC IMGUI_DEFINE_MATH_OPERATORS)
 target_link_libraries(imgui PUBLIC SDL2::SDL2)
-
 
 cmrc_add_resource_library(launcher_assets
     ALIAS
@@ -148,55 +115,113 @@ cmrc_add_resource_library(launcher_assets
         assets
     PREFIX
         assets
-    assets/bg.png
-    assets/Beaufort-Bold.ttf
-    assets/Beaufort-Regular.ttf
-    assets/Roboto-Bold.ttf
-    assets/Roboto-Regular.ttf
-    assets/fontawesome-webfont.ttf
-    assets/exocet1.ttf
-    assets/exocet2.ttf
+        assets/bg.png
+        assets/Beaufort-Bold.ttf
+        assets/Beaufort-Regular.ttf
+        assets/Roboto-Bold.ttf
+        assets/Roboto-Regular.ttf
+        assets/fontawesome-webfont.ttf
+        assets/exocet1.ttf
+        assets/exocet2.ttf
 )
 
-set(LAUNCHER_SOURCES
+# ---------------------------------------------------------------------------
+# launcher_core: portable MVI core + services + mocks (no SDL, no ImGui,
+# no Qt). Shared by the desktop executable and unit tests.
+# ---------------------------------------------------------------------------
+set(LAUNCHER_CORE_SOURCES
+    core/GameFiles.cpp
+    core/Store.cpp
+    services/ConfigService.cpp
+    services/DesktopPathProvider.cpp
+    services/GameFilesService.cpp
+    services/ServiceFactory.cpp
+    services/ZoeDownloadService.cpp
+    services/mocks/MockDownloadService.cpp
+    services/mocks/MockScenarios.cpp
+    services/mocks/MockServices.cpp
+    services/mocks/MockWorld.cpp
+)
+
+set(LAUNCHER_UI_SOURCES
     Application.cpp
-    Application.hpp
     DPIHandler.cpp
-    DPIHandler.hpp
     thirdparty/FileBrowser.cpp
-    GameView.cpp
-    GameView.hpp
-    GameModel.hpp
-    GameModel.cpp
-    GamePresenter.cpp
-    GamePresenter.hpp
+    ui/Format.cpp
+    ui/LauncherView.cpp
+    ui/Scale.cpp
+    ui/Theme.cpp
+    ui/dialogs/Dialogs.cpp
+    ui/screens/Screens.cpp
+    ui/widgets/Widgets.cpp
 )
 
-if(LAUNCHER_DESKTOP)
-  add_executable(devilution_launcher
-      ${LAUNCHER_SOURCES}
-      main.cpp
-  )
-else()
-  add_devilutionx_object_library(devilution_launcher
-      ${LAUNCHER_SOURCES}
-  )
+# App version from the repository VERSION file.
+set(LAUNCHER_APP_VERSION_STRING "dev")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../../VERSION")
+  file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../../../VERSION" LAUNCHER_VERSION_LINE LIMIT_COUNT 1)
+  string(STRIP "${LAUNCHER_VERSION_LINE}" LAUNCHER_VERSION_LINE)
+  if(NOT "${LAUNCHER_VERSION_LINE}" STREQUAL "")
+    set(LAUNCHER_APP_VERSION_STRING "${LAUNCHER_VERSION_LINE}")
+  endif()
 endif()
 
-target_link_libraries(devilution_launcher
-    PUBLIC
-        SDL2::SDL2
-        SDL2::SDL2_image
-        # fmt::fmt
-        imgui
-        spdlog::spdlog
-        launcher::assets
-        zoe::zoe
-        CURL::libcurl
-        tomlplusplus::tomlplusplus
-)
+if(LAUNCHER_DESKTOP)
 
-target_include_directories(devilution_launcher
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
-)
+  add_library(launcher_core OBJECT ${LAUNCHER_CORE_SOURCES})
+  target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe tomlplusplus::tomlplusplus)
+
+  add_executable(devilution_launcher
+      ${LAUNCHER_UI_SOURCES}
+      main.cpp
+  )
+  target_include_directories(devilution_launcher PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_compile_definitions(devilution_launcher PRIVATE LAUNCHER_APP_VERSION="${LAUNCHER_APP_VERSION_STRING}")
+  target_link_libraries(devilution_launcher
+      PRIVATE
+          launcher_core
+          spdlog::spdlog
+          zoe::zoe
+          tomlplusplus::tomlplusplus
+          imgui
+          launcher::assets
+          SDL2::SDL2
+          SDL2::SDL2_image
+  )
+
+  # Keep the freshly built SDL2_image.dll next to the executable so the
+  # launcher runs straight from the build tree.
+  add_custom_command(TARGET devilution_launcher POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+              "$<TARGET_FILE:SDL2_image>"
+              "$<TARGET_FILE_DIR:devilution_launcher>"
+  )
+
+  if(LAUNCHER_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+  endif()
+
+else()
+
+  # Aurora OS: object libraries linked into the game binary.
+  add_devilutionx_object_library(launcher_core ${LAUNCHER_CORE_SOURCES} services/AuroraPathProvider.cpp)
+  target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+  # AuroraPathProvider includes StandartPaths.hpp from the parent directory.
+  target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+  target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe tomlplusplus::tomlplusplus)
+
+  add_devilutionx_object_library(devilution_launcher ${LAUNCHER_UI_SOURCES})
+  target_include_directories(devilution_launcher PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+  target_compile_definitions(devilution_launcher PRIVATE LAUNCHER_APP_VERSION="${LAUNCHER_APP_VERSION_STRING}")
+  target_link_libraries(devilution_launcher
+      PUBLIC
+          launcher_core
+          imgui
+          launcher::assets
+          SDL2::SDL2
+          SDL2::SDL2_image
+  )
+
+endif()

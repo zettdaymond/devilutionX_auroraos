@@ -1,5 +1,6 @@
 #include <SDL.h>
 #include <SDL_main.h>
+#include <array>
 
 #ifdef __SWITCH__
 #include "platform/switch/network.h"
@@ -24,7 +25,14 @@
 #   include "Utilities.hpp"
 #   include "StandartPaths.hpp"
 #   include "DisplayBlankerController.hpp"
+#   include "Application.hpp"
+#   include "appfat.h"
 #   define FUNC_EXPORT extern "C" __attribute__((visibility("default"))) int main
+
+namespace devilution {
+extern SDL_Window *ghMainWnd;
+}
+
 #else
 #   define FUNC_EXPORT extern "C" int main
 #endif
@@ -65,8 +73,41 @@ FUNC_EXPORT(int argc, char **argv)
 
     devilution::DisplayBlankerController::Init();
     devilution::DisplayBlankerController::SetPreventDisplayBlanking(true);
-#endif
 
+    std::array<char*, 2> new_argv;
+
+    if (SDL_Init(SDL_INIT_VIDEO) <= -1) {
+        devilution::ErrSdl();
+    }
+
+    devilution::ghMainWnd = SDL_CreateWindow("Diablo launcher", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1, 1, SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_ALLOW_HIGHDPI);
+    auto app = App::Application(devilution::ghMainWnd, "org.diasurgical", "devilutionx");
+    const auto launcherResult = app.run();
+
+    SDL_DestroyWindow(devilution::ghMainWnd);
+    SDL_Quit();
+
+    if(launcherResult.success) {
+        if(launcherResult.action == App::ExitAction::LaunchDiablo
+           || launcherResult.action == App::ExitAction::LaunchHellfire)
+        {
+            if(!launcherResult.dataPath.empty()) {
+                devilution::AuroraOsStandartPaths::SetUserDefinedMPQSearchPath(launcherResult.dataPath.string());
+            }
+        }
+
+        if(launcherResult.action == App::ExitAction::LaunchDemo) {
+            new_argv = { argv[0], (char*)"--spawn" };
+            argc = new_argv.size();
+            argv = new_argv.data();
+        }
+        else if(launcherResult.action == App::ExitAction::LaunchHellfire) {
+            new_argv = { argv[0], (char*)"--hellfire" };
+            argc = new_argv.size();
+            argv = new_argv.data();
+        }
+    }
+#endif
 	const int result = devilution::DiabloMain(argc, argv);
 #ifdef GPERF_HEAP_MAIN
 	HeapProfilerStop();
