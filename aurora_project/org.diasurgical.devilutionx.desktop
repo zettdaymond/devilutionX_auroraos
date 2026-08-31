@@ -7,10 +7,10 @@ Name=DevilutionX
 Name[ru]=DevilutionX
 
 [X-Application]
-Permissions=Audio;UserDirs
+Permissions=Audio;UserDirs;Internet
 OrganizationName=org.diasurgical
 ApplicationName=devilutionx
 ExecDBus=/usr/bin/org.diasurgical.devilutionx
 
 [X-Aurora-Application]
-Orientation=Landscape
+Orientation=All
