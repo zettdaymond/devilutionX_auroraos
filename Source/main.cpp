@@ -93,20 +93,25 @@ FUNC_EXPORT(int argc, char **argv)
     SDL_DestroyWindow(devilution::ghMainWnd);
     SDL_Quit();
 
-    if (launcherResult.success) {
-        if (launcher::WantsUserMpqPath(launcherResult.action) && !launcherResult.dataPath.empty()) {
-            devilution::AuroraOsStandartPaths::SetUserDefinedMPQSearchPath(launcherResult.dataPath.string());
-        }
+    if (!launcherResult.success) {
+        // Пользователь закрыл лаунчер, не выбрав игру — выходим из
+        // приложения вместо запуска игры в режиме по умолчанию.
+        devilution::DisplayBlankerController::Shutdown();
+        return 0;
+    }
 
-        engineArgs = launcher::EngineArgsFor(launcherResult.action, launcherResult.dataPath);
-        if (!engineArgs.empty()) {
-            engineArgv.push_back(argv[0]);
-            for (const std::string &arg : engineArgs) {
-                engineArgv.push_back(const_cast<char *>(arg.c_str()));
-            }
-            argc = static_cast<int>(engineArgv.size());
-            argv = engineArgv.data();
+    if (launcher::WantsUserMpqPath(launcherResult.action) && !launcherResult.dataPath.empty()) {
+        devilution::AuroraOsStandartPaths::SetUserDefinedMPQSearchPath(launcherResult.dataPath.string());
+    }
+
+    engineArgs = launcher::EngineArgsFor(launcherResult.action, launcherResult.dataPath);
+    if (!engineArgs.empty()) {
+        engineArgv.push_back(argv[0]);
+        for (const std::string &arg : engineArgs) {
+            engineArgv.push_back(const_cast<char *>(arg.c_str()));
         }
+        argc = static_cast<int>(engineArgv.size());
+        argv = engineArgv.data();
     }
 #endif
 	const int result = devilution::DiabloMain(argc, argv);

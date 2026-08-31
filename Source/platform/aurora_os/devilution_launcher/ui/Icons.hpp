@@ -22,5 +22,6 @@ inline constexpr const char *Refresh = "\xEF\x80\xA1";       // U+F021
 inline constexpr const char *Exclamation = "\xEF\x84\xAA";   // U+F12A
 inline constexpr const char *Music = "\xEF\x80\x81";         // U+F001
 inline constexpr const char *Book = "\xEF\x80\xAD";          // U+F02D
+inline constexpr const char *Envelope = "\xEF\x83\xA0";      // U+F0E0
 
 } // namespace launcher::ui::icons

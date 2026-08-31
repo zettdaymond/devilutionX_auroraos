@@ -9,6 +9,7 @@
 
 #include <imgui.h>
 
+#include <cstring>
 #include <string>
 
 #ifndef LAUNCHER_APP_VERSION
@@ -237,14 +238,57 @@ namespace {
 
 void RenderChecklist(const LauncherState &state, const Dispatcher &dispatch)
 {
-	if (ImGui::BeginTable("files", 4, ImGuiTableFlags_SizingStretchProp)) {
+	// Файлы сгруппированы по режимам игры: пользователь сразу видит,
+	// что для Diablo достаточно одного файла, а hf*.mpq нужны только
+	// Hellfire, и их отсутствие не мешает игре в оригинал.
+	struct FileGroup {
+		const char *title;
+		std::vector<KnownFile> files;
+	};
+	const FileGroup groups[] {
+		{ "Diablo", { KnownFile::Diabdat } },
+		{ "Hellfire", { KnownFile::Hellfire, KnownFile::HfMonk, KnownFile::HfMusic, KnownFile::HfVoice } },
+		{ "Прочее", { KnownFile::Spawn, KnownFile::RuVoice } },
+	};
+
+	auto renderGroup = [&](const FileGroup &group, int groupIndex) {
+		// Заголовок группы + сводка.
+		size_t missing = 0;
+		for (KnownFile file : group.files) {
+			if (state.fileSizes[static_cast<size_t>(file)] < 0) {
+				++missing;
+			}
+		}
+		ImGui::Dummy(ImVec2(0, Scale::px(0.2F)));
+		ImGui::PushFont(Theme::font(FontRole::BodyBold));
+		ImGui::TextUnformatted(group.title);
+		ImGui::PopFont();
+		ImGui::SameLine();
+		ImGui::PushFont(Theme::font(FontRole::Body));
+		ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(missing == 0 ? ColorRole::Success : ColorRole::TextDim));
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + Scale::px(0.15F));
+		if (strcmp(group.title, "Прочее") == 0) {
+			ImGui::TextUnformatted("— не обязательны для запуска");
+		} else if (missing == 0) {
+			ImGui::TextUnformatted("— всё на месте");
+		} else {
+			ImGui::Text("— не хватает %zu из %zu", missing, group.files.size());
+		}
+		ImGui::PopStyleColor();
+		ImGui::PopFont();
+		ImGui::Dummy(ImVec2(0, Scale::px(0.2F)));
+
+		const std::string tableName = "files_" + std::to_string(groupIndex);
+		if (!ImGui::BeginTable(tableName.c_str(), 4, ImGuiTableFlags_SizingStretchProp)) {
+			return;
+		}
 		ImGui::TableSetupColumn("status", ImGuiTableColumnFlags_WidthFixed, Scale::px(1.6F));
 		ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthStretch);
 		ImGui::TableSetupColumn("detail", ImGuiTableColumnFlags_WidthStretch);
 		ImGui::TableSetupColumn("actions", ImGuiTableColumnFlags_WidthFixed, Scale::px(2.4F));
 
-		for (size_t i = 0; i < kKnownFileCount; ++i) {
-			const KnownFile id = static_cast<KnownFile>(i);
+		for (KnownFile id : group.files) {
+			const size_t i = static_cast<size_t>(id);
 			const FileSpec &spec = kFileCatalog[i];
 			ImGui::TableNextRow();
 
@@ -274,6 +318,10 @@ void RenderChecklist(const LauncherState &state, const Dispatcher &dispatch)
 			}
 		}
 		ImGui::EndTable();
+	};
+
+	for (int g = 0; g < 3; ++g) {
+		renderGroup(groups[g], g);
 	}
 }
 
@@ -329,7 +377,14 @@ void About(const LauncherState &)
 
 	ImGui::TextWrapped(
 	    "DevilutionX — современный открытый порт классического Diablo (1996) "
-	    "и дополнения Hellfire с исправлением сотен ошибок оригинала.\n\n"
+	    "и дополнения Hellfire с исправлением сотен ошибок оригинала.");
+
+	ImGui::TextWrapped(
+	    "Эта сборка — неофициальный порт DevilutionX на Aurora OS: адаптированы "
+	    "управление (сенсорный экран, виртуальный геймпад), звук и графика "
+	    "под устройства с Aurora OS.");
+
+	ImGui::TextWrapped(
 	    "Этот лаунчер помогает настроить игру: найти файлы оригинала, скачать "
 	    "бесплатную демо-версию или русскую озвучку.");
 
@@ -348,7 +403,14 @@ void About(const LauncherState &)
 	ImGui::TextUnformatted("Ссылки");
 	ImGui::PopFont();
 	ImGui::Text("%s  github.com/diasurgical/DevilutionX", icons::Globe);
+	ImGui::Text("%s  github.com/zettdaymond/devilutionX_auroraos", icons::Globe);
 	ImGui::Text("%s  Diablo © 1996 Blizzard Entertainment", icons::Book);
+
+	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
+	ImGui::PushFont(Theme::font(FontRole::BodyBold));
+	ImGui::TextUnformatted("Поддержка");
+	ImGui::PopFont();
+	ImGui::TextWrapped("%s  Нашли проблему или есть предложение? Пишите: zettday@gmail.com", icons::Envelope);
 
 	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextDim));

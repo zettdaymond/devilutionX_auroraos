@@ -131,15 +131,19 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 	textY += titleSize + Scale::px(0.15F);
 	if (status != nullptr) {
 		// Draw status line by line so embedded '\n' breaks stay aligned.
+		// The font first shrinks to fit (dense phone DPI), ellipsis is the
+		// last resort only.
 		const char *lineStart = status;
 		while (lineStart != nullptr && *lineStart != '\0') {
 			const char *lineEnd = std::strchr(lineStart, '\n');
 			const std::string line(lineStart, lineEnd != nullptr ? lineEnd : lineStart + std::strlen(lineStart));
-			const std::string fitted = FitTextEllipsis(Theme::font(FontRole::Body), statusSize, line.c_str(),
+			const float lineSize = FitFontSize(Theme::font(FontRole::Body), statusSize, line.c_str(), textMaxWidth,
+			    Scale::px(0.62F));
+			const std::string fitted = FitTextEllipsis(Theme::font(FontRole::Body), lineSize, line.c_str(),
 			    textMaxWidth);
-			draw->AddText(Theme::font(FontRole::Body), statusSize, ImVec2(min.x + pad, textY),
+			draw->AddText(Theme::font(FontRole::Body), lineSize, ImVec2(min.x + pad, textY),
 			    Theme::colorU32(ColorRole::TextBody), fitted.c_str());
-			textY += statusSize * 1.3F;
+			textY += lineSize * 1.3F;
 			lineEnd != nullptr ? lineStart = lineEnd + 1 : lineStart = nullptr;
 		}
 	}
