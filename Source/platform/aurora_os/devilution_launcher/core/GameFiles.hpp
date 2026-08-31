@@ -35,11 +35,11 @@ struct FileSpec {
 
 /// Каталог всех известных файлов. Держать синхронно с KnownFile.
 inline constexpr std::array<FileSpec, kKnownFileCount> kFileCatalog { {
-	{ KnownFile::Diabdat, "diabdat.mpq", "DIABDAT.MPQ (оригинальный Diablo)", 0, false },
-	{ KnownFile::Hellfire, "hellfire.mpq", "hellfire.mpq (дополнение)", 0, false },
-	{ KnownFile::HfMonk, "hfmonk.mpq", "hfmonk.mpq (монах Hellfire)", 0, false },
-	{ KnownFile::HfMusic, "hfmusic.mpq", "hfmusic.mpq (музыка Hellfire)", 0, false },
-	{ KnownFile::HfVoice, "hfvoice.mpq", "hfvoice.mpq (озвучка Hellfire)", 0, false },
+	{ KnownFile::Diabdat, "diabdat.mpq", "DIABDAT.MPQ", 0, false },
+	{ KnownFile::Hellfire, "hellfire.mpq", "hellfire.mpq", 0, false },
+	{ KnownFile::HfMonk, "hfmonk.mpq", "hfmonk.mpq", 0, false },
+	{ KnownFile::HfMusic, "hfmusic.mpq", "hfmusic.mpq", 0, false },
+	{ KnownFile::HfVoice, "hfvoice.mpq", "hfvoice.mpq", 0, false },
 	{ KnownFile::Spawn, "spawn.mpq", "spawn.mpq (демо-версия)", 52 * 1024 * 1024, true },
 	{ KnownFile::RuVoice, "ru.mpq", "ru.mpq (русская озвучка)", 150 * 1024 * 1024, true },
 } };

@@ -337,11 +337,13 @@ void RenderFileGroup(const LauncherState &state, const Dispatcher &dispatch, con
 	// смещённым влево.
 	const int columnCount = anyDeletable ? 4 : 3;
 	const std::string tableName = "files_" + std::to_string(groupIndex);
-	if (!ImGui::BeginTable(tableName.c_str(), columnCount, ImGuiTableFlags_SizingStretchProp)) {
+	// FixedFit: колонка имени сжимается ровно под самое длинное имя файла,
+	// а всё свободное место достаётся размеру и пути.
+	if (!ImGui::BeginTable(tableName.c_str(), columnCount, ImGuiTableFlags_SizingFixedFit)) {
 		return;
 	}
 	ImGui::TableSetupColumn("status", ImGuiTableColumnFlags_WidthFixed, Scale::Px(1.6F));
-	ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthStretch);
+	ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthFixed);
 	ImGui::TableSetupColumn("detail", ImGuiTableColumnFlags_WidthStretch);
 	if (anyDeletable) {
 		ImGui::TableSetupColumn("actions", ImGuiTableColumnFlags_WidthFixed, Scale::Px(2.0F));
@@ -353,19 +355,16 @@ void RenderFileGroup(const LauncherState &state, const Dispatcher &dispatch, con
 		ImGui::TableNextRow();
 
 		const bool present = state.fileSizes[i] >= 0;
-		std::string detail;
+		std::string status;
+		std::string path;
 		if (present) {
-			detail = FormatBytes(state.fileSizes[i]);
-			if (!state.fileFolders[i].empty()) {
-				detail += "\n" + state.fileFolders[i].string();
-			}
-			if (spec.downloadable) {
-				detail += "\nскачан лаунчером";
-			}
+			status = FormatBytes(state.fileSizes[i]);
+			path = state.fileFolders[i].string();
 		} else {
-			detail = spec.downloadable ? "можно скачать" : "не найден";
+			status = spec.downloadable ? "можно скачать" : "не найден";
 		}
-		widgets::FileStatusLine(present, spec.displayName.data(), detail.c_str());
+		widgets::FileStatusLine(present, spec.displayName.data(), status.c_str(),
+		    path.empty() ? nullptr : path.c_str(), present && spec.downloadable);
 
 		if (anyDeletable) {
 			ImGui::TableNextColumn();
@@ -439,7 +438,6 @@ void Data(const LauncherState &state, const Dispatcher &dispatch)
 void About(const LauncherState &, const Dispatcher &dispatch)
 {
 	widgets::ScreenHeader("О порте", [&dispatch] { dispatch(intent::UiNavigate { Screen::Home }); });
-	ImGui::Dummy(ImVec2(0, Scale::Px(1.0F)));
 	Theme::PushFont(FontRole::Heading);
 	widgets::CenteredText("DIABLO", ColorRole::TextHeading);
 	Theme::PopFont();

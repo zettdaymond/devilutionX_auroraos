@@ -338,7 +338,73 @@ void CenteredText(const char *text, ColorRole role)
 	ImGui::PopStyleColor();
 }
 
-void FileStatusLine(bool present, const char *text, const char *detail)
+/// Обрезает текст посередине: голова + «…» + хвост. Для пути важны
+/// начало (корень/диск) и конец (имя файла) — жертвуем серединой,
+/// а не краями, и никогда не рвём строку посреди слова.
+std::string MiddleEllipsis(ImFont *font, float size, const std::string &text, float maxWidth)
+{
+	if (font == nullptr || maxWidth <= font->CalcTextSizeA(size, FLT_MAX, 0.0F, "...").x) {
+		return text;
+	}
+	if (font->CalcTextSizeA(size, FLT_MAX, 0.0F, text.c_str()).x <= maxWidth) {
+		return text;
+	}
+	auto popBackCodePoint = [](std::string &s) {
+		s.pop_back();
+		while (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xC0) == 0x80) {
+			s.pop_back();
+		}
+	};
+	auto popFrontCodePoint = [](std::string &s) {
+		const auto *begin = reinterpret_cast<const unsigned char *>(s.data());
+		size_t len = 1;
+		while (len < s.size() && (begin[len] & 0xC0) == 0x80) {
+			++len;
+		}
+		s.erase(0, len);
+	};
+
+	// Делим примерно пополам по код-точкам: хвост чуть длиннее — имя
+	// файла в конце пути обычно важнее корня.
+	std::string head = text;
+	std::string tail;
+	size_t codePoints = 0;
+	for (auto it = head.begin(); it != head.end();) {
+		size_t len = 1;
+		while (it + len != head.end() && (static_cast<unsigned char>(it[len]) & 0xC0) == 0x80) {
+			++len;
+		}
+		++codePoints;
+		it += len;
+	}
+	size_t kept = 0;
+	std::string::iterator split = head.begin();
+	while (kept < codePoints * 2 / 5) {
+		size_t len = 1;
+		while (split + len != head.end() && (static_cast<unsigned char>(split[len]) & 0xC0) == 0x80) {
+			++len;
+		}
+		++kept;
+		split += len;
+	}
+	tail = std::string(split, head.end());
+	head.erase(split, head.end());
+
+	while (!head.empty() || !tail.empty()) {
+		const std::string candidate = head + "..." + tail;
+		if (font->CalcTextSizeA(size, FLT_MAX, 0.0F, candidate.c_str()).x <= maxWidth) {
+			return candidate;
+		}
+		if (head.size() >= tail.size() && !head.empty()) {
+			popBackCodePoint(head);
+		} else if (!tail.empty()) {
+			popFrontCodePoint(tail);
+		}
+	}
+	return "...";
+}
+
+void FileStatusLine(bool present, const char *name, const char *status, const char *path, bool downloaded)
 {
 	ImGui::TableNextColumn();
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(present ? ColorRole::Success : ColorRole::TextDim));
@@ -349,14 +415,22 @@ void FileStatusLine(bool present, const char *text, const char *detail)
 	if (!present) {
 		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 	}
-	ImGui::TextWrapped("%s", text);
+	ImGui::TextUnformatted(name);
 	if (!present) {
 		ImGui::PopStyleColor();
 	}
 
 	ImGui::TableNextColumn();
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
-	ImGui::TextWrapped("%s", detail);
+	ImGui::TextUnformatted(status);
+	if (present && path != nullptr && path[0] != '\0') {
+		const std::string fitted = MiddleEllipsis(ImGui::GetFont(), ImGui::GetFontSize(), path,
+		    ImGui::GetContentRegionAvail().x);
+		ImGui::TextUnformatted(fitted.c_str());
+		if (downloaded) {
+			ImGui::Text("%s скачан", icons::Download);
+		}
+	}
 	ImGui::PopStyleColor();
 }
 

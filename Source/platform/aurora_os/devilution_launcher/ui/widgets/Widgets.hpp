@@ -66,8 +66,11 @@ void IconButton(const char *icon, const char *label, bool accent, const ImVec2 &
 /// Текст цветом роли, по центру текущей ширины контента.
 void CenteredText(const char *text, ColorRole role = ColorRole::TextBody);
 
-/// Маркер статуса: зелёная галка или тусклый крест + текст + пояснение.
-void FileStatusLine(bool present, const char *text, const char *detail);
+/// Маркер статуса файла: галка/крест, имя и статус (размер либо
+/// «не найден»). Для найденного файла вторыми строками идут путь
+/// (обрезанный посередине многоточием до ширины колонки) и пометка
+/// «скачан лаунчером».
+void FileStatusLine(bool present, const char *name, const char *status, const char *path, bool downloaded);
 
 /// Шапка второстепенного экрана: кнопка «←» слева (возврат на главный),
 /// заголовок, золотой разделитель снизу.
