@@ -68,24 +68,10 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(tomlplusplus)
 
 if(LAUNCHER_DESKTOP)
-  # CONFIG mode picks the shared import library (SDL2.dll.a). SDL2_image
-  # is built shared as well: its static flavor links the separate
-  # SDL2::SDL2-static target (libSDL2.a), and linking both static and
-  # shared SDL2 into one binary produces duplicate-symbol errors.
+  # CONFIG mode picks the shared import library (SDL2.dll.a). Арты и
+  # иконки декодирует вендоренный stb_image, SDL_image не нужен вовсе.
   find_package(SDL2 CONFIG REQUIRED)
   find_package(CURL REQUIRED)
-
-  FetchContent_Declare(SDL2_image
-      URL https://github.com/libsdl-org/SDL_image/archive/refs/tags/release-2.8.8.zip
-      DOWNLOAD_EXTRACT_TIMESTAMP true
-      OVERRIDE_FIND_PACKAGE
-  )
-  set(BUILD_SHARED_LIBS ON)
-  FetchContent_MakeAvailable(SDL2_image)
-  set(BUILD_SHARED_LIBS OFF)
-  if(NOT TARGET SDL2::SDL2_image)
-    add_library(SDL2::SDL2_image ALIAS SDL2_image)
-  endif()
 endif()
 
 add_library(imgui STATIC
@@ -115,10 +101,10 @@ cmrc_add_resource_library(launcher_assets
         assets
     PREFIX
         assets
-        assets/bg.png
-        assets/hero_diablo.png
-        assets/hero_hellfire.png
-        assets/hero_demo.png
+        assets/bg.jpg
+        assets/hero_diablo.jpg
+        assets/hero_hellfire.jpg
+        assets/hero_demo.jpg
         assets/icon_diablo.png
         assets/icon_hellfire.png
         assets/icon_demo.png
@@ -194,15 +180,6 @@ if(LAUNCHER_DESKTOP)
           imgui
           launcher::assets
           SDL2::SDL2
-          SDL2::SDL2_image
-  )
-
-  # Keep the freshly built SDL2_image.dll next to the executable so the
-  # launcher runs straight from the build tree.
-  add_custom_command(TARGET devilution_launcher POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-              "$<TARGET_FILE:SDL2_image>"
-              "$<TARGET_FILE_DIR:devilution_launcher>"
   )
 
   if(LAUNCHER_TESTS)
@@ -228,7 +205,6 @@ else()
           imgui
           launcher::assets
           SDL2::SDL2
-          SDL2::SDL2_image
   )
 
 endif()

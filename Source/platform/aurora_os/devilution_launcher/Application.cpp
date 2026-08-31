@@ -5,8 +5,12 @@
 #include "ui/LauncherView.hpp"
 #include "ui/Theme.hpp"
 
+// stb_image декодирует JPEG/PNG сам: сборка SDL_image для Aurora не
+// содержит JPEG-загрузчика, и ради него не хочется тащить libjpeg в движок.
+#define STB_IMAGE_IMPLEMENTATION
+#include "thirdparty/stb_image.h"
+
 #include <SDL2/SDL.h>
-#include <SDL_image.h>
 #include <backends/imgui_impl_sdl2.h>
 #include <backends/imgui_impl_sdlrenderer2.h>
 #include <imgui.h>
@@ -26,38 +30,40 @@ namespace App {
 
 namespace {
 
-/// Decodes an embedded PNG into an SDL texture. Returns nullptr (and logs)
-/// when the asset is not bundled or fails to decode — callers fall back.
-/// Opaque art is converted to RGB24 so the renderer can skip the alpha
-/// channel it will never read.
-SDL_Texture *LoadAssetTexture(SDL_Renderer *renderer, const char *path, ImVec2 &outSize, bool opaque)
+/// Decodes an embedded image (JPEG art / PNG icons) into an SDL texture.
+/// Returns nullptr (and logs) when the asset is not bundled or fails to
+/// decode — callers fall back.
+SDL_Texture *LoadAssetTexture(SDL_Renderer *renderer, const char *path, ImVec2 &outSize)
 {
 	try {
 		auto file = cmrc::assets::get_filesystem().open(path);
-		SDL_RWops *rw = SDL_RWFromMem(const_cast<void *>(static_cast<const void *>(file.begin())),
-		    static_cast<int>(file.size()));
-		SDL_Surface *surface = IMG_Load_RW(rw, 1);
-		if (surface == nullptr) {
-			spdlog::warn("IMG_Load_RW({}) failed: {}", path, IMG_GetError());
+		int width = 0;
+		int height = 0;
+		int components = 0;
+		unsigned char *pixels = stbi_load_from_memory(
+		    reinterpret_cast<const unsigned char *>(file.begin()), static_cast<int>(file.size()),
+		    &width, &height, &components, 0);
+		if (pixels == nullptr) {
+			spdlog::warn("stbi_load({}) failed: {}", path, stbi_failure_reason());
 			return nullptr;
 		}
-		SDL_Surface *converted = nullptr;
-		if (opaque && surface->format->format != SDL_PIXELFORMAT_RGB24) {
-			converted = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGB24, 0);
-			if (converted != nullptr) {
-				SDL_FreeSurface(surface);
-				surface = converted;
-			}
-		}
-		SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+		// JPEG даёт 3 канала (RGB24), PNG-иконки — 4 (RGBA). Поверхность
+		// лишь обёртка над данными stb — освобождаем обе после текстуры.
+		const Uint32 format = components == 4 ? SDL_PIXELFORMAT_RGBA32 : SDL_PIXELFORMAT_RGB24;
+		SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormatFrom(pixels, width, height,
+		    components * 8, width * components, format);
+		SDL_Texture *texture = surface != nullptr ? SDL_CreateTextureFromSurface(renderer, surface) : nullptr;
 		if (texture != nullptr) {
 			// SDL2 defaults new textures to nearest-neighbour scaling: our
 			// art (photos and icons) is always displayed smaller than its
 			// natural size, which produced stair-stepped edges. The ImGui
 			// backend only fixes the scale mode of the font atlas it owns.
 			SDL_SetTextureScaleMode(texture, SDL_ScaleModeLinear);
+		} else {
+			spdlog::warn("SDL_CreateTextureFromSurface({}) failed: {}", path, SDL_GetError());
 		}
-		outSize = ImVec2(static_cast<float>(surface->w), static_cast<float>(surface->h));
+		outSize = ImVec2(static_cast<float>(width), static_cast<float>(height));
+		stbi_image_free(pixels);
 		SDL_FreeSurface(surface);
 		return texture;
 	} catch (const std::system_error &err) {
@@ -134,20 +140,20 @@ bool Application::setup()
 	// Artwork from the embedded assets: the shared background, optional
 	// per-mode hero panels and golden tile icons (absent files fall back
 	// to bg crops / FontAwesome glyphs).
-	m_backgroundTexture = LoadAssetTexture(m_renderer, "assets/bg.png", m_backgroundSize, true);
+	m_backgroundTexture = LoadAssetTexture(m_renderer, "assets/bg.jpg", m_backgroundSize);
 	struct ModeAsset {
 		ExitAction mode;
 		const char *heroPath;
 		const char *iconPath;
 	};
 	for (const ModeAsset &asset : std::initializer_list<ModeAsset> {
-	         { ExitAction::LaunchDiablo, "assets/hero_diablo.png", "assets/icon_diablo.png" },
-	         { ExitAction::LaunchHellfire, "assets/hero_hellfire.png", "assets/icon_hellfire.png" },
-	         { ExitAction::LaunchDemo, "assets/hero_demo.png", "assets/icon_demo.png" },
+	         { ExitAction::LaunchDiablo, "assets/hero_diablo.jpg", "assets/icon_diablo.png" },
+	         { ExitAction::LaunchHellfire, "assets/hero_hellfire.jpg", "assets/icon_hellfire.png" },
+	         { ExitAction::LaunchDemo, "assets/hero_demo.jpg", "assets/icon_demo.png" },
 	     }) {
 		const size_t idx = static_cast<size_t>(asset.mode);
-		m_heroTextures[idx] = LoadAssetTexture(m_renderer, asset.heroPath, m_heroSizes[idx], true);
-		m_iconTextures[idx] = LoadAssetTexture(m_renderer, asset.iconPath, m_iconSizes[idx], false);
+		m_heroTextures[idx] = LoadAssetTexture(m_renderer, asset.heroPath, m_heroSizes[idx]);
+		m_iconTextures[idx] = LoadAssetTexture(m_renderer, asset.iconPath, m_iconSizes[idx]);
 	}
 
 	return true;
