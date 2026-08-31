@@ -435,7 +435,7 @@ void FileRow(bool present, const char *name, const char *status, const char *pat
 		}
 		Theme::PopButtonStyle();
 	}
-	const float actionBottom = textBottom + buttonSize + gap;
+	const float actionBottom = actionWidth > 0.0F ? textBottom + buttonSize + gap : 0.0F;
 
 	if (present && path != nullptr && path[0] != '\0') {
 		ImGui::SetCursorPosY(textBottom);
