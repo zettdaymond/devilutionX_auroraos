@@ -86,9 +86,11 @@ private:
 	std::array<SDL_Texture *, 3> m_heroTextures {};
 	std::array<ImVec2, 3> m_heroSizes {};
 
-	/// Golden tile icons, indexed by ExitAction (null = FA glyph).
-	std::array<SDL_Texture *, 3> m_iconTextures {};
-	std::array<ImVec2, 3> m_iconSizes {};
+	/// Golden tile icons as pre-scaled levels (256/128/64), indexed by
+	/// ExitAction then level; count 3 = FA glyph fallback.
+	std::array<std::array<SDL_Texture *, 3>, 3> m_iconTextures {};
+	std::array<std::array<ImVec2, 3>, 3> m_iconSizes {};
+	std::array<int, 3> m_iconLevelCounts {};
 
 	bool m_running { true };
 	std::optional<launcher::Screen> m_initialScreen;

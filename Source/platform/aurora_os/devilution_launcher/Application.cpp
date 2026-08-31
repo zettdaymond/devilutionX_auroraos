@@ -9,6 +9,10 @@
 // содержит JPEG-загрузчика, и ради него не хочется тащить libjpeg в движок.
 #define STB_IMAGE_IMPLEMENTATION
 #include "thirdparty/stb_image.h"
+// Ручные «мипмапы» для иконок: SDL_Renderer не генерирует уровни, а
+// билинейка при сильной минификации рассыпает края.
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#include "thirdparty/stb_image_resize2.h"
 
 #include <SDL2/SDL.h>
 #include <backends/imgui_impl_sdl2.h>
@@ -23,12 +27,88 @@
 #include <filesystem>
 #include <iterator>
 #include <utility>
+#include <vector>
 
 CMRC_DECLARE(assets);
 
 namespace App {
 
 namespace {
+
+/// Wraps raw RGBA/RGB pixels in a surface and uploads them as a texture
+/// with linear filtering (SDL2 defaults textures to nearest-neighbour,
+/// which stair-steps everything we downscale).
+SDL_Texture *MakeTextureFromPixels(SDL_Renderer *renderer, const unsigned char *pixels, int width,
+    int height, int components)
+{
+	const Uint32 format = components == 4 ? SDL_PIXELFORMAT_RGBA32 : SDL_PIXELFORMAT_RGB24;
+	SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormatFrom(
+	    const_cast<unsigned char *>(pixels), width, height, components * 8, width * components, format);
+	if (surface == nullptr) {
+		spdlog::warn("SDL_CreateRGBSurfaceWithFormatFrom failed: {}", SDL_GetError());
+		return nullptr;
+	}
+	SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+	if (texture == nullptr) {
+		spdlog::warn("SDL_CreateTextureFromSurface failed: {}", SDL_GetError());
+	} else {
+		SDL_SetTextureScaleMode(texture, SDL_ScaleModeLinear);
+	}
+	SDL_FreeSurface(surface);
+	return texture;
+}
+
+/// Строит цепочку уменьшенных копий иконки (256→128→64, box-фильтр) —
+/// ручная замена мипмапам, которых SDL_Renderer не генерирует. Возвращает
+/// число готовых уровней (0 = использовать FontAwesome-фолбэк).
+int BuildIconLevels(SDL_Renderer *renderer, const char *path, SDL_Texture *outTextures[3], ImVec2 outSizes[3])
+{
+	try {
+		auto file = cmrc::assets::get_filesystem().open(path);
+		int width = 0;
+		int height = 0;
+		int components = 0;
+		unsigned char *source = stbi_load_from_memory(
+		    reinterpret_cast<const unsigned char *>(file.begin()), static_cast<int>(file.size()),
+		    &width, &height, &components, 0);
+		if (source == nullptr) {
+			spdlog::warn("stbi_load({}) failed: {}", path, stbi_failure_reason());
+			return 0;
+		}
+		constexpr int kSizes[3] = { 256, 128, 64 };
+		int count = 0;
+		for (int side : kSizes) {
+			if (side > width) {
+				continue;
+			}
+			const unsigned char *pixels = source;
+			std::vector<unsigned char> shrunk;
+			if (side != width) {
+				shrunk.resize(static_cast<size_t>(side) * side * components);
+				const stbir_pixel_layout layout = components == 4 ? STBIR_RGBA : STBIR_RGB;
+				if (stbir_resize(source, width, height, 0, shrunk.data(), side, side, 0, layout,
+			        STBIR_TYPE_UINT8, STBIR_EDGE_CLAMP, STBIR_FILTER_BOX)
+				    == nullptr) {
+					spdlog::warn("stbir_resize({} -> {}) failed", path, side);
+					continue;
+				}
+				pixels = shrunk.data();
+			}
+			SDL_Texture *texture = MakeTextureFromPixels(renderer, pixels, side, side, components);
+			if (texture == nullptr) {
+				continue;
+			}
+			outTextures[count] = texture;
+			outSizes[count] = ImVec2(static_cast<float>(side), static_cast<float>(side));
+			++count;
+		}
+		stbi_image_free(source);
+		return count;
+	} catch (const std::system_error &err) {
+		spdlog::info("{} not bundled ({}), using fallback", path, err.what());
+		return 0;
+	}
+}
 
 /// Decodes an embedded image (JPEG art / PNG icons) into an SDL texture.
 /// Returns nullptr (and logs) when the asset is not bundled or fails to
@@ -47,24 +127,9 @@ SDL_Texture *LoadAssetTexture(SDL_Renderer *renderer, const char *path, ImVec2 &
 			spdlog::warn("stbi_load({}) failed: {}", path, stbi_failure_reason());
 			return nullptr;
 		}
-		// JPEG даёт 3 канала (RGB24), PNG-иконки — 4 (RGBA). Поверхность
-		// лишь обёртка над данными stb — освобождаем обе после текстуры.
-		const Uint32 format = components == 4 ? SDL_PIXELFORMAT_RGBA32 : SDL_PIXELFORMAT_RGB24;
-		SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormatFrom(pixels, width, height,
-		    components * 8, width * components, format);
-		SDL_Texture *texture = surface != nullptr ? SDL_CreateTextureFromSurface(renderer, surface) : nullptr;
-		if (texture != nullptr) {
-			// SDL2 defaults new textures to nearest-neighbour scaling: our
-			// art (photos and icons) is always displayed smaller than its
-			// natural size, which produced stair-stepped edges. The ImGui
-			// backend only fixes the scale mode of the font atlas it owns.
-			SDL_SetTextureScaleMode(texture, SDL_ScaleModeLinear);
-		} else {
-			spdlog::warn("SDL_CreateTextureFromSurface({}) failed: {}", path, SDL_GetError());
-		}
+		SDL_Texture *texture = MakeTextureFromPixels(renderer, pixels, width, height, components);
 		outSize = ImVec2(static_cast<float>(width), static_cast<float>(height));
 		stbi_image_free(pixels);
-		SDL_FreeSurface(surface);
 		return texture;
 	} catch (const std::system_error &err) {
 		spdlog::info("{} not bundled ({}), using fallback", path, err.what());
@@ -104,9 +169,11 @@ Application::~Application()
 			SDL_DestroyTexture(texture);
 		}
 	}
-	for (SDL_Texture *texture : m_iconTextures) {
-		if (texture != nullptr) {
-			SDL_DestroyTexture(texture);
+	for (const auto &levels : m_iconTextures) {
+		for (SDL_Texture *texture : levels) {
+			if (texture != nullptr) {
+				SDL_DestroyTexture(texture);
+			}
 		}
 	}
 	if (m_renderer != nullptr) {
@@ -153,7 +220,8 @@ bool Application::setup()
 	     }) {
 		const size_t idx = static_cast<size_t>(asset.mode);
 		m_heroTextures[idx] = LoadAssetTexture(m_renderer, asset.heroPath, m_heroSizes[idx]);
-		m_iconTextures[idx] = LoadAssetTexture(m_renderer, asset.iconPath, m_iconSizes[idx]);
+		m_iconLevelCounts[idx]
+		    = BuildIconLevels(m_renderer, asset.iconPath, m_iconTextures[idx].data(), m_iconSizes[idx].data());
 	}
 
 	return true;
@@ -203,8 +271,12 @@ AppResult Application::run()
 		if (m_heroTextures[i] != nullptr) {
 			m_view->SetHeroTexture(static_cast<launcher::ExitAction>(i), m_heroTextures[i], m_heroSizes[i]);
 		}
-		if (m_iconTextures[i] != nullptr) {
-			m_view->SetModeIconTexture(static_cast<launcher::ExitAction>(i), m_iconTextures[i], m_iconSizes[i]);
+		if (m_iconLevelCounts[i] > 0) {
+			launcher::ui::widgets::BackgroundArt levels[3];
+			for (int l = 0; l < m_iconLevelCounts[i]; ++l) {
+				levels[l] = launcher::ui::widgets::BackgroundArt { m_iconTextures[i][l], m_iconSizes[i][l] };
+			}
+			m_view->SetModeIconLevels(static_cast<launcher::ExitAction>(i), levels, m_iconLevelCounts[i]);
 		}
 	}
 

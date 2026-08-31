@@ -19,6 +19,15 @@ struct BackgroundArt {
 	ImVec2 size { 0.0F, 0.0F };
 };
 
+/// Иконка режима, заранее уменьшенная в несколько копий — замена мипмапам,
+/// которые SDL_Renderer не генерирует: рисуем ближайший уровень сверху, и
+/// минификация не превышает ~2x при любом размере окна.
+struct IconSet {
+    static constexpr int kMaxLevels = 3;
+    BackgroundArt levels[kMaxLevels]; // от крупной к мелкой
+    int count = 0;
+};
+
 /// A call-to-action button for hero panels.
 struct HeroAction {
 	const char *label = nullptr;
@@ -39,8 +48,8 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 
 /// Compact shelf tile: icon in a tinted chip, title + status, trailing
 /// play/lock indicator. The chip shows the dedicated silhouette artwork
-/// when available and falls back to the FontAwesome glyph.
-void GameTile(const char *title, const char *status, const char *icon, const BackgroundArt *iconArt,
+/// (nearest suitable level) when available, else the FontAwesome glyph.
+void GameTile(const char *title, const char *status, const char *icon, const IconSet *icons,
     bool available, const ImVec4 &accent, const ImVec2 &size, const std::function<void()> &onClick);
 
 /// Gold gradient button with dark bold text — the primary action.

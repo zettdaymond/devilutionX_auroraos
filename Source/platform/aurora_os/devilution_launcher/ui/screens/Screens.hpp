@@ -8,12 +8,11 @@ using widgets::BackgroundArt;
 using widgets::Dispatcher;
 
 /// Per-mode artwork: the dedicated hero key art and the golden silhouette
-/// icon for shelf tiles. Both entries are optional (null texture) — the
-/// hero falls back to a crop of `background`, the icon to a FontAwesome
-/// glyph.
+/// icon set for shelf tiles. Both are optional (null textures) — the hero
+/// falls back to a crop of `background`, the icon to a FontAwesome glyph.
 struct ModeArt {
     BackgroundArt hero;
-    BackgroundArt icon;
+    widgets::IconSet icon;
 };
 
 /// All artwork the screens render.

@@ -112,8 +112,8 @@ struct ShelfItem {
 	const char *title;
 	std::string status;
 	bool playable;
-	const char *icon;             // FontAwesome fallback glyph
-	const BackgroundArt *iconArt; // dedicated silhouette (may be null)
+	const char *icon;                  // FontAwesome fallback glyph
+	const widgets::IconSet *icons;     // dedicated silhouettes (may be null)
 	const GameStyle *style;
 };
 
@@ -185,7 +185,7 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 
 	auto renderTile = [&](const ShelfItem &item) {
 		const ImVec2 tileSize(portrait ? width : width * 0.5F - Scale::px(0.25F), Scale::px(4.2F));
-		widgets::GameTile(item.title, item.status.c_str(), item.icon, item.iconArt, item.playable,
+		widgets::GameTile(item.title, item.status.c_str(), item.icon, item.icons, item.playable,
 		    item.style->accent, tileSize, [&dispatch, item] { dispatch(intent::LaunchGame { item.game }); });
 	};
 

@@ -166,7 +166,7 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 	}
 }
 
-void GameTile(const char *title, const char *status, const char *icon, const BackgroundArt *iconArt,
+void GameTile(const char *title, const char *status, const char *icon, const IconSet *icons,
     bool available, const ImVec4 &accent, const ImVec2 &size, const std::function<void()> &onClick)
 {
 	if (ImGui::InvisibleButton(title, size, ImGuiButtonFlags_None)) {
@@ -198,13 +198,26 @@ void GameTile(const char *title, const char *status, const char *icon, const Bac
 	draw->AddRect(min, max, border, rounding, 0, borderThickness);
 
 	// Icon chip with the game accent: dedicated golden silhouette when
-	// bundled, FontAwesome glyph otherwise.
+	// bundled (nearest suitable level), FontAwesome glyph otherwise.
 	const float chip = size.y - Scale::px(1.0F);
 	const ImVec2 chipMin = min + ImVec2(Scale::px(0.5F), Scale::px(0.5F));
 	const ImVec2 chipMax = chipMin + ImVec2(chip, chip);
 	draw->AddRectFilled(chipMin, chipMax,
 	    ImGui::ColorConvertFloat4ToU32(ImVec4(accent.x, accent.y, accent.z, available ? 0.35F : 0.15F)),
 	    Scale::px(0.3F));
+	const BackgroundArt *iconArt = nullptr;
+	if (icons != nullptr && icons->count > 0) {
+		// Наименьший уровень, покрывающий нужный размер: минификация
+		// остаётся небольшой даже в крошечном окне, где одна крупная
+		// текстура «рассыпалась» бы без мипмапов.
+		const float fit = chip * 0.74F;
+		int level = 0;
+		for (int i = 0; i < icons->count && std::min(icons->levels[i].size.x, icons->levels[i].size.y) >= fit;
+		    ++i) {
+			level = i;
+		}
+		iconArt = &icons->levels[level];
+	}
 	if (iconArt != nullptr && iconArt->texture != nullptr && iconArt->size.x > 0 && iconArt->size.y > 0) {
 		const float fit = chip * 0.74F;
 		const float w = iconArt->size.x >= iconArt->size.y ? fit : fit * iconArt->size.x / iconArt->size.y;

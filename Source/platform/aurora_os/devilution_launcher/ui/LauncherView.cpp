@@ -64,9 +64,13 @@ void LauncherView::SetHeroTexture(ExitAction mode, void *texture, ImVec2 size)
 	m_heroArts[static_cast<size_t>(mode)] = widgets::BackgroundArt { texture, size };
 }
 
-void LauncherView::SetModeIconTexture(ExitAction mode, void *texture, ImVec2 size)
+void LauncherView::SetModeIconLevels(ExitAction mode, const widgets::BackgroundArt *levels, int count)
 {
-	m_iconArts[static_cast<size_t>(mode)] = widgets::BackgroundArt { texture, size };
+	widgets::IconSet &set = m_iconSets[static_cast<size_t>(mode)];
+	set.count = std::min(count, widgets::IconSet::kMaxLevels);
+	for (int i = 0; i < set.count; ++i) {
+		set.levels[i] = levels[i];
+	}
 }
 
 void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch)
@@ -418,7 +422,7 @@ void LauncherView::RenderScreen(const LauncherState &state, const Dispatcher &di
 {
 	const auto modeArt = [this](ExitAction mode) {
 		const size_t i = static_cast<size_t>(mode);
-		return screens::ModeArt { m_heroArts[i], m_iconArts[i] };
+		return screens::ModeArt { m_heroArts[i], m_iconSets[i] };
 	};
 	const screens::ArtSet art {
 		{ m_backgroundTexture, m_backgroundTextureSize },
