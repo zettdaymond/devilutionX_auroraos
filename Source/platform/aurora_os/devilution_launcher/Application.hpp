@@ -78,7 +78,6 @@ private:
 	ImVec2 m_backgroundSize { 0.0F, 0.0F };
 
 	bool m_running { true };
-	bool m_minimized { false };
 	std::optional<launcher::Screen> m_initialScreen;
 	bool m_initialBrowser = false;
 	std::optional<launcher::Dialog> m_initialDialog;

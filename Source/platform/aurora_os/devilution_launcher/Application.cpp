@@ -140,11 +140,20 @@ AppResult Application::run()
 			}
 		}
 
+		m_store->poll();
+
+		// В фоне (свёрнуто/скрыто) цикл продолжает обслуживать события и
+		// загрузки, но не рендерит и не крутится вхолостую.
+		const Uint32 windowFlags = SDL_GetWindowFlags(m_window);
+		if ((windowFlags & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0) {
+			SDL_Delay(66); // ~15 пробуждений в секунду
+			continue;
+		}
+
 		ImGui_ImplSDLRenderer2_NewFrame();
 		ImGui_ImplSDL2_NewFrame();
 		ImGui::NewFrame();
 
-		m_store->poll();
 		m_view->Render(m_store->state(), dispatch);
 
 		ImGui::Render();
@@ -171,18 +180,8 @@ void Application::stop()
 
 void Application::on_event(const SDL_WindowEvent &event)
 {
-	switch (event.event) {
-	case SDL_WINDOWEVENT_CLOSE:
+	if (event.event == SDL_WINDOWEVENT_CLOSE) {
 		stop();
-		break;
-	case SDL_WINDOWEVENT_MINIMIZED:
-		m_minimized = true;
-		break;
-	case SDL_WINDOWEVENT_SHOWN:
-		m_minimized = false;
-		break;
-	default:
-		break;
 	}
 }
 
