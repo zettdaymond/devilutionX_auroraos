@@ -160,7 +160,38 @@ void LauncherView::RenderBackground() const
 		    ImVec2(crop.x, crop.y), ImVec2(1.0F - crop.x, 1.0F - crop.y));
 	}
 
+	// Тлеющие угольки, всплывающие над артом — отсылка к огню в главном
+	// меню Diablo. Частицы бессостоятельные: позиция — чистая функция
+	// времени и индекса, поэтому анимация бесплатна и для паузы в фоне
+	// ничего сохранять не нужно.
+	constexpr int kEmberCount = 26;
+	const float time = static_cast<float>(ImGui::GetTime());
+	for (int i = 0; i < kEmberCount; ++i) {
+		const float seed = static_cast<float>(i) * 0.618034F; // золотое сечение — рассинхрон фаз
+		const float cycle = 9.0F + 6.0F * std::sin(seed * 13.7F); // период всплытия 3–15 с
+		const float phase = std::fmod(time / cycle + seed, 1.0F); // 0..1 за виток
+
+		const float x01 = 0.08F + 0.84F * std::fmod(seed * 7.31F, 1.0F)
+		    + 0.02F * std::sin(time * (0.6F + 0.3F * std::sin(seed * 3.1F)) + seed * 9.0F);
+		const float y01 = 1.02F - phase * 1.08F; // от низа до чуть выше верха
+
+		const float fade = std::sin(phase * 3.14159265F); // появление и растворение
+		const float alpha = 0.32F * fade;
+		if (alpha <= 0.01F) {
+			continue;
+		}
+		const float radius = Scale::px(0.08F + 0.06F * std::sin(seed * 5.9F));
+		const ImVec2 center(viewport->WorkPos.x + x01 * viewport->WorkSize.x,
+		    viewport->WorkPos.y + y01 * viewport->WorkSize.y);
+
+		// Тёплые оттенки: от глубокого красного к золоту.
+		const ImVec4 tint(0.91F - 0.35F * std::sin(seed * 2.3F), 0.52F - 0.28F * std::sin(seed * 2.3F),
+		    0.16F, alpha);
+		draw->AddCircleFilled(center, radius, ImGui::ColorConvertFloat4ToU32(tint), 6);
+	}
+
 	// Dark vignette so text stays readable over the artwork.
+	// Полупрозрачность сохраняет угольки видимыми сквозь затемнение.
 	const ImU32 shade = ImGui::GetColorU32(ImVec4(0.02F, 0.01F, 0.01F, 0.28F));
 	draw->AddRectFilled(viewport->WorkPos, viewport->WorkPos + viewport->WorkSize, shade);
 }
