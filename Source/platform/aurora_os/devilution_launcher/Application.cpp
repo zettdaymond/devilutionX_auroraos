@@ -126,27 +126,42 @@ AppResult Application::run()
 		m_store->dispatch(std::move(intent));
 	};
 
+	auto processEvent = [this](const SDL_Event &event) {
+		ImGui_ImplSDL2_ProcessEvent(&event);
+
+		if (event.type == SDL_QUIT) {
+			stop();
+		}
+		if (event.type == SDL_WINDOWEVENT && event.window.windowID == SDL_GetWindowID(m_window)) {
+			on_event(event.window);
+		}
+	};
+
 	m_running = true;
 	while (m_running && !m_store->state().pendingLaunch.has_value()) {
-		SDL_Event event {};
-		while (SDL_PollEvent(&event) == 1) {
-			ImGui_ImplSDL2_ProcessEvent(&event);
+		// В фоне (свёрнуто/скрыто) цикл продолжает обслуживать события и
+		// загрузки, но не рендерит. Вместо слепого сна ждём событие в ОС:
+		// разворачивание обрабатывается мгновенно, а таймаут 250 мс равен
+		// периоду троттлинга прогресса загрузок — просыпаемся ровно в такт
+		// прибытию интентов из фоновой очереди (они приходят не как
+		// SDL-события, поэтому бесконечное ожидание недопустимо).
+		const Uint32 windowFlags = SDL_GetWindowFlags(m_window);
+		const bool hidden = (windowFlags & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
 
-			if (event.type == SDL_QUIT) {
-				stop();
-			}
-			if (event.type == SDL_WINDOWEVENT && event.window.windowID == SDL_GetWindowID(m_window)) {
-				on_event(event.window);
+		if (hidden) {
+			SDL_Event wake {};
+			if (SDL_WaitEventTimeout(&wake, 250) == 1) {
+				processEvent(wake);
 			}
 		}
 
-		m_store->poll();
+		SDL_Event event {};
+		while (SDL_PollEvent(&event) == 1) {
+			processEvent(event);
+		}
 
-		// В фоне (свёрнуто/скрыто) цикл продолжает обслуживать события и
-		// загрузки, но не рендерит и не крутится вхолостую.
-		const Uint32 windowFlags = SDL_GetWindowFlags(m_window);
-		if ((windowFlags & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0) {
-			SDL_Delay(66); // ~15 пробуждений в секунду
+		m_store->poll();
+		if (hidden) {
 			continue;
 		}
 
