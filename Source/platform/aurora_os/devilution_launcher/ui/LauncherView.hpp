@@ -46,7 +46,7 @@ public:
 
 private:
 	void RenderBackground() const;
-	void RenderNavBar(const LauncherState &state, const Dispatcher &dispatch);
+	void RenderQuickActions(const Dispatcher &dispatch);
 	void RenderScreen(const LauncherState &state, const Dispatcher &dispatch);
 	void RenderDialogs(const LauncherState &state, const Dispatcher &dispatch);
 	void RenderFileBrowser(const LauncherState &state, const Dispatcher &dispatch);

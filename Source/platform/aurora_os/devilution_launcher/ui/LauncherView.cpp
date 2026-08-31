@@ -94,12 +94,11 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	};
 
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
-	const float navHeight = Scale::Px(3.2F);
 	// ~16dp на устройстве: как базовые поля мобильных платформ — текст
 	// дышит, интерактив не лазит в жестовую зону у края.
 	const float pad = Scale::Px(1.5F);
 	// Небольшой отступ от края экрана, чтобы системные жесты телефона
-	// не обрезали панель навигации.
+	// не обрезали контент.
 	const float bottomInset = Scale::Px(0.35F);
 
 	// Корневое окно занимает весь экран, без рамок и заголовка.
@@ -109,7 +108,7 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
 	// Корень — прозрачный контейнер: флаг NoInputs не даёт ему перекрыть
-	// панель навигации и перехватывать клики при пересортировке окон ImGui
+	// прочие окна и перехватывать клики при пересортировке окон ImGui
 	// (дочерние окна остаются кликабельными сами по себе).
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove
 	    | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus
@@ -118,14 +117,16 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	ImGui::Begin("##launcher-root", nullptr, flags);
 	RenderBackground();
 
-	// Контентная область: панель навигации занимает место снизу (портрет)
-	// or at the top (landscape). Родной скроллбар скрыт (десктопная
+	// Контент занимает всё окно. Родной скроллбар скрыт (десктопная
 	// идиома, крадущая ширину) — позицию прокрутки показывает тонкий
-	// оверлей-индикатор у края, контент держит симметричные поля.
+	// оверлей-индикатор у края, контент держит симметричные поля. На
+	// главном экране снизу резерв под плавающие кнопки разделов.
+	const bool isHome = (state.screen == Screen::Home);
+	const float bottomReserve = isHome ? Scale::Px(3.4F) : pad * 0.5F;
 	const ImVec2 windowSize = ImGui::GetWindowSize();
-	const ImVec2 contentPos(0.0F, Scale::Portrait() ? pad : navHeight + pad * 0.5F);
+	const ImVec2 contentPos(0.0F, pad * 0.5F);
 	const ImVec2 contentSize(windowSize.x,
-	    windowSize.y - navHeight - pad * 1.5F - bottomInset);
+	    windowSize.y - pad - bottomReserve - bottomInset);
 
 	ImGui::SetCursorPos(contentPos);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, 0));
@@ -168,7 +169,9 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	ImGui::End();
 	ImGui::PopStyleVar();
 
-	RenderNavBar(state, guardedDispatch);
+	if (isHome) {
+		RenderQuickActions(guardedDispatch);
+	}
 	RenderDialogs(state, guardedDispatch);
 	RenderFileBrowser(state, dispatch);
 	dialogs::Toast(state, guardedDispatch);
@@ -373,57 +376,57 @@ void LauncherView::RenderScrollIndicator(float scrollY, float scrollMaxY, const 
 	    ImGui::GetColorU32(ImVec4(0.91F, 0.78F, 0.49F, 0.85F * alpha)), barW * 0.5F);
 }
 
-void LauncherView::RenderNavBar(const LauncherState &state, const Dispatcher &dispatch)
+/// Плавающие кнопки разделов в правом нижнем углу главного экрана:
+/// «Данные» и «О порте» — второстепенные действия и не заслуживают
+/// вкладок; кнопки висят поверх контента, всегда в одном жесте от
+/// любой прокрутки.
+void LauncherView::RenderQuickActions(const Dispatcher &dispatch)
 {
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
-	const float height = Scale::Px(3.2F);
-	const ImVec2 size(viewport->WorkSize.x, height);
-	// Чуть выше нижнего края экрана, чтобы системные жесты телефона
-	// не обрезали кнопки.
-	const float bottomInset = Scale::Px(0.35F);
-	const ImVec2 pos = Scale::Portrait()
-	    ? ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + viewport->WorkSize.y - height - bottomInset)
-	    : viewport->WorkPos;
+	const float buttonHeight = Scale::Px(2.3F);
+	const float buttonWidth = Scale::Px(4.6F);
+	const float gap = Scale::Px(0.4F);
+	const float sideInset = Scale::Px(0.6F);
+	const float bottomInset = Scale::Px(0.35F) + Scale::Px(0.3F);
+	const ImVec2 clusterSize(buttonWidth * 2.0F + gap, buttonHeight);
+	const ImVec2 pos(viewport->WorkPos.x + viewport->WorkSize.x - clusterSize.x - sideInset,
+	    viewport->WorkPos.y + viewport->WorkSize.y - clusterSize.y - bottomInset);
 
 	ImGui::SetNextWindowPos(pos);
-	ImGui::SetNextWindowSize(size);
+	ImGui::SetNextWindowSize(clusterSize);
 	ImGui::SetNextWindowViewport(viewport->ID);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Scale::Px(0.4F), Scale::Px(0.4F)));
-	ImGui::PushStyleColor(ImGuiCol_WindowBg, Theme::Color(ColorRole::Panel));
-	ImGui::Begin("##navbar", nullptr,
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Scale::Px(0.4F));
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0F, 0.0F, 0.0F, 0.0F));
+	ImGui::Begin("##quick-actions", nullptr,
 	    ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings
-	        | ImGuiWindowFlags_NoBringToFrontOnFocus);
+	        | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-	struct NavItem {
+	struct QuickItem {
 		Screen screen;
 		const char *icon;
 		const char *label;
 	};
-	const NavItem items[] {
-		{ Screen::Home, icons::Home, "Главная" },
+	const QuickItem items[] {
 		{ Screen::Data, icons::Folder, "Данные" },
 		{ Screen::About, icons::Info, "О порте" },
 	};
-
-	const float buttonWidth = ImGui::GetContentRegionAvail().x / std::size(items);
-	for (const NavItem &item : items) {
-		const bool selected = (state.screen == item.screen);
-		ImGui::PushStyleColor(ImGuiCol_Button, Theme::Color(selected ? ColorRole::Red : ColorRole::Bg));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Theme::Color(selected ? ColorRole::RedHover : ColorRole::Panel));
+	for (const QuickItem &item : items) {
+		ImGui::PushStyleColor(ImGuiCol_Button, Theme::Color(ColorRole::Panel));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Theme::Color(ColorRole::PanelHover));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, Theme::Color(ColorRole::RedPressed));
-		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(selected ? ColorRole::GoldBright : ColorRole::TextBody));
-
-		const std::string label = std::string(item.icon) + "  " + item.label;
-		if (ImGui::Button(label.c_str(), ImVec2(buttonWidth - Scale::Px(0.4F), height - Scale::Px(0.8F)))) {
+		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextBody));
+		const std::string label = std::string(item.icon) + " " + item.label;
+		if (ImGui::Button(label.c_str(), ImVec2(buttonWidth, buttonHeight))) {
 			dispatch(intent::UiNavigate { item.screen });
 		}
-		ImGui::SameLine(0, Scale::Px(0.4F));
+		ImGui::SameLine(0, gap);
 		ImGui::PopStyleColor(4);
 	}
 
 	ImGui::End();
 	ImGui::PopStyleColor();
-	ImGui::PopStyleVar();
+	ImGui::PopStyleVar(2);
 }
 
 void LauncherView::RenderScreen(const LauncherState &state, const Dispatcher &dispatch)
@@ -446,7 +449,7 @@ void LauncherView::RenderScreen(const LauncherState &state, const Dispatcher &di
 		screens::Data(state, dispatch);
 		break;
 	case Screen::About:
-		screens::About(state);
+		screens::About(state, dispatch);
 		break;
 	}
 }

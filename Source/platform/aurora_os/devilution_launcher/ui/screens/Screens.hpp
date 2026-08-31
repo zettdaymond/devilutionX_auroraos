@@ -33,6 +33,6 @@ void Home(const LauncherState &state, const Dispatcher &dispatch, const ArtSet &
 void Data(const LauncherState &state, const Dispatcher &dispatch);
 
 /// Экран «О порте».
-void About(const LauncherState &state);
+void About(const LauncherState &state, const Dispatcher &dispatch);
 
 } // namespace launcher::ui::screens

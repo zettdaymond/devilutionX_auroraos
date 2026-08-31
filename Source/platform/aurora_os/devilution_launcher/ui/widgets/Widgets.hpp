@@ -69,4 +69,8 @@ void CenteredText(const char *text, ColorRole role = ColorRole::TextBody);
 /// Маркер статуса: зелёная галка или тусклый крест + текст + пояснение.
 void FileStatusLine(bool present, const char *text, const char *detail);
 
+/// Шапка второстепенного экрана: кнопка «←» слева (возврат на главный),
+/// заголовок, золотой разделитель снизу.
+void ScreenHeader(const char *title, const std::function<void()> &onBack);
+
 } // namespace launcher::ui::widgets

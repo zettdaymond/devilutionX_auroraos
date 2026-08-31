@@ -360,4 +360,28 @@ void FileStatusLine(bool present, const char *text, const char *detail)
 	ImGui::PopStyleColor();
 }
 
+void ScreenHeader(const char *title, const std::function<void()> &onBack)
+{
+	const float width = ImGui::GetContentRegionAvail().x;
+	const float buttonSize = Scale::Px(2.3F);
+
+	Theme::PushButtonStyle(false);
+	if (ImGui::Button(icons::ArrowLeft, ImVec2(buttonSize, buttonSize))) {
+		onBack();
+	}
+	Theme::PopButtonStyle();
+
+	ImGui::SameLine(0, Scale::Px(0.5F));
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + buttonSize * 0.22F);
+	Theme::PushFont(FontRole::BodyBold);
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextHeading));
+	ImGui::TextUnformatted(title);
+	ImGui::PopStyleColor();
+	Theme::PopFont();
+
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.35F)));
+	Theme::DrawDivider(ImGui::GetCursorScreenPos(), ImGui::GetCursorScreenPos() + ImVec2(width, 0), 0.6F);
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.5F)));
+}
+
 } // namespace launcher::ui::widgets

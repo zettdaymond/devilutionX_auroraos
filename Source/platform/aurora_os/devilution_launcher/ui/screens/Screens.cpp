@@ -400,6 +400,8 @@ void RenderChecklist(const LauncherState &state, const Dispatcher &dispatch)
 
 void Data(const LauncherState &state, const Dispatcher &dispatch)
 {
+	widgets::ScreenHeader("Данные", [&dispatch] { dispatch(intent::UiNavigate { Screen::Home }); });
+
 	const float width = ImGui::GetContentRegionAvail().x;
 
 	ImGui::PushFont(Theme::Font(FontRole::BodyBold));
@@ -434,8 +436,9 @@ void Data(const LauncherState &state, const Dispatcher &dispatch)
 	ImGui::PopStyleColor();
 }
 
-void About(const LauncherState &)
+void About(const LauncherState &, const Dispatcher &dispatch)
 {
+	widgets::ScreenHeader("О порте", [&dispatch] { dispatch(intent::UiNavigate { Screen::Home }); });
 	ImGui::Dummy(ImVec2(0, Scale::Px(1.0F)));
 	Theme::PushFont(FontRole::Heading);
 	widgets::CenteredText("DIABLO", ColorRole::TextHeading);
