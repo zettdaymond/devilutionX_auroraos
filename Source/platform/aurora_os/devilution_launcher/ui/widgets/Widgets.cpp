@@ -387,6 +387,7 @@ void FileRow(bool present, const char *name, const char *status, const char *pat
 	ImGui::PushID(name);
 
 	const float startX = ImGui::GetCursorPosX();
+	const float rowTopY = ImGui::GetCursorPosY();
 	const float rowWidth = ImGui::GetContentRegionAvail().x;
 	const float buttonSize = Scale::Px(2.2F);
 	const float gap = Scale::Px(0.5F);
@@ -447,6 +448,13 @@ void FileRow(bool present, const char *name, const char *status, const char *pat
 	}
 
 	if (present && path != nullptr && path[0] != '\0') {
+		// Путь у всех строк начинается на одной глубине — по высокой
+		// первой строке (высота кнопки), а не по тому, есть ли кнопка
+		// в конкретной строке. Иначе путь «проседал» у файлов с
+		// корзинкой и плясал у остальных.
+		const float firstLineBottom = rowTopY + std::max(buttonSize, ImGui::GetTextLineHeight())
+		    + ImGui::GetStyle().ItemSpacing.y;
+		ImGui::SetCursorPosY(firstLineBottom);
 		const float indent = Scale::Px(1.6F);
 		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 		for (const std::string &line : WrapPathAtSlashes(ImGui::GetFont(), ImGui::GetFontSize(), path,
