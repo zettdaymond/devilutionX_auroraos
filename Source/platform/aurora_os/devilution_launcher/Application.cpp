@@ -40,6 +40,13 @@ SDL_Texture *LoadAssetTexture(SDL_Renderer *renderer, const char *path, ImVec2 &
 			return nullptr;
 		}
 		SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+		if (texture != nullptr) {
+			// SDL2 defaults new textures to nearest-neighbour scaling: our
+			// art (photos and icons) is always displayed smaller than its
+			// natural size, which produced stair-stepped edges. The ImGui
+			// backend only fixes the scale mode of the font atlas it owns.
+			SDL_SetTextureScaleMode(texture, SDL_ScaleModeLinear);
+		}
 		outSize = ImVec2(static_cast<float>(surface->w), static_cast<float>(surface->h));
 		SDL_FreeSurface(surface);
 		return texture;
