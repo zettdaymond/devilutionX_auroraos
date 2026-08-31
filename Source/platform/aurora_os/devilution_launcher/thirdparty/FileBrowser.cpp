@@ -607,7 +607,7 @@ void FileBrowser::RenderListView(float height)
 
     const auto& records = filteredRecords_.empty() ? fileRecords_ : filteredRecords_;
 
-    auto iconFont = launcher::ui::Theme::font(launcher::ui::FontRole::IconBig);
+    auto iconFont = launcher::ui::Theme::Font(launcher::ui::FontRole::IconBig);
 
     for (int i = 0; i < records.size(); i++) {
         const auto& rsc = records[i];
@@ -766,7 +766,7 @@ void FileBrowser::RenderGridView(float height)
             const float iconY = itemMin.y + verticalPadding;
 
             // Рисуем иконку
-            auto largeIconFont = launcher::ui::Theme::font(launcher::ui::FontRole::IconBig);
+            auto largeIconFont = launcher::ui::Theme::Font(launcher::ui::FontRole::IconBig);
             if (largeIconFont) {
                 ImGui::PushFont(largeIconFont);
             }
@@ -1356,7 +1356,7 @@ void FileBrowser::RenderCustomTitleBar(float height) {
     const float pad = Scale(14.0f);
 
     // Заголовок слева, шрифтом дизайн-системы
-    ImFont* titleFont = launcher::ui::Theme::font(launcher::ui::FontRole::BodyBold);
+    ImFont* titleFont = launcher::ui::Theme::Font(launcher::ui::FontRole::BodyBold);
     const float titleSize = ImGui::GetFontSize() * 1.25f;
     const ImVec2 textSize = titleFont
         ? titleFont->CalcTextSizeA(titleSize, FLT_MAX, 0.0f, title_.c_str())
@@ -1386,7 +1386,7 @@ void FileBrowser::RenderCustomTitleBar(float height) {
     }
     const ImVec2 btnMin = ImGui::GetItemRectMin();
     const ImVec2 btnMax = ImGui::GetItemRectMax();
-    ImFont *closeIconFont = launcher::ui::Theme::font(launcher::ui::FontRole::IconBig);
+    ImFont *closeIconFont = launcher::ui::Theme::Font(launcher::ui::FontRole::IconBig);
     if (closeIconFont != nullptr) {
         const float glyphSize = buttonSize * 0.6f;
         const char *closeGlyph = "ï" /* U+F00D */;
@@ -1400,7 +1400,7 @@ void FileBrowser::RenderCustomTitleBar(float height) {
     ImGui::PopStyleColor(3);
 
     // Золотой разделитель с затухающими краями
-    launcher::ui::Theme::drawDivider(
+    launcher::ui::Theme::DrawDivider(
         ImVec2(windowPos.x + pad, windowPos.y + height - Scale(1.0f)),
         ImVec2(windowPos.x + windowSize.x - pad, windowPos.y + height - Scale(1.0f)),
         0.6f);

@@ -127,16 +127,16 @@ int main(int argc, char **argv)
 	    ? std::make_unique<App::Application>(window, std::move(*services))
 	    : std::make_unique<App::Application>(window, "org.diasurgical", "devilutionx");
 	if (args.screen.has_value()) {
-		app->setInitialScreen(*args.screen);
+		app->SetInitialScreen(*args.screen);
 	}
 	if (args.openBrowser) {
-		app->setInitialBrowser(true);
+		app->SetInitialBrowser(true);
 	}
 	if (args.dialog.has_value()) {
-		app->setInitialDialog(*args.dialog);
+		app->SetInitialDialog(*args.dialog);
 	}
 
-	const App::AppResult result = app->run();
+	const App::AppResult result = app->Run();
 
 	spdlog::info("Launcher finished: success={}, action={}",
 	    result.success,

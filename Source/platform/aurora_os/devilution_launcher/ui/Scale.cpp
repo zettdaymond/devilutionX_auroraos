@@ -14,7 +14,7 @@ bool g_portrait = false;
 float g_minSide = 540.0F;
 } // namespace
 
-void Scale::beginFrame(float dpiScale)
+void Scale::BeginFrame(float dpiScale)
 {
 	const ImVec2 size = ImGui::GetMainViewport()->WorkSize;
 	const float diagonal = std::sqrt(size.x * size.x + size.y * size.y);
@@ -29,17 +29,17 @@ void Scale::beginFrame(float dpiScale)
 	}
 }
 
-float Scale::rem()
+float Scale::Rem()
 {
 	return g_rem;
 }
 
-bool Scale::portrait()
+bool Scale::Portrait()
 {
 	return g_portrait;
 }
 
-float Scale::minSide()
+float Scale::MinSide()
 {
 	return g_minSide;
 }

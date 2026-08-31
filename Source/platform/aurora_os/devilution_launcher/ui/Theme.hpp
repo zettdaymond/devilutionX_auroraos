@@ -4,13 +4,15 @@
 
 namespace launcher::ui {
 
+/// Роль шрифта: шриты грузятся по назначению, а не по имени файла.
 enum class FontRole {
-	Body,      // Beaufort Regular + Cyrillic + icons
-	BodyBold,  // Beaufort Bold + Cyrillic + icons
-	Heading,   // Exocet (latin only — Diablo logo style)
-	IconBig,   // large standalone icons
+	Body,     ///< Beaufort Regular + кириллица + иконки
+	BodyBold, ///< Beaufort Bold + кириллица + иконки
+	Heading,  ///< Exocet (только латиница — стиль логотипа Diablo)
+	IconBig,  ///< крупные одиночные иконки
 };
 
+/// Роль цвета из палитры Diablo-темы.
 enum class ColorRole {
 	Bg,
 	Panel,
@@ -28,25 +30,32 @@ enum class ColorRole {
 	Success,
 };
 
-/// Diablo-styled look: fonts by role, palette and ImGui style.
-/// Call init() once after creating the ImGui context.
+/**
+ * @brief Diablo-стиль: шрифты по ролям, палитра и стиль ImGui.
+ *
+ * Init() вызывается один раз после создания ImGui-контекста; остальные
+ * функции можно звать только внутри кадра.
+ */
 namespace Theme {
 
-void init(float dpiScale);
+/// Инициализирует шрифты, палитру и стиль. Затратная операция — один раз при старте.
+void Init(float dpiScale);
 
-[[nodiscard]] ImFont *font(FontRole role);
-void pushFont(FontRole role);
-void popFont();
+/// Шрифт по роли; nullptr, если шрифт не загрузился.
+[[nodiscard]] auto Font(FontRole role) -> ImFont *;
+void PushFont(FontRole role);
+void PopFont();
 
-[[nodiscard]] ImVec4 color(ColorRole role);
-[[nodiscard]] ImU32 colorU32(ColorRole role);
+/// Цвет по роли.
+[[nodiscard]] auto Color(ColorRole role) -> ImVec4;
+[[nodiscard]] auto ColorU32(ColorRole role) -> ImU32;
 
-/// Push/pop a Diablo button appearance (red fill, gold border).
-void pushButtonStyle(bool accent = false);
-void popButtonStyle();
+/// Внешний вид кнопки в стиле Diablo (красная заливка, золотой контур).
+void PushButtonStyle(bool accent = false);
+void PopButtonStyle();
 
-/// Gold hairline with faded ends, for separating sections.
-void drawDivider(ImVec2 from, ImVec2 to, float alpha = 1.0F);
+/// Золотая волосяная линия с затухающими концами — разделитель секций.
+void DrawDivider(ImVec2 from, ImVec2 to, float alpha = 1.0F);
 
 } // namespace Theme
 

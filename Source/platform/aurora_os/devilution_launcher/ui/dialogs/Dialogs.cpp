@@ -25,12 +25,12 @@ bool BeginModal(const char *name, float widthRem)
 {
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
 	const float maxWidth = viewport->WorkSize.x * 0.94F;
-	const ImVec2 size(std::min(Scale::px(widthRem), maxWidth), 0.0F);
+	const ImVec2 size(std::min(Scale::Px(widthRem), maxWidth), 0.0F);
 	ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5F,
 	                    viewport->WorkPos.y + viewport->WorkSize.y * 0.5F),
 	    ImGuiCond_Appearing, ImVec2(0.5F, 0.5F));
 	ImGui::SetNextWindowSize(size, ImGuiCond_Appearing);
-	ImGui::PushStyleColor(ImGuiCol_PopupBg, Theme::color(ColorRole::Panel));
+	ImGui::PushStyleColor(ImGuiCol_PopupBg, Theme::Color(ColorRole::Panel));
 	const bool open = ImGui::BeginPopupModal(name, nullptr,
 	    ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar
 	        | ImGuiWindowFlags_AlwaysAutoResize);
@@ -46,7 +46,7 @@ ImVec2 PairedButtonSize(float widthRem, float heightRem)
 {
 	const float avail = ImGui::GetContentRegionAvail().x;
 	const float half = (avail - ImGui::GetStyle().ItemSpacing.x) * 0.5F;
-	return ImVec2(std::min(Scale::px(widthRem), half), Scale::px(heightRem));
+	return ImVec2(std::min(Scale::Px(widthRem), half), Scale::Px(heightRem));
 }
 
 void EndModal()
@@ -57,12 +57,12 @@ void EndModal()
 
 void ModalTitle(const char *text)
 {
-	Theme::pushFont(FontRole::BodyBold);
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextHeading));
+	Theme::PushFont(FontRole::BodyBold);
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextHeading));
 	ImGui::TextUnformatted(text);
 	ImGui::PopStyleColor();
-	Theme::popFont();
-	ImGui::Dummy(ImVec2(0, Scale::px(0.3F)));
+	Theme::PopFont();
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.3F)));
 }
 
 } // namespace
@@ -86,12 +86,12 @@ void Download(const LauncherState &state, const Dispatcher &dispatch, KnownFile 
 	          "Полная игра таким образом не заменяется."
 	        : "Русская озвучка и тексты для полной версии игры.");
 
-	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
 	ImGui::Text("Размер: ~%s", FormatBytes(spec.expectedSizeBytes).c_str());
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextDim));
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 	ImGui::Text("Свободно: %s", FormatBytes(state.freeDiskBytes).c_str());
 	ImGui::PopStyleColor();
-	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
 
 	const ImVec2 buttonSize = PairedButtonSize(9.0F, 2.2F);
 	if (ImGui::Button("Скачать", buttonSize)) {
@@ -131,21 +131,21 @@ void Download(const LauncherState &state, const Dispatcher &dispatch)
 
 	ModalTitle(download.active ? "Загрузка" : (download.error.empty() ? "Готово" : "Ошибка загрузки"));
 	ImGui::TextUnformatted(spec.displayName.data());
-	ImGui::Dummy(ImVec2(0, Scale::px(0.5F)));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.5F)));
 
 	// Progress bar with a gold gradient fill. The bar lives in the modal
 	// window's draw list (the earlier `draw` is the background dim).
 	ImDrawList *barDraw = ImGui::GetWindowDrawList();
 	const float width = ImGui::GetContentRegionAvail().x;
 	const ImVec2 barPos = ImGui::GetCursorScreenPos();
-	const ImVec2 barSize(width, Scale::px(1.2F));
+	const ImVec2 barSize(width, Scale::Px(1.2F));
 	const float fraction = std::clamp(download.fraction, 0.0F, 1.0F);
 	const float fillX = barPos.x + barSize.x * fraction;
-	barDraw->AddRectFilled(barPos, barPos + barSize, Theme::colorU32(ColorRole::PanelHover), Scale::px(0.2F));
+	barDraw->AddRectFilled(barPos, barPos + barSize, Theme::ColorU32(ColorRole::PanelHover), Scale::Px(0.2F));
 	if (fraction > 0.0F) {
 		barDraw->AddRectFilledMultiColor(barPos, barPos + ImVec2(barSize.x * fraction, barSize.y),
-		    Theme::colorU32(ColorRole::Red), Theme::colorU32(ColorRole::BorderGold),
-		    Theme::colorU32(ColorRole::BorderGold), Theme::colorU32(ColorRole::Red));
+		    Theme::ColorU32(ColorRole::Red), Theme::ColorU32(ColorRole::BorderGold),
+		    Theme::ColorU32(ColorRole::BorderGold), Theme::ColorU32(ColorRole::Red));
 	}
 	// Горящий край: заливка раскаляется к передней кромке, пока загрузка
 	// активна. Мерцание — чистая функция времени (как угольки фона).
@@ -153,7 +153,7 @@ void Download(const LauncherState &state, const Dispatcher &dispatch)
 		const float time = static_cast<float>(ImGui::GetTime());
 		const float flicker = 0.75F + 0.25F * std::sin(time * 13.0F + 2.0F * std::sin(time * 5.1F));
 		const float heat = std::min(fraction * 4.0F, 1.0F); // разгорается по мере старта
-		const float hotW = std::min(Scale::px(3.0F), barSize.x * fraction);
+		const float hotW = std::min(Scale::Px(3.0F), barSize.x * fraction);
 		const ImVec2 hotPos(fillX - hotW, barPos.y);
 		barDraw->AddRectFilledMultiColor(hotPos, ImVec2(fillX, barPos.y + barSize.y),
 		    IM_COL32(0, 0, 0, 0), ImGui::GetColorU32(ImVec4(1.0F, 0.62F, 0.18F, 0.85F * flicker * heat)),
@@ -161,8 +161,8 @@ void Download(const LauncherState &state, const Dispatcher &dispatch)
 
 		// Свечение над кромкой и стайка искр, поднимающихся от неё.
 		const float glowA = 0.30F * flicker * heat;
-		barDraw->AddRectFilledMultiColor(ImVec2(fillX - Scale::px(0.5F), barPos.y - Scale::px(0.45F)),
-		    ImVec2(fillX + Scale::px(0.5F), barPos.y),
+		barDraw->AddRectFilledMultiColor(ImVec2(fillX - Scale::Px(0.5F), barPos.y - Scale::Px(0.45F)),
+		    ImVec2(fillX + Scale::Px(0.5F), barPos.y),
 		    IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0),
 		    ImGui::GetColorU32(ImVec4(1.0F, 0.55F, 0.15F, glowA)),
 		    ImGui::GetColorU32(ImVec4(1.0F, 0.55F, 0.15F, glowA)));
@@ -176,15 +176,15 @@ void Download(const LauncherState &state, const Dispatcher &dispatch)
 			if (alpha <= 0.02F) {
 				continue;
 			}
-			const float rise = Scale::px(0.9F) * phase;
-			const ImVec2 spark(fillX + std::sin(time * (2.2F + seed) + seed * 7.0F) * Scale::px(0.35F),
-			    barPos.y - Scale::px(0.12F) - rise);
-			barDraw->AddCircleFilled(spark, Scale::px(0.07F + 0.03F * std::sin(seed * 5.3F)),
+			const float rise = Scale::Px(0.9F) * phase;
+			const ImVec2 spark(fillX + std::sin(time * (2.2F + seed) + seed * 7.0F) * Scale::Px(0.35F),
+			    barPos.y - Scale::Px(0.12F) - rise);
+			barDraw->AddCircleFilled(spark, Scale::Px(0.07F + 0.03F * std::sin(seed * 5.3F)),
 			    ImGui::GetColorU32(ImVec4(1.0F, 0.66F, 0.22F, alpha)), 5);
 		}
 	}
 	ImGui::Dummy(barSize);
-	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
 
 	// Bytes / percent
 	const int percent = static_cast<int>(fraction * 100.0F);
@@ -193,7 +193,7 @@ void Download(const LauncherState &state, const Dispatcher &dispatch)
 	    download.totalBytes > 0 ? FormatBytes(download.totalBytes).c_str() : "?");
 
 	// Speed + ETA
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextDim));
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 	if (download.active && download.bytesPerSec > 0) {
 		const int64_t remaining = download.bytesPerSec > 0
 		    ? (std::max<int64_t>(download.totalBytes - download.downloadedBytes, 0)) / download.bytesPerSec
@@ -201,14 +201,14 @@ void Download(const LauncherState &state, const Dispatcher &dispatch)
 		ImGui::Text("%s/с   %s", FormatBytes(download.bytesPerSec).c_str(), FormatEta(remaining).c_str());
 	} else if (!download.error.empty()) {
 		ImGui::PopStyleColor();
-		ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::Error));
+		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::Error));
 		ImGui::TextWrapped("%s", download.error.c_str());
 		ImGui::PopStyleColor();
-		ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextDim));
+		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 	}
 	ImGui::PopStyleColor();
 
-	ImGui::Dummy(ImVec2(0, Scale::px(0.6F)));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.6F)));
 	const ImVec2 buttonSize = PairedButtonSize(10.0F, 2.2F);
 	if (download.active) {
 		widgets::IconButton(icons::Times, "Отмена", false, buttonSize, [&dispatch] {
@@ -244,12 +244,12 @@ void MissingFiles(const LauncherState &state, const Dispatcher &dispatch)
 		ImGui::BulletText("%s", FileSpecOf(file).canonical.data());
 	}
 
-	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextDim));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 	ImGui::TextWrapped("%s", "Скопируйте их в папку с DIABDAT.MPQ и повторите поиск, либо выберите другую папку.");
 	ImGui::PopStyleColor();
 
-	ImGui::Dummy(ImVec2(0, Scale::px(0.5F)));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.5F)));
 	const ImVec2 buttonSize = PairedButtonSize(11.0F, 2.2F);
 	widgets::IconButton(icons::Folder, "Выбрать папку", true, buttonSize, [&dispatch] {
 		ImGui::CloseCurrentPopup();
@@ -271,12 +271,12 @@ void Error(const LauncherState &state, const Dispatcher &dispatch)
 	}
 
 	ModalTitle("Ошибка");
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::Error));
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::Error));
 	ImGui::TextWrapped("%s", state.errorText.c_str());
 	ImGui::PopStyleColor();
 
-	ImGui::Dummy(ImVec2(0, Scale::px(0.5F)));
-	if (ImGui::Button("Закрыть", ImVec2(Scale::px(10.0F), Scale::px(2.2F)))) {
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.5F)));
+	if (ImGui::Button("Закрыть", ImVec2(Scale::Px(10.0F), Scale::Px(2.2F)))) {
 		ImGui::CloseCurrentPopup();
 		dispatch(intent::UiCloseDialog {});
 	}
@@ -310,10 +310,10 @@ void Toast(const LauncherState &state, const Dispatcher &dispatch)
 
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
 	const ImVec2 textSize = ImGui::CalcTextSize(state.toast->c_str());
-	const ImVec2 size(textSize.x + Scale::px(2.0F), textSize.y + Scale::px(1.0F));
+	const ImVec2 size(textSize.x + Scale::Px(2.0F), textSize.y + Scale::Px(1.0F));
 	const ImVec2 pos(viewport->WorkPos.x + (viewport->WorkSize.x - size.x) * 0.5F,
-	    viewport->WorkPos.y + viewport->WorkSize.y - size.y - Scale::px(1.4F)
-	        + (1.0F - alpha) * Scale::px(0.3F));
+	    viewport->WorkPos.y + viewport->WorkSize.y - size.y - Scale::Px(1.4F)
+	        + (1.0F - alpha) * Scale::Px(0.3F));
 
 	ImDrawList *draw = ImGui::GetForegroundDrawList();
 	auto withAlpha = [alpha](ImU32 col) {
@@ -321,11 +321,11 @@ void Toast(const LauncherState &state, const Dispatcher &dispatch)
 		c.w *= alpha;
 		return ImGui::ColorConvertFloat4ToU32(c);
 	};
-	draw->AddRectFilled(pos, pos + size, withAlpha(Theme::colorU32(ColorRole::Panel)), Scale::px(0.3F));
-	draw->AddRect(pos, pos + size, withAlpha(Theme::colorU32(ColorRole::GoldDim)), Scale::px(0.3F), 0,
-	    Scale::px(0.06F));
-	draw->AddText(Theme::font(FontRole::Body), Scale::px(1.0F), pos + ImVec2(Scale::px(1.0F), Scale::px(0.5F)),
-	    withAlpha(Theme::colorU32(ColorRole::TextBody)), state.toast->c_str());
+	draw->AddRectFilled(pos, pos + size, withAlpha(Theme::ColorU32(ColorRole::Panel)), Scale::Px(0.3F));
+	draw->AddRect(pos, pos + size, withAlpha(Theme::ColorU32(ColorRole::GoldDim)), Scale::Px(0.3F), 0,
+	    Scale::Px(0.06F));
+	draw->AddText(Theme::Font(FontRole::Body), Scale::Px(1.0F), pos + ImVec2(Scale::Px(1.0F), Scale::Px(0.5F)),
+	    withAlpha(Theme::ColorU32(ColorRole::TextBody)), state.toast->c_str());
 }
 
 const char *ConfirmDemoId()

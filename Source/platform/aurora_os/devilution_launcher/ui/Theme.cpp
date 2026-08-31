@@ -72,7 +72,7 @@ const ImWchar *iconRanges()
 
 } // namespace
 
-void init(float dpiScale)
+void Init(float dpiScale)
 {
 	auto &io = ImGui::GetIO();
 
@@ -121,31 +121,31 @@ void init(float dpiScale)
 	style.ItemSpacing = ImVec2(8.0F * dpiScale, 8.0F * dpiScale);
 
 	ImVec4 *c = style.Colors;
-	c[ImGuiCol_Text] = color(ColorRole::TextBody);
-	c[ImGuiCol_TextDisabled] = color(ColorRole::TextDim);
-	c[ImGuiCol_WindowBg] = color(ColorRole::Bg);
+	c[ImGuiCol_Text] = Color(ColorRole::TextBody);
+	c[ImGuiCol_TextDisabled] = Color(ColorRole::TextDim);
+	c[ImGuiCol_WindowBg] = Color(ColorRole::Bg);
 	c[ImGuiCol_PopupBg] = ImVec4(0.055F, 0.035F, 0.025F, 0.97F);
-	c[ImGuiCol_Border] = color(ColorRole::GoldDim);
+	c[ImGuiCol_Border] = Color(ColorRole::GoldDim);
 	c[ImGuiCol_FrameBg] = ImVec4(0.08F, 0.05F, 0.035F, 1.00F);
-	c[ImGuiCol_FrameBgHovered] = color(ColorRole::PanelHover);
-	c[ImGuiCol_FrameBgActive] = color(ColorRole::RedPressed);
-	c[ImGuiCol_TitleBg] = color(ColorRole::Panel);
-	c[ImGuiCol_TitleBgActive] = color(ColorRole::Panel);
-	c[ImGuiCol_Button] = color(ColorRole::Red);
-	c[ImGuiCol_ButtonHovered] = color(ColorRole::RedHover);
-	c[ImGuiCol_ButtonActive] = color(ColorRole::RedPressed);
-	c[ImGuiCol_Header] = color(ColorRole::Panel);
-	c[ImGuiCol_HeaderHovered] = color(ColorRole::PanelHover);
-	c[ImGuiCol_HeaderActive] = color(ColorRole::RedPressed);
-	c[ImGuiCol_Separator] = color(ColorRole::GoldDim);
-	c[ImGuiCol_CheckMark] = color(ColorRole::GoldBright);
-	c[ImGuiCol_SliderGrab] = color(ColorRole::GoldBright);
-	c[ImGuiCol_SliderGrabActive] = color(ColorRole::GoldBright);
+	c[ImGuiCol_FrameBgHovered] = Color(ColorRole::PanelHover);
+	c[ImGuiCol_FrameBgActive] = Color(ColorRole::RedPressed);
+	c[ImGuiCol_TitleBg] = Color(ColorRole::Panel);
+	c[ImGuiCol_TitleBgActive] = Color(ColorRole::Panel);
+	c[ImGuiCol_Button] = Color(ColorRole::Red);
+	c[ImGuiCol_ButtonHovered] = Color(ColorRole::RedHover);
+	c[ImGuiCol_ButtonActive] = Color(ColorRole::RedPressed);
+	c[ImGuiCol_Header] = Color(ColorRole::Panel);
+	c[ImGuiCol_HeaderHovered] = Color(ColorRole::PanelHover);
+	c[ImGuiCol_HeaderActive] = Color(ColorRole::RedPressed);
+	c[ImGuiCol_Separator] = Color(ColorRole::GoldDim);
+	c[ImGuiCol_CheckMark] = Color(ColorRole::GoldBright);
+	c[ImGuiCol_SliderGrab] = Color(ColorRole::GoldBright);
+	c[ImGuiCol_SliderGrabActive] = Color(ColorRole::GoldBright);
 	c[ImGuiCol_ModalWindowDimBg] = ImVec4(0, 0, 0, 0.70F);
-	c[ImGuiCol_NavCursor] = color(ColorRole::GoldBright);
+	c[ImGuiCol_NavCursor] = Color(ColorRole::GoldBright);
 }
 
-ImFont *font(FontRole role)
+ImFont *Font(FontRole role)
 {
 	if (auto it = fonts().find(role); it != fonts().end()) {
 		return it->second;
@@ -153,46 +153,46 @@ ImFont *font(FontRole role)
 	return nullptr;
 }
 
-void pushFont(FontRole role)
+void PushFont(FontRole role)
 {
-	ImGui::PushFont(font(role));
+	ImGui::PushFont(Font(role));
 }
 
-void popFont()
+void PopFont()
 {
 	ImGui::PopFont();
 }
 
-ImVec4 color(ColorRole role)
+ImVec4 Color(ColorRole role)
 {
 	return kColors[static_cast<size_t>(role)];
 }
 
-ImU32 colorU32(ColorRole role)
+ImU32 ColorU32(ColorRole role)
 {
-	return ImGui::ColorConvertFloat4ToU32(color(role));
+	return ImGui::ColorConvertFloat4ToU32(Color(role));
 }
 
-void pushButtonStyle(bool accent)
+void PushButtonStyle(bool accent)
 {
-	ImGui::PushStyleColor(ImGuiCol_Button, color(accent ? ColorRole::Red : ColorRole::Panel));
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color(accent ? ColorRole::RedHover : ColorRole::PanelHover));
-	ImGui::PushStyleColor(ImGuiCol_ButtonActive, color(ColorRole::RedPressed));
-	ImGui::PushStyleColor(ImGuiCol_Border, color(ColorRole::BorderGold));
-	ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, Scale::px(0.08F));
+	ImGui::PushStyleColor(ImGuiCol_Button, Color(accent ? ColorRole::Red : ColorRole::Panel));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Color(accent ? ColorRole::RedHover : ColorRole::PanelHover));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, Color(ColorRole::RedPressed));
+	ImGui::PushStyleColor(ImGuiCol_Border, Color(ColorRole::BorderGold));
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, Scale::Px(0.08F));
 }
 
-void popButtonStyle()
+void PopButtonStyle()
 {
 	ImGui::PopStyleVar();
 	ImGui::PopStyleColor(4);
 }
 
-void drawDivider(ImVec2 from, ImVec2 to, float alpha)
+void DrawDivider(ImVec2 from, ImVec2 to, float alpha)
 {
 	ImDrawList *draw = ImGui::GetWindowDrawList();
-	const ImU32 gold = ImGui::GetColorU32(ImVec4(color(ColorRole::BorderGold).x, color(ColorRole::BorderGold).y,
-	    color(ColorRole::BorderGold).z, alpha));
+	const ImU32 gold = ImGui::GetColorU32(ImVec4(Color(ColorRole::BorderGold).x, Color(ColorRole::BorderGold).y,
+	    Color(ColorRole::BorderGold).z, alpha));
 	const ImU32 transparent = gold & 0x00FFFFFF;
 	draw->AddRectFilledMultiColor(from, to, transparent, gold, gold, transparent);
 }

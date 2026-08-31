@@ -75,7 +75,7 @@ void LauncherView::SetModeIconLevels(ExitAction mode, const widgets::BackgroundA
 
 void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch)
 {
-	Scale::beginFrame(m_dpiScale);
+	Scale::BeginFrame(m_dpiScale);
 
 	// Drag-to-scroll gesture: once the pointer moves further than a tap
 	// threshold while held down, the frame is in "scrolling" mode —
@@ -83,7 +83,7 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	ImGuiIO &io = ImGui::GetIO();
 	if (ImGui::IsMouseDown(0)) {
 		const float dragDistance = std::sqrt(io.MouseDragMaxDistanceSqr[0]);
-		if (dragDistance > Scale::px(0.6F)) {
+		if (dragDistance > Scale::Px(0.6F)) {
 			m_gestureDrag = true;
 		}
 	}
@@ -94,13 +94,13 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	};
 
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
-	const float navHeight = Scale::px(3.2F);
+	const float navHeight = Scale::Px(3.2F);
 	// ~16dp на устройстве: как базовые поля мобильных платформ — текст
 	// дышит, интерактив не лазит в жестовую зону у края.
-	const float pad = Scale::px(1.5F);
+	const float pad = Scale::Px(1.5F);
 	// Keep a small gap above the screen edge so the nav bar is never
 	// clipped by system gesture areas on phones.
-	const float bottomInset = Scale::px(0.35F);
+	const float bottomInset = Scale::Px(0.35F);
 
 	// Root window: covers the viewport, no chrome.
 	ImGui::SetNextWindowPos(viewport->WorkPos);
@@ -123,7 +123,7 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	// идиома, крадущая ширину) — позицию прокрутки показывает тонкий
 	// оверлей-индикатор у края, контент держит симметричные поля.
 	const ImVec2 windowSize = ImGui::GetWindowSize();
-	const ImVec2 contentPos(0.0F, Scale::portrait() ? pad : navHeight + pad * 0.5F);
+	const ImVec2 contentPos(0.0F, Scale::Portrait() ? pad : navHeight + pad * 0.5F);
 	const ImVec2 contentSize(windowSize.x,
 	    windowSize.y - navHeight - pad * 1.5F - bottomInset);
 
@@ -156,7 +156,7 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 			m_scrollActiveAt = ImGui::GetTime();
 		}
 		const float appearK = EaseOutCubic(ElapsedFraction(m_screenShownAt, ImGui::GetTime(), 0.20F));
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (1.0F - appearK) * Scale::px(0.6F));
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (1.0F - appearK) * Scale::Px(0.6F));
 		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, appearK);
 		RenderScreen(state, guardedDispatch);
 		ImGui::PopStyleVar();
@@ -269,9 +269,9 @@ void LauncherView::RenderLaunchIris(const LauncherState &state)
 	const float time = static_cast<float>(ImGui::GetTime());
 	const float flicker = 0.70F + 0.30F * std::sin(time * 17.0F + 2.0F * std::sin(time * 6.3F));
 	const float rimAlpha = 0.55F * flicker * (1.0F - eased * 0.5F);
-	draw->AddCircle(c, radius, ImGui::GetColorU32(ImVec4(1.0F, 0.58F, 0.16F, rimAlpha)), 48, Scale::px(0.1F));
+	draw->AddCircle(c, radius, ImGui::GetColorU32(ImVec4(1.0F, 0.58F, 0.16F, rimAlpha)), 48, Scale::Px(0.1F));
 	draw->AddCircle(c, radius * 0.96F,
-	    ImGui::GetColorU32(ImVec4(0.91F, 0.55F, 0.16F, rimAlpha * 0.6F)), 48, Scale::px(0.18F));
+	    ImGui::GetColorU32(ImVec4(0.91F, 0.55F, 0.16F, rimAlpha * 0.6F)), 48, Scale::Px(0.18F));
 }
 
 void LauncherView::RenderBackground() const
@@ -310,7 +310,7 @@ void LauncherView::RenderBackground() const
 		if (alpha <= 0.01F) {
 			continue;
 		}
-		const float radius = Scale::px(0.08F + 0.06F * std::sin(seed * 5.9F));
+		const float radius = Scale::Px(0.08F + 0.06F * std::sin(seed * 5.9F));
 		const ImVec2 center(viewport->WorkPos.x + x01 * viewport->WorkSize.x,
 		    viewport->WorkPos.y + y01 * viewport->WorkSize.y);
 
@@ -349,14 +349,14 @@ void LauncherView::RenderScrollIndicator(float scrollY, float scrollMaxY, const 
 		return;
 	}
 
-	const float barW = Scale::px(0.14F);
-	const float inset = Scale::px(0.1F);
+	const float barW = Scale::Px(0.14F);
+	const float inset = Scale::Px(0.1F);
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
 	const float x0 = viewport->WorkPos.x + viewport->WorkSize.x - inset - barW;
 
 	// Доля видимой части экрана → высота бегунка (не короче 1.5rem).
 	const float fraction = height / (height + scrollMaxY);
-	const float thumbH = std::max(height * fraction, Scale::px(1.5F));
+	const float thumbH = std::max(height * fraction, Scale::Px(1.5F));
 	const float travel = height - thumbH;
 	const float thumbY = topLeft.y + (scrollMaxY > 0.0F ? travel * (scrollY / scrollMaxY) : 0.0F);
 
@@ -368,20 +368,20 @@ void LauncherView::RenderScrollIndicator(float scrollY, float scrollMaxY, const 
 void LauncherView::RenderNavBar(const LauncherState &state, const Dispatcher &dispatch)
 {
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
-	const float height = Scale::px(3.2F);
+	const float height = Scale::Px(3.2F);
 	const ImVec2 size(viewport->WorkSize.x, height);
 	// Slightly above the screen bottom so system gesture areas never
 	// clip the buttons on phones.
-	const float bottomInset = Scale::px(0.35F);
-	const ImVec2 pos = Scale::portrait()
+	const float bottomInset = Scale::Px(0.35F);
+	const ImVec2 pos = Scale::Portrait()
 	    ? ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + viewport->WorkSize.y - height - bottomInset)
 	    : viewport->WorkPos;
 
 	ImGui::SetNextWindowPos(pos);
 	ImGui::SetNextWindowSize(size);
 	ImGui::SetNextWindowViewport(viewport->ID);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Scale::px(0.4F), Scale::px(0.4F)));
-	ImGui::PushStyleColor(ImGuiCol_WindowBg, Theme::color(ColorRole::Panel));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Scale::Px(0.4F), Scale::Px(0.4F)));
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, Theme::Color(ColorRole::Panel));
 	ImGui::Begin("##navbar", nullptr,
 	    ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings
 	        | ImGuiWindowFlags_NoBringToFrontOnFocus);
@@ -400,16 +400,16 @@ void LauncherView::RenderNavBar(const LauncherState &state, const Dispatcher &di
 	const float buttonWidth = ImGui::GetContentRegionAvail().x / std::size(items);
 	for (const NavItem &item : items) {
 		const bool selected = (state.screen == item.screen);
-		ImGui::PushStyleColor(ImGuiCol_Button, Theme::color(selected ? ColorRole::Red : ColorRole::Bg));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Theme::color(selected ? ColorRole::RedHover : ColorRole::Panel));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, Theme::color(ColorRole::RedPressed));
-		ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(selected ? ColorRole::GoldBright : ColorRole::TextBody));
+		ImGui::PushStyleColor(ImGuiCol_Button, Theme::Color(selected ? ColorRole::Red : ColorRole::Bg));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Theme::Color(selected ? ColorRole::RedHover : ColorRole::Panel));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, Theme::Color(ColorRole::RedPressed));
+		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(selected ? ColorRole::GoldBright : ColorRole::TextBody));
 
 		const std::string label = std::string(item.icon) + "  " + item.label;
-		if (ImGui::Button(label.c_str(), ImVec2(buttonWidth - Scale::px(0.4F), height - Scale::px(0.8F)))) {
+		if (ImGui::Button(label.c_str(), ImVec2(buttonWidth - Scale::Px(0.4F), height - Scale::Px(0.8F)))) {
 			dispatch(intent::UiNavigate { item.screen });
 		}
-		ImGui::SameLine(0, Scale::px(0.4F));
+		ImGui::SameLine(0, Scale::Px(0.4F));
 		ImGui::PopStyleColor(4);
 	}
 

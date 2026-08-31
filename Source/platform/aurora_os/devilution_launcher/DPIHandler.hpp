@@ -1,23 +1,14 @@
 #pragma once
 
-#include <SDL2/SDL.h>
-#include <imgui.h>
-
 namespace App {
 
-struct WindowSize {
-    int width;
-    int height;
-};
-
+/**
+ * @brief Масштаб экрана для HiDPI-устройств.
+ */
 class DPIHandler {
 public:
-    [[nodiscard]] static float get_scale();
-
-    [[nodiscard]] static WindowSize get_dpi_aware_window_size(const WindowSize& size);
-
-    static void set_render_scale(SDL_Renderer* renderer);
-    static void set_global_font_scaling(ImGuiIO* io);
+	/// Коэффициент масштаба дисплея (96 dpi = 1.0).
+	[[nodiscard]] static auto GetScale() -> float;
 };
 
 } // namespace App

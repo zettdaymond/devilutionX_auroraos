@@ -181,7 +181,7 @@ Application::~Application()
 	}
 }
 
-bool Application::setup()
+bool Application::Setup()
 {
 	m_renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
 	if (m_renderer == nullptr) {
@@ -199,7 +199,7 @@ bool Application::setup()
 	io.ConfigFlags |= ImGuiConfigFlags_IsTouchScreen;
 	io.IniFilename = nullptr; // no imgui.ini — the launcher layout is fixed
 
-	launcher::ui::Theme::init(DPIHandler::get_scale());
+	launcher::ui::Theme::Init(DPIHandler::GetScale());
 
 	ImGui_ImplSDL2_InitForSDLRenderer(m_window, m_renderer);
 	ImGui_ImplSDLRenderer2_Init(m_renderer);
@@ -249,7 +249,7 @@ void Application::AttachFileLog()
 	}
 }
 
-AppResult Application::run()
+AppResult Application::Run()
 {
 	AttachFileLog();
 
@@ -258,12 +258,12 @@ AppResult Application::run()
 
 	// setup() creates the ImGui context and loads fonts; the view (and
 	// its FileBrowser, which queries the font atlas) must come after it.
-	if (m_renderer == nullptr && !setup()) {
+	if (m_renderer == nullptr && !Setup()) {
 		AppResult result;
 		result.success = false;
 		return result;
 	}
-	m_view = std::make_unique<launcher::ui::LauncherView>(DPIHandler::get_scale());
+	m_view = std::make_unique<launcher::ui::LauncherView>(DPIHandler::GetScale());
 	if (m_backgroundTexture != nullptr) {
 		m_view->SetBackgroundTexture(m_backgroundTexture, m_backgroundSize);
 	}
@@ -299,10 +299,10 @@ AppResult Application::run()
 		ImGui_ImplSDL2_ProcessEvent(&event);
 
 		if (event.type == SDL_QUIT) {
-			stop();
+			Stop();
 		}
 		if (event.type == SDL_WINDOWEVENT && event.window.windowID == SDL_GetWindowID(m_window)) {
-			on_event(event.window);
+			OnEvent(event.window);
 		}
 	};
 
@@ -365,15 +365,15 @@ AppResult Application::run()
 	return result;
 }
 
-void Application::stop()
+void Application::Stop()
 {
 	m_running = false;
 }
 
-void Application::on_event(const SDL_WindowEvent &event)
+void Application::OnEvent(const SDL_WindowEvent &event)
 {
 	if (event.event == SDL_WINDOWEVENT_CLOSE) {
-		stop();
+		Stop();
 	}
 }
 

@@ -72,7 +72,7 @@ void RenderFirstRun(const LauncherState &state, const Dispatcher &dispatch, cons
 {
 	const float width = ImGui::GetContentRegionAvail().x;
 	const float height = ImGui::GetContentRegionAvail().y;
-	const float heroHeight = std::min(height * 0.62F, Scale::px(17.0F));
+	const float heroHeight = std::min(height * 0.62F, Scale::Px(17.0F));
 
 	const HeroArtRef hero = ResolveHeroArt(art, art.diablo.hero, kDiabloStyle);
 	widgets::HeroPanel("DEVILUTIONX ДЛЯ AURORA OS", "DIABLO",
@@ -87,8 +87,8 @@ void RenderFirstRun(const LauncherState &state, const Dispatcher &dispatch, cons
 	                             } },
 	    });
 
-	ImGui::Dummy(ImVec2(0, Scale::px(0.6F)));
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextDim));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.6F)));
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 	ImGui::TextWrapped("%s",
 	    "Для полной версии скопируйте DIABDAT.MPQ с диска\nили купите игру на GoG.com. Для Hellfire нужны hellfire.mpq,\nhfmonk.mpq, hfmusic.mpq и hfvoice.mpq.");
 	ImGui::PopStyleColor();
@@ -121,7 +121,7 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 {
 	const float width = ImGui::GetContentRegionAvail().x;
 	const float height = ImGui::GetContentRegionAvail().y;
-	const bool portrait = Scale::portrait();
+	const bool portrait = Scale::Portrait();
 
 	// Pick the featured game: the first launchable mode.
 	Featured featured;
@@ -156,7 +156,7 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 	const bool hellfireFeatured = (featured.game == ExitAction::LaunchHellfire && featured.playable);
 	const bool demoFeatured = (featured.game == ExitAction::LaunchDemo && featured.playable);
 
-	const float heroHeight = portrait ? std::min(height * 0.52F, Scale::px(14.0F)) : Scale::px(11.0F);
+	const float heroHeight = portrait ? std::min(height * 0.52F, Scale::Px(14.0F)) : Scale::Px(11.0F);
 	const ModeArt &featuredMode = featured.game == ExitAction::LaunchDiablo ? art.diablo
 	    : featured.game == ExitAction::LaunchHellfire                    ? art.hellfire
 	                                                                    : art.demo;
@@ -173,18 +173,18 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 	                             } },
 	    });
 
-	ImGui::Dummy(ImVec2(0, Scale::px(0.8F)));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.8F)));
 
 	// Shelf header.
-	ImGui::PushFont(Theme::font(FontRole::BodyBold));
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::GoldBright));
+	ImGui::PushFont(Theme::Font(FontRole::BodyBold));
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::GoldBright));
 	ImGui::TextUnformatted("ДРУГИЕ РЕЖИМЫ");
 	ImGui::PopStyleColor();
 	ImGui::PopFont();
-	ImGui::Dummy(ImVec2(0, Scale::px(0.3F)));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.3F)));
 
 	auto renderTile = [&](const ShelfItem &item) {
-		const ImVec2 tileSize(portrait ? width : width * 0.5F - Scale::px(0.25F), Scale::px(4.2F));
+		const ImVec2 tileSize(portrait ? width : width * 0.5F - Scale::Px(0.25F), Scale::Px(4.2F));
 		widgets::GameTile(item.title, item.status.c_str(), item.icon, item.icons, item.playable,
 		    item.style->accent, tileSize, [&dispatch, item] { dispatch(intent::LaunchGame { item.game }); });
 	};
@@ -192,17 +192,17 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 	if (!diabloFeatured) {
 		renderTile(diabloTile);
 		if (!portrait) {
-			ImGui::SameLine(0, Scale::px(0.5F));
+			ImGui::SameLine(0, Scale::Px(0.5F));
 		} else {
-			ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
+			ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
 		}
 	}
 	if (!hellfireFeatured) {
 		renderTile(hellfireTile);
 		if (!portrait) {
-			ImGui::SameLine(0, Scale::px(0.5F));
+			ImGui::SameLine(0, Scale::Px(0.5F));
 		} else {
-			ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
+			ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
 		}
 	}
 	if (!demoFeatured) {
@@ -211,8 +211,8 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 
 	// Russian voice-pack offer as a slim banner.
 	if (state.diablo.available && !state.russianVoiceInstalled) {
-		ImGui::Dummy(ImVec2(0, Scale::px(0.6F)));
-		const ImVec2 bannerSize(width, Scale::px(2.4F));
+		ImGui::Dummy(ImVec2(0, Scale::Px(0.6F)));
+		const ImVec2 bannerSize(width, Scale::Px(2.4F));
 		if (ImGui::InvisibleButton("ruvoice", bannerSize)) {
 			dispatch(intent::UiOpenDialog { Dialog::ConfirmDownloadRu });
 		}
@@ -221,28 +221,28 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 		const ImVec2 max = ImGui::GetItemRectMax();
 		const bool hovered = ImGui::IsItemHovered();
 		draw->AddRectFilled(min, max,
-		    Theme::colorU32(hovered ? ColorRole::PanelHover : ColorRole::Panel), Scale::px(0.35F));
-		draw->AddRect(min, max, Theme::colorU32(ColorRole::GoldDim), Scale::px(0.35F), 0, Scale::px(0.06F));
+		    Theme::ColorU32(hovered ? ColorRole::PanelHover : ColorRole::Panel), Scale::Px(0.35F));
+		draw->AddRect(min, max, Theme::ColorU32(ColorRole::GoldDim), Scale::Px(0.35F), 0, Scale::Px(0.06F));
 
 		// Иконки рисуем в меру плачки: у IconBig-шрифта нативный кегль
 		// крупнее тонкого баннера и торчит за его границы.
-		ImFont *bannerIconFont = Theme::font(FontRole::IconBig);
+		ImFont *bannerIconFont = Theme::Font(FontRole::IconBig);
 		const float iconSize = bannerSize.y * 0.55F;
 		const float iconW = bannerIconFont != nullptr ? bannerIconFont->CalcTextSizeA(iconSize, FLT_MAX, 0.0F, icons::Music).x : iconSize;
 		draw->AddText(bannerIconFont, iconSize,
-		    ImVec2(min.x + Scale::px(0.8F), min.y + (bannerSize.y - iconSize) * 0.5F),
-		    Theme::colorU32(ColorRole::GoldBright), icons::Music);
+		    ImVec2(min.x + Scale::Px(0.8F), min.y + (bannerSize.y - iconSize) * 0.5F),
+		    Theme::ColorU32(ColorRole::GoldBright), icons::Music);
 
-		draw->AddText(Theme::font(FontRole::Body), Scale::px(0.95F),
-		    ImVec2(min.x + Scale::px(0.8F) + iconW + Scale::px(0.7F), min.y + (bannerSize.y - Scale::px(1.1F)) * 0.5F),
-		    Theme::colorU32(ColorRole::TextBody),
+		draw->AddText(Theme::Font(FontRole::Body), Scale::Px(0.95F),
+		    ImVec2(min.x + Scale::Px(0.8F) + iconW + Scale::Px(0.7F), min.y + (bannerSize.y - Scale::Px(1.1F)) * 0.5F),
+		    Theme::ColorU32(ColorRole::TextBody),
 		    "Русская озвучка и тексты · ru.mpq");
 
 		const float chevSize = bannerSize.y * 0.45F;
 		const float chevW = bannerIconFont != nullptr ? bannerIconFont->CalcTextSizeA(chevSize, FLT_MAX, 0.0F, icons::Play).x : chevSize;
 		draw->AddText(bannerIconFont, chevSize,
-		    ImVec2(max.x - chevW - Scale::px(0.7F), min.y + (bannerSize.y - chevSize) * 0.5F),
-		    Theme::colorU32(ColorRole::GoldBright), icons::Play);
+		    ImVec2(max.x - chevW - Scale::Px(0.7F), min.y + (bannerSize.y - chevSize) * 0.5F),
+		    Theme::ColorU32(ColorRole::GoldBright), icons::Play);
 	}
 }
 
@@ -256,10 +256,10 @@ void Home(const LauncherState &state, const Dispatcher &dispatch, const ArtSet &
 	}
 
 	// Nudge the block towards the vertical center of the content area.
-	const float heroH = Scale::portrait() ? Scale::px(14.0F) : Scale::px(11.0F);
-	const float shelfH = Scale::px(4.2F) * 2.0F + Scale::px(3.5F);
+	const float heroH = Scale::Portrait() ? Scale::Px(14.0F) : Scale::Px(11.0F);
+	const float shelfH = Scale::Px(4.2F) * 2.0F + Scale::Px(3.5F);
 	const float free = ImGui::GetContentRegionAvail().y - (heroH + shelfH);
-	ImGui::Dummy(ImVec2(0, std::max(free * 0.25F, Scale::px(0.5F))));
+	ImGui::Dummy(ImVec2(0, std::max(free * 0.25F, Scale::Px(0.5F))));
 
 	RenderHeroAndShelf(state, dispatch, art);
 }
@@ -293,14 +293,14 @@ void RenderChecklist(const LauncherState &state, const Dispatcher &dispatch)
 				anyDeletable = true;
 			}
 		}
-		ImGui::Dummy(ImVec2(0, Scale::px(0.2F)));
-		ImGui::PushFont(Theme::font(FontRole::BodyBold));
+		ImGui::Dummy(ImVec2(0, Scale::Px(0.2F)));
+		ImGui::PushFont(Theme::Font(FontRole::BodyBold));
 		ImGui::TextUnformatted(group.title);
 		ImGui::PopFont();
 		ImGui::SameLine();
-		ImGui::PushFont(Theme::font(FontRole::Body));
-		ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(missing == 0 ? ColorRole::Success : ColorRole::TextDim));
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + Scale::px(0.15F));
+		ImGui::PushFont(Theme::Font(FontRole::Body));
+		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(missing == 0 ? ColorRole::Success : ColorRole::TextDim));
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + Scale::Px(0.15F));
 		if (strcmp(group.title, "Прочее") == 0) {
 			ImGui::TextUnformatted("— не обязательны для запуска");
 		} else if (missing == 0) {
@@ -310,7 +310,7 @@ void RenderChecklist(const LauncherState &state, const Dispatcher &dispatch)
 		}
 		ImGui::PopStyleColor();
 		ImGui::PopFont();
-		ImGui::Dummy(ImVec2(0, Scale::px(0.2F)));
+		ImGui::Dummy(ImVec2(0, Scale::Px(0.2F)));
 
 		// Колонка действий добавляется только когда есть хотя бы одна
 		// кнопка — иначе на устройстве она съедала ~140px справа и
@@ -320,11 +320,11 @@ void RenderChecklist(const LauncherState &state, const Dispatcher &dispatch)
 		if (!ImGui::BeginTable(tableName.c_str(), columnCount, ImGuiTableFlags_SizingStretchProp)) {
 			return;
 		}
-		ImGui::TableSetupColumn("status", ImGuiTableColumnFlags_WidthFixed, Scale::px(1.6F));
+		ImGui::TableSetupColumn("status", ImGuiTableColumnFlags_WidthFixed, Scale::Px(1.6F));
 		ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthStretch);
 		ImGui::TableSetupColumn("detail", ImGuiTableColumnFlags_WidthStretch);
 		if (anyDeletable) {
-			ImGui::TableSetupColumn("actions", ImGuiTableColumnFlags_WidthFixed, Scale::px(2.0F));
+			ImGui::TableSetupColumn("actions", ImGuiTableColumnFlags_WidthFixed, Scale::Px(2.0F));
 		}
 
 		for (KnownFile id : group.files) {
@@ -350,12 +350,12 @@ void RenderChecklist(const LauncherState &state, const Dispatcher &dispatch)
 			if (anyDeletable) {
 				ImGui::TableNextColumn();
 				if (present && spec.downloadable) {
-					Theme::pushButtonStyle(false);
+					Theme::PushButtonStyle(false);
 					const std::string label = std::string(icons::Trash) + "##del" + std::to_string(i);
 					if (ImGui::SmallButton(label.c_str())) {
 						dispatch(intent::DeleteDownloadedFile { id });
 					}
-					Theme::popButtonStyle();
+					Theme::PopButtonStyle();
 				}
 			}
 		}
@@ -373,48 +373,48 @@ void Data(const LauncherState &state, const Dispatcher &dispatch)
 {
 	const float width = ImGui::GetContentRegionAvail().x;
 
-	ImGui::PushFont(Theme::font(FontRole::BodyBold));
+	ImGui::PushFont(Theme::Font(FontRole::BodyBold));
 	ImGui::TextUnformatted("Папка с файлами игры");
 	ImGui::PopFont();
 
 	if (state.dataFolder.empty()) {
-		ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextDim));
+		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 		ImGui::TextWrapped("Не выбрана — используются папки приложения.");
 		ImGui::PopStyleColor();
 	} else {
 		ImGui::TextWrapped("%s", state.dataFolder.string().c_str());
 	}
 
-	widgets::IconButton(icons::Folder, "Изменить папку", false, ImVec2(width, Scale::px(2.2F)), [&dispatch] {
+	widgets::IconButton(icons::Folder, "Изменить папку", false, ImVec2(width, Scale::Px(2.2F)), [&dispatch] {
 		dispatch(intent::SelectDataFolder {});
 	});
 
-	ImGui::Dummy(ImVec2(0, Scale::px(0.6F)));
-	Theme::drawDivider(ImGui::GetCursorScreenPos(),
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.6F)));
+	Theme::DrawDivider(ImGui::GetCursorScreenPos(),
 	    ImGui::GetCursorScreenPos() + ImVec2(width, 0), 0.6F);
-	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
 
-	ImGui::PushFont(Theme::font(FontRole::BodyBold));
+	ImGui::PushFont(Theme::Font(FontRole::BodyBold));
 	ImGui::TextUnformatted("Файлы игры");
 	ImGui::PopFont();
 	RenderChecklist(state, dispatch);
 
-	ImGui::Dummy(ImVec2(0, Scale::px(0.6F)));
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextDim));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.6F)));
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 	ImGui::Text("%s Свободно: %s", icons::Hdd, FormatBytes(state.freeDiskBytes).c_str());
 	ImGui::PopStyleColor();
 }
 
 void About(const LauncherState &)
 {
-	ImGui::Dummy(ImVec2(0, Scale::px(1.0F)));
-	Theme::pushFont(FontRole::Heading);
+	ImGui::Dummy(ImVec2(0, Scale::Px(1.0F)));
+	Theme::PushFont(FontRole::Heading);
 	widgets::CenteredText("DIABLO", ColorRole::TextHeading);
-	Theme::popFont();
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextBody));
+	Theme::PopFont();
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextBody));
 	widgets::CenteredText("DevilutionX — порт для Aurora OS");
 	ImGui::PopStyleColor();
-	ImGui::Dummy(ImVec2(0, Scale::px(0.8F)));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.8F)));
 
 	ImGui::TextWrapped(
 	    "DevilutionX — современный открытый порт классического Diablo (1996) "
@@ -429,32 +429,32 @@ void About(const LauncherState &)
 	    "Этот лаунчер помогает настроить игру: найти файлы оригинала, скачать "
 	    "бесплатную демо-версию или русскую озвучку.");
 
-	ImGui::Dummy(ImVec2(0, Scale::px(0.8F)));
-	Theme::drawDivider(ImGui::GetCursorScreenPos(),
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.8F)));
+	Theme::DrawDivider(ImGui::GetCursorScreenPos(),
 	    ImGui::GetCursorScreenPos() + ImVec2(ImGui::GetContentRegionAvail().x, 0), 0.6F);
-	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
 
-	ImGui::PushFont(Theme::font(FontRole::BodyBold));
+	ImGui::PushFont(Theme::Font(FontRole::BodyBold));
 	ImGui::TextUnformatted("Версия");
 	ImGui::PopFont();
 	ImGui::Text("DevilutionX %s (порт для Aurora OS)", LAUNCHER_APP_VERSION);
 
-	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
-	ImGui::PushFont(Theme::font(FontRole::BodyBold));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
+	ImGui::PushFont(Theme::Font(FontRole::BodyBold));
 	ImGui::TextUnformatted("Ссылки");
 	ImGui::PopFont();
 	ImGui::TextWrapped("%s  github.com/diasurgical/DevilutionX", icons::Globe);
 	ImGui::TextWrapped("%s  github.com/zettdaymond/devilutionX_auroraos", icons::Globe);
 	ImGui::TextWrapped("%s  Diablo © 1996 Blizzard Entertainment", icons::Book);
 
-	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
-	ImGui::PushFont(Theme::font(FontRole::BodyBold));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
+	ImGui::PushFont(Theme::Font(FontRole::BodyBold));
 	ImGui::TextUnformatted("Поддержка");
 	ImGui::PopFont();
 	ImGui::TextWrapped("%s  Нашли проблему или есть предложение? Пишите: zettday@gmail.com", icons::Envelope);
 
-	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::color(ColorRole::TextDim));
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 	ImGui::TextWrapped(
 	    "Лицензия: Sustainable Use License — использование в некоммерческих целях. "
 	    "Diablo, Blizzard Entertainment — товарные знаки Blizzard Entertainment, Inc. "

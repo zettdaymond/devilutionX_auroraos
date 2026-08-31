@@ -46,24 +46,24 @@ public:
 	Application &operator=(Application &&) = delete;
 
 	/// Runs the UI loop; returns what to launch.
-	[[nodiscard]] AppResult run();
+	[[nodiscard]] AppResult Run();
 
 	/// Override the first screen (desktop development aid).
-	void setInitialScreen(launcher::Screen screen) { m_initialScreen = screen; }
+	void SetInitialScreen(launcher::Screen screen) { m_initialScreen = screen; }
 
 	/// Open the MPQ folder browser on startup (desktop development aid).
-	void setInitialBrowser(bool open) { m_initialBrowser = open; }
+	void SetInitialBrowser(bool open) { m_initialBrowser = open; }
 
 	/// Open a dialog on startup (desktop development aid):
 	/// confirm-demo | confirm-ru | hellfire-missing | error.
-	void setInitialDialog(launcher::Dialog dialog) { m_initialDialog = dialog; }
+	void SetInitialDialog(launcher::Dialog dialog) { m_initialDialog = dialog; }
 
-	void stop();
-	void on_event(const SDL_WindowEvent &event);
+	void Stop();
+	void OnEvent(const SDL_WindowEvent &event);
 
 private:
 	/// Common SDL/ImGui bootstrap. Returns false on failure.
-	bool setup();
+	bool Setup();
 
 	/// Adds a rotating file sink next to the console logger so on-device
 	/// issues can be read without root access to the system journal.

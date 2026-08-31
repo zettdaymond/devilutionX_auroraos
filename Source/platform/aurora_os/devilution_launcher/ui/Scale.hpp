@@ -2,28 +2,32 @@
 
 namespace launcher::ui {
 
-/// Fluid, viewport-derived sizing (a "rem" unit, like in modern UI
-/// toolkits). All UI dimensions are expressed in rem units so the
-/// interface scales smoothly between phone, tablet and desktop window
-/// sizes — no fixed breakpoints for sizes, only for layout structure.
-///
-/// rem = clamp(viewport diagonal / 36, 14·dpi, 30·dpi) pixels.
+/**
+ * @brief Жидкое масштабирование интерфейса по размеру вьюпорта.
+ *
+ * Все размеры UI выражены в «rem» — как в современных веб-тулкитах, —
+ * поэтому интерфейс плавно масштабируется между телефоном, планшетом и
+ * окном на десктопе: фиксированные брейкпоинты есть только у структуры
+ * layout, но не у размеров.
+ *
+ * rem = clamp(диагональ вьюпорта / 44, 12·dpi, 26·dpi) пикселей.
+ */
 class Scale {
 public:
-	/// Recompute for the current frame. Call once before rendering.
-	static void beginFrame(float dpiScale);
+	/// Пересчитывает значения под текущий кадр. Вызывается раз в кадр до рендера.
+	static void BeginFrame(float dpiScale);
 
-	/// Current rem in pixels.
-	[[nodiscard]] static float rem();
+	/// Текущий rem в пикселях.
+	[[nodiscard]] static auto Rem() -> float;
 
-	/// Convert rem units to pixels.
-	[[nodiscard]] static float px(float remUnits) { return remUnits * rem(); }
+	/// Переводит rem-ы в пиксели.
+	[[nodiscard]] static auto Px(float remUnits) -> float { return remUnits * Rem(); }
 
-	/// Portrait (phone) or landscape (tablet/desktop) layout.
-	[[nodiscard]] static bool portrait();
+	/// Портретная (телефон) или альбомная (планшет/десктоп) компоновка.
+	[[nodiscard]] static auto Portrait() -> bool;
 
-	/// Smaller viewport side in pixels.
-	[[nodiscard]] static float minSide();
+	/// Меньшая сторона вьюпорта в пикселях.
+	[[nodiscard]] static auto MinSide() -> float;
 };
 
 } // namespace launcher::ui

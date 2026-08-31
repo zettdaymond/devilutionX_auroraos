@@ -88,7 +88,7 @@ FUNC_EXPORT(int argc, char **argv)
 
     devilution::ghMainWnd = SDL_CreateWindow("Diablo launcher", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1, 1, SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_ALLOW_HIGHDPI);
     auto app = App::Application(devilution::ghMainWnd, "org.diasurgical", "devilutionx");
-    const auto launcherResult = app.run();
+    const auto launcherResult = app.Run();
 
     SDL_DestroyWindow(devilution::ghMainWnd);
     SDL_Quit();
