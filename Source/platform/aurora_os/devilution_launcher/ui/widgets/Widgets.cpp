@@ -387,7 +387,6 @@ void FileRow(bool present, const char *name, const char *status, const char *pat
 	ImGui::PushID(name);
 
 	const float startX = ImGui::GetCursorPosX();
-	const float rowTopY = ImGui::GetCursorPosY();
 	const float rowWidth = ImGui::GetContentRegionAvail().x;
 	const float buttonSize = Scale::Px(2.2F);
 	const float gap = Scale::Px(0.5F);
@@ -409,28 +408,30 @@ void FileRow(bool present, const char *name, const char *status, const char *pat
 		actionWidth = ImGui::CalcTextSize("Скачать").x + Scale::Px(1.2F);
 	}
 
-	// Статус справа: у отсутствующего скачиваемого файла кнопка «Скачать»
-	// сама говорит всё — статус не дублируем. Если статус не влезает до
-	// действия, уводим его строкой ниже (с отступом, как путь), а не
-	// печатаем поверх имени.
+	// Статус (размер или «не найден») живёт всегда на первой строке:
+	// прижат к правому краю, а если длинное имя с кнопкой не оставляет
+	// места — сразу после имени. Отдельной строкой он бы «просаживал»
+	// блок пути вниз. У отсутствующего скачиваемого файла статус не
+	// нужен вовсе: кнопка «Скачать» говорит всё сама.
 	const ImVec2 statusSize = ImGui::CalcTextSize(status);
 	const float nameWidth = ImGui::CalcTextSize(present ? icons::Check : icons::Times).x
 	    + ImGui::GetStyle().ItemSpacing.x + ImGui::CalcTextSize(name).x;
 	const float statusX = rightEdge - actionWidth - (actionWidth > 0.0F ? gap : 0.0F) - statusSize.x;
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
-	if (!onDownload && startX + nameWidth + gap <= statusX) {
-		ImGui::SameLine(statusX);
-		ImGui::TextUnformatted(status);
-		ImGui::PopStyleColor();
-	} else if (!onDownload) {
-		ImGui::PopStyleColor();
-		ImGui::SetCursorPosX(startX + Scale::Px(1.6F));
+	if (!onDownload) {
 		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
+		if (startX + nameWidth + gap <= statusX) {
+			ImGui::SameLine(statusX);
+		} else {
+			ImGui::SameLine(0, Scale::Px(0.8F));
+		}
 		ImGui::TextUnformatted(status);
-		ImGui::PopStyleColor();
-	} else {
 		ImGui::PopStyleColor();
 	}
+
+	// Низ текстовой строки: путь начнётся сразу под именем, а не под
+	// высокой кнопкой — иначе у строк с кнопкой между именем и путём
+	// зияла пустота размером с кнопку.
+	const float textBottom = ImGui::GetCursorPosY();
 
 	if (onDelete || onDownload) {
 		ImGui::SameLine(rightEdge - actionWidth);
@@ -448,17 +449,14 @@ void FileRow(bool present, const char *name, const char *status, const char *pat
 	}
 
 	if (present && path != nullptr && path[0] != '\0') {
-		// Путь у всех строк начинается на одной глубине — по высокой
-		// первой строке (высота кнопки), а не по тому, есть ли кнопка
-		// в конкретной строке. Иначе путь «проседал» у файлов с
-		// корзинкой и плясал у остальных.
-		const float firstLineBottom = rowTopY + std::max(buttonSize, ImGui::GetTextLineHeight())
-		    + ImGui::GetStyle().ItemSpacing.y;
-		ImGui::SetCursorPosY(firstLineBottom);
+		ImGui::SetCursorPosY(textBottom);
 		const float indent = Scale::Px(1.6F);
+		// Строки пути не заходят в зону кнопки: кнопка занимает
+		// правый край первых ~2.2rem высоты строки.
+		const float pathWidth = rowWidth - indent - (actionWidth > 0.0F ? actionWidth + gap : 0.0F);
 		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 		for (const std::string &line : WrapPathAtSlashes(ImGui::GetFont(), ImGui::GetFontSize(), path,
-		     rowWidth - indent)) {
+		     pathWidth)) {
 			ImGui::SetCursorPosX(startX + indent);
 			ImGui::TextUnformatted(line.c_str());
 		}
