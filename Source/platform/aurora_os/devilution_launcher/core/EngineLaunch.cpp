@@ -2,23 +2,33 @@
 
 namespace launcher {
 
-std::vector<std::string> EngineArgsFor(ExitAction action)
+std::vector<std::string> EngineArgsFor(ExitAction action, const std::filesystem::path &dataPath)
 {
+	std::vector<std::string> args;
+
 	switch (action) {
 	case ExitAction::LaunchDiablo:
-		return { "--diablo" };
+		args.push_back("--diablo");
+		break;
 	case ExitAction::LaunchHellfire:
-		return { "--hellfire" };
+		args.push_back("--hellfire");
+		break;
 	case ExitAction::LaunchDemo:
-		return { "--spawn" };
+		args.push_back("--spawn");
+		return args;
 	}
-	return {};
+
+	// The shareware demo relies on the engine's own search paths
+	// (spawn.mpq is downloaded into the additional MPQ directory).
+	if (!dataPath.empty()) {
+		args.push_back("--data-dir");
+		args.push_back(dataPath.string());
+	}
+	return args;
 }
 
 bool WantsUserMpqPath(ExitAction action)
 {
-	// The shareware demo relies on the engine's own search paths
-	// (spawn.mpq is downloaded into the additional MPQ directory).
 	return action == ExitAction::LaunchDiablo || action == ExitAction::LaunchHellfire;
 }
 

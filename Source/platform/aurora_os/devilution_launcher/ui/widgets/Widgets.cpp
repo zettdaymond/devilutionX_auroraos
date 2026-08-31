@@ -110,11 +110,9 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 			++statusLines;
 		}
 	}
-	// With several buttons or a multi-line status the text goes full-width
-	// above the button row; side-by-side only fits a single button + line.
-	const bool sideBySide = (actionCount <= 1) && (statusLines <= 1);
-	const float textMaxWidth = size.x - pad * 2.0F
-	    - ((actionCount > 0 && sideBySide) ? btnW + Scale::px(0.6F) : 0.0F);
+	// The text block sits fully ABOVE the button row, so it always spans
+	// the panel width (buttons are anchored to the bottom edge).
+	const float textMaxWidth = size.x - pad * 2.0F;
 
 	// Measure the text block first so it never grows into the buttons.
 	const float eyebrowH = Scale::px(0.95F);

@@ -45,6 +45,11 @@ private:
 
 	Dialog m_lastDialog = Dialog::None;
 	std::unique_ptr<ImGui::FileBrowser> m_fileBrowser;
+
+	/// True while the user is drag-scrolling the content (touch): clicks
+	/// dispatched during the gesture are suppressed so dragging over a
+	/// card does not "press" it.
+	bool m_gestureDrag = false;
 };
 
 } // namespace launcher::ui

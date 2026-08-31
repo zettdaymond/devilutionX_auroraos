@@ -17,10 +17,14 @@ namespace launcher::ui::dialogs {
 
 namespace {
 
-/// Centered modal window helper. Returns true while the dialog is open.
-bool BeginModal(const char *name, const ImVec2 &size)
+/// Centered modal window helper. The desired width is given in rem and
+/// always capped by the viewport so the dialog can never overflow a
+/// phone screen. Returns true while the dialog is open.
+bool BeginModal(const char *name, float widthRem)
 {
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
+	const float maxWidth = viewport->WorkSize.x * 0.94F;
+	const ImVec2 size(std::min(Scale::px(widthRem), maxWidth), 0.0F);
 	ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5F,
 	                    viewport->WorkPos.y + viewport->WorkSize.y * 0.5F),
 	    ImGuiCond_Appearing, ImVec2(0.5F, 0.5F));
@@ -33,6 +37,15 @@ bool BeginModal(const char *name, const ImVec2 &size)
 		ImGui::PopStyleColor();
 	}
 	return open;
+}
+
+/// Width for one of a pair of dialog buttons: the preferred rem-based
+/// size, never wider than half of the available row.
+ImVec2 PairedButtonSize(float widthRem, float heightRem)
+{
+	const float avail = ImGui::GetContentRegionAvail().x;
+	const float half = (avail - ImGui::GetStyle().ItemSpacing.x) * 0.5F;
+	return ImVec2(std::min(Scale::px(widthRem), half), Scale::px(heightRem));
 }
 
 void EndModal()
@@ -61,7 +74,7 @@ void Download(const LauncherState &state, const Dispatcher &dispatch, KnownFile 
 	const bool isDemo = (file == KnownFile::Spawn);
 	const char *title = isDemo ? "Скачать демо-версию?" : "Скачать русскую озвучку?";
 
-	if (!BeginModal(title, ImVec2(Scale::px(24.0F), 0))) {
+	if (!BeginModal(title, 24.0F)) {
 		return;
 	}
 
@@ -79,7 +92,7 @@ void Download(const LauncherState &state, const Dispatcher &dispatch, KnownFile 
 	ImGui::PopStyleColor();
 	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
 
-	const ImVec2 buttonSize(Scale::px(9.0F), Scale::px(2.2F));
+	const ImVec2 buttonSize = PairedButtonSize(9.0F, 2.2F);
 	if (ImGui::Button("Скачать", buttonSize)) {
 		ImGui::CloseCurrentPopup();
 		dispatch(intent::StartDownload { file });
@@ -111,7 +124,7 @@ void Download(const LauncherState &state, const Dispatcher &dispatch)
 	draw->AddRectFilled(viewport->WorkPos, viewport->WorkPos + viewport->WorkSize,
 	    ImGui::GetColorU32(ImVec4(0, 0, 0, 0.80F)));
 
-	if (!BeginModal("##download-overlay", ImVec2(Scale::px(26.0F), 0))) {
+	if (!BeginModal("##download-overlay", 26.0F)) {
 		return;
 	}
 
@@ -156,7 +169,7 @@ void Download(const LauncherState &state, const Dispatcher &dispatch)
 	ImGui::PopStyleColor();
 
 	ImGui::Dummy(ImVec2(0, Scale::px(0.6F)));
-	const ImVec2 buttonSize(Scale::px(10.0F), Scale::px(2.2F));
+	const ImVec2 buttonSize = PairedButtonSize(10.0F, 2.2F);
 	if (download.active) {
 		widgets::IconButton(icons::Times, "Отмена", false, buttonSize, [&dispatch] {
 			dispatch(intent::CancelDownload {});
@@ -180,7 +193,7 @@ void Download(const LauncherState &state, const Dispatcher &dispatch)
 
 void MissingFiles(const LauncherState &state, const Dispatcher &dispatch)
 {
-	if (!BeginModal("Не хватает файлов", ImVec2(Scale::px(26.0F), 0))) {
+	if (!BeginModal("Не хватает файлов", 26.0F)) {
 		return;
 	}
 
@@ -197,7 +210,7 @@ void MissingFiles(const LauncherState &state, const Dispatcher &dispatch)
 	ImGui::PopStyleColor();
 
 	ImGui::Dummy(ImVec2(0, Scale::px(0.5F)));
-	const ImVec2 buttonSize(Scale::px(11.0F), Scale::px(2.2F));
+	const ImVec2 buttonSize = PairedButtonSize(11.0F, 2.2F);
 	widgets::IconButton(icons::Folder, "Выбрать папку", true, buttonSize, [&dispatch] {
 		ImGui::CloseCurrentPopup();
 		dispatch(intent::SelectDataFolder {});
@@ -213,7 +226,7 @@ void MissingFiles(const LauncherState &state, const Dispatcher &dispatch)
 
 void Error(const LauncherState &state, const Dispatcher &dispatch)
 {
-	if (!BeginModal("Ошибка", ImVec2(Scale::px(24.0F), 0))) {
+	if (!BeginModal("Ошибка", 24.0F)) {
 		return;
 	}
 

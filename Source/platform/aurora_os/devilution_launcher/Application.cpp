@@ -118,6 +118,9 @@ AppResult Application::run()
 	if (m_initialBrowser) {
 		m_store->dispatch(launcher::intent::SelectDataFolder {});
 	}
+	if (m_initialDialog.has_value()) {
+		m_store->dispatch(launcher::intent::UiOpenDialog { *m_initialDialog });
+	}
 
 	auto dispatch = [this](launcher::Intent intent) {
 		m_store->dispatch(std::move(intent));

@@ -33,6 +33,7 @@ struct Args {
 	std::optional<std::string> mockScenario;
 	std::optional<launcher::Screen> screen;
 	bool openBrowser = false;
+	std::optional<launcher::Dialog> dialog;
 	int windowWidth = 540;
 	int windowHeight = 960;
 };
@@ -55,6 +56,17 @@ Args ParseArgs(int argc, char **argv)
 			}
 		} else if (arg == "--open-browser") {
 			args.openBrowser = true;
+		} else if (arg.rfind("--dialog=", 0) == 0) {
+			const std::string value = arg.substr(std::strlen("--dialog="));
+			if (value == "confirm-demo") {
+				args.dialog = launcher::Dialog::ConfirmDownloadDemo;
+			} else if (value == "confirm-ru") {
+				args.dialog = launcher::Dialog::ConfirmDownloadRu;
+			} else if (value == "hellfire-missing") {
+				args.dialog = launcher::Dialog::HellfireMissingFiles;
+			} else if (value == "error") {
+				args.dialog = launcher::Dialog::Error;
+			}
 		} else if (arg.rfind("--window=", 0) == 0) {
 			const std::string value = arg.substr(std::strlen("--window="));
 			if (const char *x = std::strchr(value.c_str(), 'x'); x != nullptr) {
@@ -119,6 +131,9 @@ int main(int argc, char **argv)
 	}
 	if (args.openBrowser) {
 		app->setInitialBrowser(true);
+	}
+	if (args.dialog.has_value()) {
+		app->setInitialDialog(*args.dialog);
 	}
 
 	const App::AppResult result = app->run();

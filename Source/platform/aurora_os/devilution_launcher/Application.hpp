@@ -53,6 +53,10 @@ public:
 	/// Open the MPQ folder browser on startup (desktop development aid).
 	void setInitialBrowser(bool open) { m_initialBrowser = open; }
 
+	/// Open a dialog on startup (desktop development aid):
+	/// confirm-demo | confirm-ru | hellfire-missing | error.
+	void setInitialDialog(launcher::Dialog dialog) { m_initialDialog = dialog; }
+
 	void stop();
 	void on_event(const SDL_WindowEvent &event);
 
@@ -77,6 +81,7 @@ private:
 	bool m_minimized { false };
 	std::optional<launcher::Screen> m_initialScreen;
 	bool m_initialBrowser = false;
+	std::optional<launcher::Dialog> m_initialDialog;
 };
 
 } // namespace App

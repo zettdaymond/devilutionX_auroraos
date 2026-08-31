@@ -98,7 +98,7 @@ FUNC_EXPORT(int argc, char **argv)
             devilution::AuroraOsStandartPaths::SetUserDefinedMPQSearchPath(launcherResult.dataPath.string());
         }
 
-        engineArgs = launcher::EngineArgsFor(launcherResult.action);
+        engineArgs = launcher::EngineArgsFor(launcherResult.action, launcherResult.dataPath);
         if (!engineArgs.empty()) {
             engineArgv.push_back(argv[0]);
             for (const std::string &arg : engineArgs) {

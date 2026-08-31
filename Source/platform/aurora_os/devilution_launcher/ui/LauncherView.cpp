@@ -10,6 +10,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <iterator>
 #include <string>
@@ -56,9 +57,28 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 {
 	Scale::beginFrame(m_dpiScale);
 
+	// Drag-to-scroll gesture: once the pointer moves further than a tap
+	// threshold while held down, the frame is in "scrolling" mode —
+	// intents from clicks are swallowed for its duration.
+	ImGuiIO &io = ImGui::GetIO();
+	if (ImGui::IsMouseDown(0)) {
+		const float dragDistance = std::sqrt(io.MouseDragMaxDistanceSqr[0]);
+		if (dragDistance > Scale::px(0.6F)) {
+			m_gestureDrag = true;
+		}
+	}
+	Dispatcher guardedDispatch = [this, &dispatch](Intent intent) {
+		if (!m_gestureDrag) {
+			dispatch(intent);
+		}
+	};
+
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
 	const float navHeight = Scale::px(3.2F);
 	const float pad = Scale::px(1.2F);
+	// Keep a small gap above the screen edge so the nav bar is never
+	// clipped by system gesture areas on phones.
+	const float bottomInset = Scale::px(0.35F);
 
 	// Root window: covers the viewport, no chrome.
 	ImGui::SetNextWindowPos(viewport->WorkPos);
@@ -80,12 +100,19 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	// or at the top (landscape).
 	const ImVec2 windowSize = ImGui::GetWindowSize();
 	const ImVec2 contentPos(pad, Scale::portrait() ? pad : navHeight + pad * 0.5F);
-	const ImVec2 contentSize(windowSize.x - pad * 2.0F, windowSize.y - navHeight - pad * 1.5F);
+	const ImVec2 contentSize(windowSize.x - pad * 2.0F,
+	    windowSize.y - navHeight - pad * 1.5F - bottomInset);
 
 	ImGui::SetCursorPos(contentPos);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	if (ImGui::BeginChild("##content", contentSize, ImGuiChildFlags_None)) {
-		RenderScreen(state, dispatch);
+		// Apply the drag delta to the content scroll while the gesture
+		// is active and the pointer is over the content area.
+		if (m_gestureDrag
+		    && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
+			ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseDelta.y);
+		}
+		RenderScreen(state, guardedDispatch);
 	}
 	ImGui::EndChild();
 	ImGui::PopStyleVar();
@@ -93,10 +120,16 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	ImGui::End();
 	ImGui::PopStyleVar();
 
-	RenderNavBar(state, dispatch);
-	RenderDialogs(state, dispatch);
+	RenderNavBar(state, guardedDispatch);
+	RenderDialogs(state, guardedDispatch);
 	RenderFileBrowser(state, dispatch);
-	dialogs::Toast(state, dispatch);
+	dialogs::Toast(state, guardedDispatch);
+
+	// The gesture ends with the button release — reset AFTER rendering so
+	// a click fired on the release frame of a drag is still suppressed.
+	if (!ImGui::IsMouseDown(0)) {
+		m_gestureDrag = false;
+	}
 }
 
 void LauncherView::RenderBackground() const
@@ -125,8 +158,11 @@ void LauncherView::RenderNavBar(const LauncherState &state, const Dispatcher &di
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
 	const float height = Scale::px(3.2F);
 	const ImVec2 size(viewport->WorkSize.x, height);
+	// Slightly above the screen bottom so system gesture areas never
+	// clip the buttons on phones.
+	const float bottomInset = Scale::px(0.35F);
 	const ImVec2 pos = Scale::portrait()
-	    ? ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + viewport->WorkSize.y - height)
+	    ? ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + viewport->WorkSize.y - height - bottomInset)
 	    : viewport->WorkPos;
 
 	ImGui::SetNextWindowPos(pos);
