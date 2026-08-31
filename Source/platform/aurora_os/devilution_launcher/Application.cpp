@@ -203,7 +203,10 @@ AppResult Application::run()
 	};
 
 	m_running = true;
-	while (m_running && !m_store->state().pendingLaunch.has_value()) {
+	// После «Играть» цикл дорисовывает iris-анимацию (сужающийся круг
+	// поверх последнего кадра) и только затем отдаёт управление движку.
+	while (m_running
+	    && (!m_store->state().pendingLaunch.has_value() || !m_view->LaunchIrisDone())) {
 		// В фоне (свёрнуто/скрыто) цикл продолжает обслуживать события и
 		// загрузки, но не рендерит. Вместо слепого сна ждём событие в ОС:
 		// разворачивание обрабатывается мгновенно, а таймаут 250 мс равен
@@ -214,6 +217,11 @@ AppResult Application::run()
 		const bool hidden = (windowFlags & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
 
 		if (hidden) {
+			// Анимировать закрытое окно не для кого: iris не стартует без
+			// рендера, и цикл выше никогда не увидел бы его завершения.
+			if (m_store->state().pendingLaunch.has_value()) {
+				break;
+			}
 			SDL_Event wake {};
 			if (SDL_WaitEventTimeout(&wake, 250) == 1) {
 				processEvent(wake);

@@ -16,6 +16,14 @@ namespace launcher::ui {
 	return 1.0F - inv * inv * inv;
 }
 
+/// Ускоряющееся течение — закрытие «ставней»: медленный старт, решительный
+/// финал (iris-out перед уходом в движок).
+[[nodiscard]] inline float EaseInQuad(float t)
+{
+	t = std::clamp(t, 0.0F, 1.0F);
+	return t * t;
+}
+
 /// Линейное значение из прошедшего времени (секунды).
 [[nodiscard]] inline float ElapsedFraction(double t0, double now, float duration)
 {

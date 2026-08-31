@@ -18,6 +18,11 @@
 
 namespace launcher::ui {
 
+namespace {
+/// Длительность iris-анимации при запуске игры (секунды).
+constexpr float kIrisDuration = 0.35F;
+}
+
 LauncherView::LauncherView(float dpiScale)
     : m_dpiScale(dpiScale)
 {
@@ -141,12 +146,106 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	RenderDialogs(state, guardedDispatch);
 	RenderFileBrowser(state, dispatch);
 	dialogs::Toast(state, guardedDispatch);
+	RenderLaunchIris(state);
 
 	// The gesture ends with the button release — reset AFTER rendering so
 	// a click fired on the release frame of a drag is still suppressed.
 	if (!ImGui::IsMouseDown(0)) {
 		m_gestureDrag = false;
 	}
+}
+
+bool LauncherView::LaunchIrisDone() const
+{
+	if (m_irisStartedAt < 0.0) {
+		return false;
+	}
+	return ElapsedFraction(m_irisStartedAt, ImGui::GetTime(), kIrisDuration) >= 1.0F;
+}
+
+void LauncherView::RenderLaunchIris(const LauncherState &state)
+{
+	if (!state.pendingLaunch.has_value()) {
+		m_irisStartedAt = -1.0;
+		return;
+	}
+	if (m_irisStartedAt < 0.0) {
+		m_irisStartedAt = ImGui::GetTime();
+	}
+
+	// Iris-out: экран закрывается сужающимся кругом перед уходом в движок —
+	// как титры старых игр. Полностью чисто view-слой: Store уже зафиксировал
+	// pendingLaunch, мы лишь догружаем последний кадр анимацией.
+	const float eased = EaseInQuad(ElapsedFraction(m_irisStartedAt, ImGui::GetTime(), kIrisDuration));
+
+	const ImGuiViewport *viewport = ImGui::GetMainViewport();
+	const ImVec2 a = viewport->WorkPos;
+	const ImVec2 b = viewport->WorkPos + viewport->WorkSize;
+	const ImVec2 c((a.x + b.x) * 0.5F, (a.y + b.y) * 0.5F);
+	const float maxR = std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y)) * 0.5F;
+	const float radius = maxR * (1.0F - eased);
+
+	ImDrawList *draw = ImGui::GetForegroundDrawList();
+	const ImU32 dark = ImGui::GetColorU32(ImVec4(0.02F, 0.01F, 0.01F, 1.0F));
+	if (radius <= 1.0F) {
+		draw->AddRectFilled(a, b, dark);
+		return;
+	}
+
+	// Затемнение вне круга: четыре полосы вокруг описанного квадрата…
+	const float x0 = std::max(a.x, c.x - radius);
+	const float x1 = std::min(b.x, c.x + radius);
+	const float y0 = std::max(a.y, c.y - radius);
+	const float y1 = std::min(b.y, c.y + radius);
+	if (x0 > a.x) {
+		draw->AddRectFilled(ImVec2(a.x, a.y), ImVec2(x0, b.y), dark);
+	}
+	if (x1 < b.x) {
+		draw->AddRectFilled(ImVec2(x1, a.y), ImVec2(b.x, b.y), dark);
+	}
+	if (y0 > a.y) {
+		draw->AddRectFilled(ImVec2(a.x, a.y), ImVec2(b.x, y0), dark);
+	}
+	if (y1 < b.y) {
+		draw->AddRectFilled(ImVec2(a.x, y1), ImVec2(b.x, b.y), dark);
+	}
+	if (x0 >= x1 || y0 >= y1) {
+		return; // круг шире экрана — полосы уже всё закрыли
+	}
+
+	// …и угловые веера треугольников для квадрата минус диск. Хорды дуг
+	// (размах 90°) отделяют угол квадрата от центра, поэтому треугольники
+	// не залезают внутрь круга.
+	constexpr int kSegments = 8;
+	struct Corner {
+		ImVec2 v;
+		float angle0;
+		float angle1;
+	};
+	const float kPi = 3.14159265F;
+	const Corner corners[] {
+		{ ImVec2(x0, y0), kPi, 1.5F * kPi },          // верхний левый
+		{ ImVec2(x1, y0), 1.5F * kPi, 2.0F * kPi },   // верхний правый
+		{ ImVec2(x1, y1), 0.0F, 0.5F * kPi },         // нижний правый
+		{ ImVec2(x0, y1), 0.5F * kPi, kPi },          // нижний левый
+	};
+	for (const Corner &corner : corners) {
+		ImVec2 prev(c.x + radius * std::cos(corner.angle0), c.y + radius * std::sin(corner.angle0));
+		for (int i = 1; i <= kSegments; ++i) {
+			const float angle = corner.angle0 + (corner.angle1 - corner.angle0) * (static_cast<float>(i) / kSegments);
+			const ImVec2 point(c.x + radius * std::cos(angle), c.y + radius * std::sin(angle));
+			draw->AddTriangleFilled(corner.v, prev, point, dark);
+			prev = point;
+		}
+	}
+
+	// Тлеющий обод — круг закрывается не тьмой, а догорающим огнём.
+	const float time = static_cast<float>(ImGui::GetTime());
+	const float flicker = 0.70F + 0.30F * std::sin(time * 17.0F + 2.0F * std::sin(time * 6.3F));
+	const float rimAlpha = 0.55F * flicker * (1.0F - eased * 0.5F);
+	draw->AddCircle(c, radius, ImGui::GetColorU32(ImVec4(1.0F, 0.58F, 0.16F, rimAlpha)), 48, Scale::px(0.1F));
+	draw->AddCircle(c, radius * 0.96F,
+	    ImGui::GetColorU32(ImVec4(0.91F, 0.55F, 0.16F, rimAlpha * 0.6F)), 48, Scale::px(0.18F));
 }
 
 void LauncherView::RenderBackground() const

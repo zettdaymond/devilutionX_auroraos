@@ -30,6 +30,10 @@ public:
 	/// Render one frame. `dispatch` is thread-safe (Store::dispatch).
 	void Render(const LauncherState &state, const Dispatcher &dispatch);
 
+	/// Закончилась ли iris-анимация запуска игры. Главный цикл держит
+	/// кадр и дорисовывает диафрагму, пока это не станет истинно.
+	[[nodiscard]] bool LaunchIrisDone() const;
+
 	void SetBackgroundTexture(void *texture, ImVec2 size);
 
 	/// Attach a dedicated hero artwork for a game mode; a null texture
@@ -42,6 +46,7 @@ private:
 	void RenderScreen(const LauncherState &state, const Dispatcher &dispatch);
 	void RenderDialogs(const LauncherState &state, const Dispatcher &dispatch);
 	void RenderFileBrowser(const LauncherState &state, const Dispatcher &dispatch);
+	void RenderLaunchIris(const LauncherState &state);
 
 	void *m_backgroundTexture = nullptr;
 	ImVec2 m_backgroundTextureSize { 0.0F, 0.0F };
@@ -61,6 +66,9 @@ private:
 	Screen m_lastScreen = Screen::Home;
 	double m_screenShownAt = 0.0;
 	double m_dialogShownAt = 0.0;
+
+	/// Момент старта iris-анимации запуска (< 0 — не запускалась).
+	double m_irisStartedAt = -1.0;
 };
 
 } // namespace launcher::ui
