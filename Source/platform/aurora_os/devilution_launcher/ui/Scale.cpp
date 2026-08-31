@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <spdlog/spdlog.h>
 
 namespace launcher::ui {
 
@@ -21,6 +22,11 @@ void Scale::beginFrame(float dpiScale)
 	g_rem = std::clamp(diagonal / 44.0F, 12.0F * dpiScale, 26.0F * dpiScale);
 	g_portrait = size.y > size.x;
 	g_minSide = std::min(size.x, size.y);
+	static bool logged = false;
+	if (!logged) {
+		logged = true;
+		spdlog::info("Scale: work={}x{} dpi={} rem={}", size.x, size.y, dpiScale, g_rem);
+	}
 }
 
 float Scale::rem()

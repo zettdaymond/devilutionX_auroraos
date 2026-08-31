@@ -129,7 +129,9 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	float contentScrollMaxY = 0.0F;
 	ImVec2 contentTopLeft;
 	float contentHeight = 0.0F;
-	if (ImGui::BeginChild("##content", contentSize, ImGuiChildFlags_None,
+	// AlwaysUseWindowPadding обязателен: child-окна без рамки получают
+	// WindowPadding(0,0) от ImGui, и контент прилипает к краям.
+	if (ImGui::BeginChild("##content", contentSize, ImGuiChildFlags_AlwaysUseWindowPadding,
 	        ImGuiWindowFlags_NoScrollbar)) {
 		contentTopLeft = ImGui::GetWindowPos();
 		contentHeight = ImGui::GetWindowHeight();
