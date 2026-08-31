@@ -113,19 +113,17 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	RenderBackground();
 
 	// Content area: the nav bar reserves space at the bottom (portrait)
-	// or at the top (landscape). Правая граница прижата к краю экрана с
-	// минимальным зазором: скроллбар висит у самого края и не съедает
-	// полезную ширину (текст отделяет от него WindowPadding ниже).
+	// or at the top (landscape). Колонка симметрична: скроллбар прижат к
+	// правому краю экрана и «живёт» в правом поле, а контент держит
+	// одинаковые поля слева и справа (inset + внутренний паддинг).
 	const ImVec2 windowSize = ImGui::GetWindowSize();
-	const float rightInset = Scale::px(0.15F);
-	const ImVec2 contentPos(pad, Scale::portrait() ? pad : navHeight + pad * 0.5F);
-	const ImVec2 contentSize(windowSize.x - pad - rightInset,
+	const float sideInset = Scale::px(0.15F);
+	const ImVec2 contentPos(sideInset, Scale::portrait() ? pad : navHeight + pad * 0.5F);
+	const ImVec2 contentSize(windowSize.x - sideInset * 2.0F,
 	    windowSize.y - navHeight - pad * 1.5F - bottomInset);
 
 	ImGui::SetCursorPos(contentPos);
-	// Горизонтальный паддинг внутри контентной области: текст и таблицы
-	// не упираются в экранный край и не перекрываются скроллбаром.
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Scale::px(0.5F), 0));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Scale::px(1.55F), 0));
 	if (ImGui::BeginChild("##content", contentSize, ImGuiChildFlags_None)) {
 		// Apply the drag delta to the content scroll while the gesture
 		// is active and the pointer is over the content area.

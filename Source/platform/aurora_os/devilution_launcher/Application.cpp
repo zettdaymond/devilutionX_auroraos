@@ -28,7 +28,9 @@ namespace {
 
 /// Decodes an embedded PNG into an SDL texture. Returns nullptr (and logs)
 /// when the asset is not bundled or fails to decode — callers fall back.
-SDL_Texture *LoadAssetTexture(SDL_Renderer *renderer, const char *path, ImVec2 &outSize)
+/// Opaque art is converted to RGB24 so the renderer can skip the alpha
+/// channel it will never read.
+SDL_Texture *LoadAssetTexture(SDL_Renderer *renderer, const char *path, ImVec2 &outSize, bool opaque)
 {
 	try {
 		auto file = cmrc::assets::get_filesystem().open(path);
@@ -38,6 +40,14 @@ SDL_Texture *LoadAssetTexture(SDL_Renderer *renderer, const char *path, ImVec2 &
 		if (surface == nullptr) {
 			spdlog::warn("IMG_Load_RW({}) failed: {}", path, IMG_GetError());
 			return nullptr;
+		}
+		SDL_Surface *converted = nullptr;
+		if (opaque && surface->format->format != SDL_PIXELFORMAT_RGB24) {
+			converted = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGB24, 0);
+			if (converted != nullptr) {
+				SDL_FreeSurface(surface);
+				surface = converted;
+			}
 		}
 		SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
 		if (texture != nullptr) {
@@ -124,7 +134,7 @@ bool Application::setup()
 	// Artwork from the embedded assets: the shared background, optional
 	// per-mode hero panels and golden tile icons (absent files fall back
 	// to bg crops / FontAwesome glyphs).
-	m_backgroundTexture = LoadAssetTexture(m_renderer, "assets/bg.png", m_backgroundSize);
+	m_backgroundTexture = LoadAssetTexture(m_renderer, "assets/bg.png", m_backgroundSize, true);
 	struct ModeAsset {
 		ExitAction mode;
 		const char *heroPath;
@@ -136,8 +146,8 @@ bool Application::setup()
 	         { ExitAction::LaunchDemo, "assets/hero_demo.png", "assets/icon_demo.png" },
 	     }) {
 		const size_t idx = static_cast<size_t>(asset.mode);
-		m_heroTextures[idx] = LoadAssetTexture(m_renderer, asset.heroPath, m_heroSizes[idx]);
-		m_iconTextures[idx] = LoadAssetTexture(m_renderer, asset.iconPath, m_iconSizes[idx]);
+		m_heroTextures[idx] = LoadAssetTexture(m_renderer, asset.heroPath, m_heroSizes[idx], true);
+		m_iconTextures[idx] = LoadAssetTexture(m_renderer, asset.iconPath, m_iconSizes[idx], false);
 	}
 
 	return true;
