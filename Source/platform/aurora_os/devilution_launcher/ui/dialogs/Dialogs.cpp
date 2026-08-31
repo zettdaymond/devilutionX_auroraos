@@ -136,10 +136,15 @@ void DrawProgressBar(ImDrawList *draw, const ImVec2 &pos, const ImVec2 &size, fl
 	draw->AddRectFilledMultiColor(ImVec2(fillX - hotWidth, pos.y), ImVec2(fillX, pos.y + size.y),
 	    IM_COL32(0, 0, 0, 0), hot, hot, IM_COL32(0, 0, 0, 0));
 
-	const float glowAlpha = 0.30F * flicker * heat;
-	const ImU32 glow = ImGui::GetColorU32(ImVec4(1.0F, 0.55F, 0.15F, glowAlpha));
-	draw->AddRectFilledMultiColor(ImVec2(fillX - Scale::Px(0.5F), pos.y - Scale::Px(0.45F)),
-	    ImVec2(fillX + Scale::Px(0.5F), pos.y), IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0), glow, glow);
+	// Мягкое свечение над кромкой: пара концентрических кругов с падающей
+	// прозрачностью. Прямоугольник с жёсткими гранями здесь выглядел
+	// посторонним блоком между искрами и шкалой.
+	for (int ring = 2; ring >= 1; --ring) {
+		const float radius = Scale::Px(0.22F * static_cast<float>(ring));
+		const float ringAlpha = 0.22F * flicker * heat / static_cast<float>(ring);
+		draw->AddCircleFilled(ImVec2(fillX, pos.y), radius,
+		    ImGui::GetColorU32(ImVec4(1.0F, 0.55F, 0.15F, ringAlpha)), 10);
+	}
 
 	constexpr int kSparks = 3;
 	for (int i = 0; i < kSparks; ++i) {
@@ -151,7 +156,10 @@ void DrawProgressBar(ImDrawList *draw, const ImVec2 &pos, const ImVec2 &size, fl
 			continue;
 		}
 		const float rise = Scale::Px(0.9F) * phase;
-		const ImVec2 spark(fillX + std::sin(time * (2.2F + seed) + seed * 7.0F) * Scale::Px(0.35F),
+		// Рой чуть левее кромки, над раскалённой заливкой: точки справа
+		// от кромки видны на тёмном треке, слева тонут в свечении, и рой
+		// казался смещённым вправо.
+		const ImVec2 spark(fillX - Scale::Px(0.2F) + std::sin(time * (2.2F + seed) + seed * 7.0F) * Scale::Px(0.25F),
 		    pos.y - Scale::Px(0.12F) - rise);
 		draw->AddCircleFilled(spark, Scale::Px(0.07F + 0.03F * std::sin(seed * 5.3F)),
 		    ImGui::GetColorU32(ImVec4(1.0F, 0.66F, 0.22F, alpha)), 5);
@@ -309,7 +317,14 @@ void Toast(const LauncherState &state, const Dispatcher &dispatch)
 	const float alpha = std::clamp(std::min(elapsed / 0.15F, (kShowTime - elapsed) / 0.35F), 0.0F, 1.0F);
 
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
-	const ImVec2 textSize = ImGui::CalcTextSize(state.toast->c_str());
+	// Мерим тем же шрифтом и кеглем, которыми рисуем: CalcTextText по
+	// умолчанию берёт текущий шрифт, и плашка получалась не по тексту —
+	// он висел у правого края вместо центра.
+	ImFont *toastFont = Theme::Font(FontRole::Body);
+	const float toastSize = Scale::Px(1.0F);
+	const ImVec2 textSize = toastFont != nullptr
+	    ? toastFont->CalcTextSizeA(toastSize, FLT_MAX, 0.0F, state.toast->c_str())
+	    : ImGui::CalcTextSize(state.toast->c_str());
 	const ImVec2 size(textSize.x + Scale::Px(2.0F), textSize.y + Scale::Px(1.0F));
 	const ImVec2 pos(viewport->WorkPos.x + (viewport->WorkSize.x - size.x) * 0.5F,
 	    viewport->WorkPos.y + viewport->WorkSize.y - size.y - Scale::Px(1.4F)
@@ -324,7 +339,7 @@ void Toast(const LauncherState &state, const Dispatcher &dispatch)
 	draw->AddRectFilled(pos, pos + size, withAlpha(Theme::ColorU32(ColorRole::Panel)), Scale::Px(0.3F));
 	draw->AddRect(pos, pos + size, withAlpha(Theme::ColorU32(ColorRole::GoldDim)), Scale::Px(0.3F), 0,
 	    Scale::Px(0.06F));
-	draw->AddText(Theme::Font(FontRole::Body), Scale::Px(1.0F), pos + ImVec2(Scale::Px(1.0F), Scale::Px(0.5F)),
+	draw->AddText(toastFont, toastSize, pos + ImVec2(Scale::Px(1.0F), Scale::Px(0.5F)),
 	    withAlpha(Theme::ColorU32(ColorRole::TextBody)), state.toast->c_str());
 }
 
