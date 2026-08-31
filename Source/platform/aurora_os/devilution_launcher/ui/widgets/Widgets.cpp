@@ -333,7 +333,10 @@ void CenteredText(const char *text, ColorRole role)
 {
 	const ImVec2 textSize = ImGui::CalcTextSize(text);
 	const float width = ImGui::GetContentRegionAvail().x;
-	ImGui::SetCursorPosX(std::max(0.0F, (width - textSize.x) * 0.5F));
+	// Смещение прибавляем к текущему X: SetCursorPosX отсчитывается от
+	// края окна, а не от начала контента — без этого текст уезжал влево
+	// на ширину паддинга.
+	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0F, (width - textSize.x) * 0.5F));
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(role));
 	ImGui::TextUnformatted(text);
 	ImGui::PopStyleColor();
@@ -392,6 +395,9 @@ void FileRow(bool present, const char *name, const char *status, const char *pat
 	const float gap = Scale::Px(0.5F);
 	const float rightEdge = startX + rowWidth;
 
+	// Первая строка одинакова у всех файлов: маркер, имя и прижатый
+	// вправо размер (или статус). Кнопка действий стоит под размером,
+	// а не рядом с именем — тогда длинные имена ничего не вытесняют.
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(present ? ColorRole::Success : ColorRole::TextDim));
 	ImGui::TextUnformatted(present ? icons::Check : icons::Times);
 	ImGui::PopStyleColor();
@@ -401,40 +407,22 @@ void FileRow(bool present, const char *name, const char *status, const char *pat
 	ImGui::TextUnformatted(name);
 	ImGui::PopStyleColor();
 
+	const ImVec2 statusSize = ImGui::CalcTextSize(status);
+	ImGui::SameLine(rightEdge - statusSize.x);
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
+	ImGui::TextUnformatted(status);
+	ImGui::PopStyleColor();
+
+	const float textBottom = ImGui::GetCursorPosY();
+
 	float actionWidth = 0.0F;
 	if (onDelete) {
 		actionWidth = buttonSize;
 	} else if (onDownload) {
 		actionWidth = ImGui::CalcTextSize("Скачать").x + Scale::Px(1.2F);
 	}
-
-	// Статус (размер или «не найден») живёт всегда на первой строке:
-	// прижат к правому краю, а если длинное имя с кнопкой не оставляет
-	// места — сразу после имени. Отдельной строкой он бы «просаживал»
-	// блок пути вниз. У отсутствующего скачиваемого файла статус не
-	// нужен вовсе: кнопка «Скачать» говорит всё сама.
-	const ImVec2 statusSize = ImGui::CalcTextSize(status);
-	const float nameWidth = ImGui::CalcTextSize(present ? icons::Check : icons::Times).x
-	    + ImGui::GetStyle().ItemSpacing.x + ImGui::CalcTextSize(name).x;
-	const float statusX = rightEdge - actionWidth - (actionWidth > 0.0F ? gap : 0.0F) - statusSize.x;
-	if (!onDownload) {
-		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
-		if (startX + nameWidth + gap <= statusX) {
-			ImGui::SameLine(statusX);
-		} else {
-			ImGui::SameLine(0, Scale::Px(0.8F));
-		}
-		ImGui::TextUnformatted(status);
-		ImGui::PopStyleColor();
-	}
-
-	// Низ текстовой строки: путь начнётся сразу под именем, а не под
-	// высокой кнопкой — иначе у строк с кнопкой между именем и путём
-	// зияла пустота размером с кнопку.
-	const float textBottom = ImGui::GetCursorPosY();
-
-	if (onDelete || onDownload) {
-		ImGui::SameLine(rightEdge - actionWidth);
+	if (actionWidth > 0.0F) {
+		ImGui::SetCursorPosX(rightEdge - actionWidth);
 		Theme::PushButtonStyle(false);
 		if (onDelete) {
 			if (ImGui::Button(icons::Trash, ImVec2(buttonSize, buttonSize))) {
@@ -447,12 +435,12 @@ void FileRow(bool present, const char *name, const char *status, const char *pat
 		}
 		Theme::PopButtonStyle();
 	}
+	const float actionBottom = textBottom + buttonSize + gap;
 
 	if (present && path != nullptr && path[0] != '\0') {
 		ImGui::SetCursorPosY(textBottom);
 		const float indent = Scale::Px(1.6F);
-		// Строки пути не заходят в зону кнопки: кнопка занимает
-		// правый край первых ~2.2rem высоты строки.
+		// Строки пути не заходят под кнопку, висящую справа.
 		const float pathWidth = rowWidth - indent - (actionWidth > 0.0F ? actionWidth + gap : 0.0F);
 		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 		for (const std::string &line : WrapPathAtSlashes(ImGui::GetFont(), ImGui::GetFontSize(), path,
@@ -465,6 +453,12 @@ void FileRow(bool present, const char *name, const char *status, const char *pat
 			ImGui::Text("%s скачан", icons::Download);
 		}
 		ImGui::PopStyleColor();
+	}
+
+	// Кнопка может висеть ниже последней строки пути — не дадим
+	// следующей строке наехать на неё.
+	if (ImGui::GetCursorPosY() < actionBottom) {
+		ImGui::SetCursorPosY(actionBottom);
 	}
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.3F)));
 	ImGui::PopID();

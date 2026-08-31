@@ -411,7 +411,7 @@ void Data(const LauncherState &state, const Dispatcher &dispatch)
 
 void About(const LauncherState &, const Dispatcher &dispatch)
 {
-	widgets::ScreenHeader("О порте", [&dispatch] { dispatch(intent::UiNavigate { Screen::Home }); });
+	widgets::ScreenHeader("Инфо", [&dispatch] { dispatch(intent::UiNavigate { Screen::Home }); });
 	Theme::PushFont(FontRole::Heading);
 	widgets::CenteredText("DIABLO", ColorRole::TextHeading);
 	Theme::PopFont();

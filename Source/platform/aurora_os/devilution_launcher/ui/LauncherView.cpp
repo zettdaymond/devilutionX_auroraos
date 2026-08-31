@@ -409,7 +409,7 @@ void LauncherView::RenderQuickActions(const Dispatcher &dispatch)
 	};
 	const QuickItem items[] {
 		{ Screen::Data, icons::Folder, "Данные" },
-		{ Screen::About, icons::Info, "О порте" },
+		{ Screen::About, icons::Info, "Инфо" },
 	};
 	for (const QuickItem &item : items) {
 		ImGui::PushStyleColor(ImGuiCol_Button, Theme::Color(ColorRole::Panel));
