@@ -13,7 +13,7 @@ namespace launcher::ui::widgets {
 
 using Dispatcher = std::function<void(Intent)>;
 
-/// Artwork shared with the view (the launcher background texture).
+/// Арт, разделяемый с view-слоем (текстура лаунчера и её размер).
 struct BackgroundArt {
 	void *texture = nullptr;
 	ImVec2 size { 0.0F, 0.0F };
@@ -23,9 +23,9 @@ struct BackgroundArt {
 /// которые SDL_Renderer не генерирует: рисуем ближайший уровень сверху, и
 /// минификация не превышает ~2x при любом размере окна.
 struct IconSet {
-    static constexpr int kMaxLevels = 3;
-    BackgroundArt levels[kMaxLevels]; // от крупной к мелкой
-    int count = 0;
+	static constexpr int kMaxLevels = 3;
+	BackgroundArt levels[kMaxLevels]; ///< от крупной к мелкой
+	int count = 0;
 };
 
 /// A call-to-action button for hero panels.

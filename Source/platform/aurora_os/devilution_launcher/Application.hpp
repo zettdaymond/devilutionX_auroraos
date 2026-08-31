@@ -62,11 +62,14 @@ public:
 	void OnEvent(const SDL_WindowEvent &event);
 
 private:
-	/// Common SDL/ImGui bootstrap. Returns false on failure.
+	/// Общий бутстрап SDL/ImGui; false — фатальная ошибка инициализации.
 	bool Setup();
 
-	/// Adds a rotating file sink next to the console logger so on-device
-	/// issues can be read without root access to the system journal.
+	/// Грузит арт из вшитых ассетов (фон, hero-панели, иконки плиток).
+	void LoadArtTextures();
+
+	/// Дублирует лог в файл рядом с настройками: на устройстве системный
+	/// журнал читается только рутом, а файл доступен пользователю напрямую.
 	void AttachFileLog();
 
 	SDL_Window *m_window { nullptr };

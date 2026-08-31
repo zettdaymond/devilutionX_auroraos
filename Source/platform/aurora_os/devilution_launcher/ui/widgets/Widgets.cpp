@@ -14,6 +14,9 @@ namespace launcher::ui::widgets {
 
 namespace {
 
+/// Доля стороны чипа, которую занимает иконка внутри него.
+constexpr float kChipIconFill = 0.74F;
+
 /// Largest font size (<= startSize) at which text fits maxWidth.
 float FitFontSize(ImFont *font, float startSize, const char *text, float maxWidth, float minSize)
 {
@@ -210,7 +213,7 @@ void GameTile(const char *title, const char *status, const char *icon, const Ico
 		// Наименьший уровень, покрывающий нужный размер: минификация
 		// остаётся небольшой даже в крошечном окне, где одна крупная
 		// текстура «рассыпалась» бы без мипмапов.
-		const float fit = chip * 0.74F;
+		const float fit = chip * kChipIconFill;
 		int level = 0;
 		for (int i = 0; i < icons->count && std::min(icons->levels[i].size.x, icons->levels[i].size.y) >= fit;
 		    ++i) {
@@ -219,7 +222,7 @@ void GameTile(const char *title, const char *status, const char *icon, const Ico
 		iconArt = &icons->levels[level];
 	}
 	if (iconArt != nullptr && iconArt->texture != nullptr && iconArt->size.x > 0 && iconArt->size.y > 0) {
-		const float fit = chip * 0.74F;
+		const float fit = chip * kChipIconFill;
 		const float w = iconArt->size.x >= iconArt->size.y ? fit : fit * iconArt->size.x / iconArt->size.y;
 		const float h = iconArt->size.y >= iconArt->size.x ? fit : fit * iconArt->size.y / iconArt->size.x;
 		const ImVec2 iconMin((chipMin.x + chipMax.x - w) * 0.5F, (chipMin.y + chipMax.y - h) * 0.5F);

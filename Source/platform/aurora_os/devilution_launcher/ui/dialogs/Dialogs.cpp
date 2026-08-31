@@ -111,6 +111,53 @@ void Download(const LauncherState &state, const Dispatcher &dispatch, KnownFile 
 
 namespace overlay {
 
+/// Полоса прогресса: золотой градиент заливки и «горящий» край у кромки —
+/// заливка раскаляется к переднему краю, над ней свечение и искры.
+/// Мерцание и движение искр — чистые функции времени (как угольки фона).
+void DrawProgressBar(ImDrawList *draw, const ImVec2 &pos, const ImVec2 &size, float fraction, bool active)
+{
+	const float fillX = pos.x + size.x * fraction;
+	draw->AddRectFilled(pos, pos + size, Theme::ColorU32(ColorRole::PanelHover), Scale::Px(0.2F));
+	if (fraction > 0.0F) {
+		draw->AddRectFilledMultiColor(pos, pos + ImVec2(size.x * fraction, size.y),
+		    Theme::ColorU32(ColorRole::Red), Theme::ColorU32(ColorRole::BorderGold),
+		    Theme::ColorU32(ColorRole::BorderGold), Theme::ColorU32(ColorRole::Red));
+	}
+	if (!active || fraction <= 0.0F || fraction >= 1.0F) {
+		return;
+	}
+
+	const float time = static_cast<float>(ImGui::GetTime());
+	const float flicker = 0.75F + 0.25F * std::sin(time * 13.0F + 2.0F * std::sin(time * 5.1F));
+	const float heat = std::min(fraction * 4.0F, 1.0F); // разгорается по мере старта
+
+	const float hotWidth = std::min(Scale::Px(3.0F), size.x * fraction);
+	const ImU32 hot = ImGui::GetColorU32(ImVec4(1.0F, 0.62F, 0.18F, 0.85F * flicker * heat));
+	draw->AddRectFilledMultiColor(ImVec2(fillX - hotWidth, pos.y), ImVec2(fillX, pos.y + size.y),
+	    IM_COL32(0, 0, 0, 0), hot, hot, IM_COL32(0, 0, 0, 0));
+
+	const float glowAlpha = 0.30F * flicker * heat;
+	const ImU32 glow = ImGui::GetColorU32(ImVec4(1.0F, 0.55F, 0.15F, glowAlpha));
+	draw->AddRectFilledMultiColor(ImVec2(fillX - Scale::Px(0.5F), pos.y - Scale::Px(0.45F)),
+	    ImVec2(fillX + Scale::Px(0.5F), pos.y), IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0), glow, glow);
+
+	constexpr int kSparks = 3;
+	for (int i = 0; i < kSparks; ++i) {
+		const float seed = static_cast<float>(i) * 0.618034F;
+		const float cycle = 0.7F + 0.5F * std::sin(seed * 9.4F);
+		const float phase = std::fmod(time / cycle + seed, 1.0F);
+		const float alpha = 0.8F * std::sin(phase * 3.14159265F) * flicker * heat;
+		if (alpha <= 0.02F) {
+			continue;
+		}
+		const float rise = Scale::Px(0.9F) * phase;
+		const ImVec2 spark(fillX + std::sin(time * (2.2F + seed) + seed * 7.0F) * Scale::Px(0.35F),
+		    pos.y - Scale::Px(0.12F) - rise);
+		draw->AddCircleFilled(spark, Scale::Px(0.07F + 0.03F * std::sin(seed * 5.3F)),
+		    ImGui::GetColorU32(ImVec4(1.0F, 0.66F, 0.22F, alpha)), 5);
+	}
+}
+
 void Download(const LauncherState &state, const Dispatcher &dispatch)
 {
 	if (!state.download.has_value()) {
@@ -119,10 +166,9 @@ void Download(const LauncherState &state, const Dispatcher &dispatch)
 	const DownloadState &download = *state.download;
 	const FileSpec &spec = FileSpecOf(download.file);
 
-	// Darkened fullscreen overlay.
+	// Затемнение на весь экран под модалкой.
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
-	ImDrawList *draw = ImGui::GetBackgroundDrawList();
-	draw->AddRectFilled(viewport->WorkPos, viewport->WorkPos + viewport->WorkSize,
+	ImGui::GetBackgroundDrawList()->AddRectFilled(viewport->WorkPos, viewport->WorkPos + viewport->WorkSize,
 	    ImGui::GetColorU32(ImVec4(0, 0, 0, 0.80F)));
 
 	if (!BeginModal("##download-overlay", 26.0F)) {
@@ -133,60 +179,14 @@ void Download(const LauncherState &state, const Dispatcher &dispatch)
 	ImGui::TextUnformatted(spec.displayName.data());
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.5F)));
 
-	// Progress bar with a gold gradient fill. The bar lives in the modal
-	// window's draw list (the earlier `draw` is the background dim).
-	ImDrawList *barDraw = ImGui::GetWindowDrawList();
-	const float width = ImGui::GetContentRegionAvail().x;
-	const ImVec2 barPos = ImGui::GetCursorScreenPos();
-	const ImVec2 barSize(width, Scale::Px(1.2F));
-	const float fraction = std::clamp(download.fraction, 0.0F, 1.0F);
-	const float fillX = barPos.x + barSize.x * fraction;
-	barDraw->AddRectFilled(barPos, barPos + barSize, Theme::ColorU32(ColorRole::PanelHover), Scale::Px(0.2F));
-	if (fraction > 0.0F) {
-		barDraw->AddRectFilledMultiColor(barPos, barPos + ImVec2(barSize.x * fraction, barSize.y),
-		    Theme::ColorU32(ColorRole::Red), Theme::ColorU32(ColorRole::BorderGold),
-		    Theme::ColorU32(ColorRole::BorderGold), Theme::ColorU32(ColorRole::Red));
-	}
-	// Горящий край: заливка раскаляется к передней кромке, пока загрузка
-	// активна. Мерцание — чистая функция времени (как угольки фона).
-	if (download.active && fraction > 0.0F && fraction < 1.0F) {
-		const float time = static_cast<float>(ImGui::GetTime());
-		const float flicker = 0.75F + 0.25F * std::sin(time * 13.0F + 2.0F * std::sin(time * 5.1F));
-		const float heat = std::min(fraction * 4.0F, 1.0F); // разгорается по мере старта
-		const float hotW = std::min(Scale::Px(3.0F), barSize.x * fraction);
-		const ImVec2 hotPos(fillX - hotW, barPos.y);
-		barDraw->AddRectFilledMultiColor(hotPos, ImVec2(fillX, barPos.y + barSize.y),
-		    IM_COL32(0, 0, 0, 0), ImGui::GetColorU32(ImVec4(1.0F, 0.62F, 0.18F, 0.85F * flicker * heat)),
-		    ImGui::GetColorU32(ImVec4(1.0F, 0.62F, 0.18F, 0.85F * flicker * heat)), IM_COL32(0, 0, 0, 0));
-
-		// Свечение над кромкой и стайка искр, поднимающихся от неё.
-		const float glowA = 0.30F * flicker * heat;
-		barDraw->AddRectFilledMultiColor(ImVec2(fillX - Scale::Px(0.5F), barPos.y - Scale::Px(0.45F)),
-		    ImVec2(fillX + Scale::Px(0.5F), barPos.y),
-		    IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0),
-		    ImGui::GetColorU32(ImVec4(1.0F, 0.55F, 0.15F, glowA)),
-		    ImGui::GetColorU32(ImVec4(1.0F, 0.55F, 0.15F, glowA)));
-		constexpr int kSparks = 3;
-		for (int i = 0; i < kSparks; ++i) {
-			const float seed = static_cast<float>(i) * 0.618034F;
-			const float cycle = 0.7F + 0.5F * std::sin(seed * 9.4F);
-			const float phase = std::fmod(time / cycle + seed, 1.0F);
-			const float fade = std::sin(phase * 3.14159265F);
-			const float alpha = 0.8F * fade * flicker * heat;
-			if (alpha <= 0.02F) {
-				continue;
-			}
-			const float rise = Scale::Px(0.9F) * phase;
-			const ImVec2 spark(fillX + std::sin(time * (2.2F + seed) + seed * 7.0F) * Scale::Px(0.35F),
-			    barPos.y - Scale::Px(0.12F) - rise);
-			barDraw->AddCircleFilled(spark, Scale::Px(0.07F + 0.03F * std::sin(seed * 5.3F)),
-			    ImGui::GetColorU32(ImVec4(1.0F, 0.66F, 0.22F, alpha)), 5);
-		}
-	}
+	const ImVec2 barSize(ImGui::GetContentRegionAvail().x, Scale::Px(1.2F));
+	DrawProgressBar(ImGui::GetWindowDrawList(), ImGui::GetCursorScreenPos(), barSize,
+	    std::clamp(download.fraction, 0.0F, 1.0F), download.active);
 	ImGui::Dummy(barSize);
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
 
-	// Bytes / percent
+	// Байты / проценты / скорость.
+	const float fraction = std::clamp(download.fraction, 0.0F, 1.0F);
 	const int percent = static_cast<int>(fraction * 100.0F);
 	ImGui::Text("%d%%   %s / %s", percent,
 	    FormatBytes(download.downloadedBytes).c_str(),

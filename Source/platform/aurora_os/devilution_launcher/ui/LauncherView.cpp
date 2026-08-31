@@ -189,40 +189,16 @@ bool LauncherView::LaunchIrisDone() const
 	return ElapsedFraction(m_irisStartedAt, ImGui::GetTime(), kIrisDuration) >= 1.0F;
 }
 
-void LauncherView::RenderLaunchIris(const LauncherState &state)
+/// Затемняет всё вне круга: четыре полосы вокруг описанного квадрата плюс
+/// угловые веера треугольников для квадрата минус диск. Хорды дуг
+/// (размах 90°) отделяют угол квадрата от центра, поэтому треугольники
+/// не залезают внутрь круга.
+void DrawIrisHole(ImDrawList *draw, const ImVec2 &center, float radius, const ImVec2 &a, const ImVec2 &b, ImU32 dark)
 {
-	if (!state.pendingLaunch.has_value()) {
-		m_irisStartedAt = -1.0;
-		return;
-	}
-	if (m_irisStartedAt < 0.0) {
-		m_irisStartedAt = ImGui::GetTime();
-	}
-
-	// Iris-out: экран закрывается сужающимся кругом перед уходом в движок —
-	// как титры старых игр. Полностью чисто view-слой: Store уже зафиксировал
-	// pendingLaunch, мы лишь догружаем последний кадр анимацией.
-	const float eased = EaseInQuad(ElapsedFraction(m_irisStartedAt, ImGui::GetTime(), kIrisDuration));
-
-	const ImGuiViewport *viewport = ImGui::GetMainViewport();
-	const ImVec2 a = viewport->WorkPos;
-	const ImVec2 b = viewport->WorkPos + viewport->WorkSize;
-	const ImVec2 c((a.x + b.x) * 0.5F, (a.y + b.y) * 0.5F);
-	const float maxR = std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y)) * 0.5F;
-	const float radius = maxR * (1.0F - eased);
-
-	ImDrawList *draw = ImGui::GetForegroundDrawList();
-	const ImU32 dark = ImGui::GetColorU32(ImVec4(0.02F, 0.01F, 0.01F, 1.0F));
-	if (radius <= 1.0F) {
-		draw->AddRectFilled(a, b, dark);
-		return;
-	}
-
-	// Затемнение вне круга: четыре полосы вокруг описанного квадрата…
-	const float x0 = std::max(a.x, c.x - radius);
-	const float x1 = std::min(b.x, c.x + radius);
-	const float y0 = std::max(a.y, c.y - radius);
-	const float y1 = std::min(b.y, c.y + radius);
+	const float x0 = std::max(a.x, center.x - radius);
+	const float x1 = std::min(b.x, center.x + radius);
+	const float y0 = std::max(a.y, center.y - radius);
+	const float y1 = std::min(b.y, center.y + radius);
 	if (x0 > a.x) {
 		draw->AddRectFilled(ImVec2(a.x, a.y), ImVec2(x0, b.y), dark);
 	}
@@ -239,61 +215,36 @@ void LauncherView::RenderLaunchIris(const LauncherState &state)
 		return; // круг шире экрана — полосы уже всё закрыли
 	}
 
-	// …и угловые веера треугольников для квадрата минус диск. Хорды дуг
-	// (размах 90°) отделяют угол квадрата от центра, поэтому треугольники
-	// не залезают внутрь круга.
 	constexpr int kSegments = 8;
+	constexpr float kPi = 3.14159265F;
 	struct Corner {
 		ImVec2 v;
 		float angle0;
 		float angle1;
 	};
-	const float kPi = 3.14159265F;
 	const Corner corners[] {
-		{ ImVec2(x0, y0), kPi, 1.5F * kPi },          // верхний левый
-		{ ImVec2(x1, y0), 1.5F * kPi, 2.0F * kPi },   // верхний правый
-		{ ImVec2(x1, y1), 0.0F, 0.5F * kPi },         // нижний правый
-		{ ImVec2(x0, y1), 0.5F * kPi, kPi },          // нижний левый
+		{ ImVec2(x0, y0), kPi, 1.5F * kPi },        // верхний левый
+		{ ImVec2(x1, y0), 1.5F * kPi, 2.0F * kPi }, // верхний правый
+		{ ImVec2(x1, y1), 0.0F, 0.5F * kPi },       // нижний правый
+		{ ImVec2(x0, y1), 0.5F * kPi, kPi },        // нижний левый
 	};
 	for (const Corner &corner : corners) {
-		ImVec2 prev(c.x + radius * std::cos(corner.angle0), c.y + radius * std::sin(corner.angle0));
+		ImVec2 prev(center.x + radius * std::cos(corner.angle0), center.y + radius * std::sin(corner.angle0));
 		for (int i = 1; i <= kSegments; ++i) {
 			const float angle = corner.angle0 + (corner.angle1 - corner.angle0) * (static_cast<float>(i) / kSegments);
-			const ImVec2 point(c.x + radius * std::cos(angle), c.y + radius * std::sin(angle));
+			const ImVec2 point(center.x + radius * std::cos(angle), center.y + radius * std::sin(angle));
 			draw->AddTriangleFilled(corner.v, prev, point, dark);
 			prev = point;
 		}
 	}
-
-	// Тлеющий обод — круг закрывается не тьмой, а догорающим огнём.
-	const float time = static_cast<float>(ImGui::GetTime());
-	const float flicker = 0.70F + 0.30F * std::sin(time * 17.0F + 2.0F * std::sin(time * 6.3F));
-	const float rimAlpha = 0.55F * flicker * (1.0F - eased * 0.5F);
-	draw->AddCircle(c, radius, ImGui::GetColorU32(ImVec4(1.0F, 0.58F, 0.16F, rimAlpha)), 48, Scale::Px(0.1F));
-	draw->AddCircle(c, radius * 0.96F,
-	    ImGui::GetColorU32(ImVec4(0.91F, 0.55F, 0.16F, rimAlpha * 0.6F)), 48, Scale::Px(0.18F));
 }
 
-void LauncherView::RenderBackground() const
+/// Тлеющие угольки, всплывающие над артом — отсылка к огню в главном меню
+/// Diablo. Частицы бессостоятельные: позиция — чистая функция времени и
+/// индекса, поэтому анимация бесплатна и для паузы в фоне ничего
+/// сохранять не нужно.
+void DrawEmbers(ImDrawList *draw, const ImGuiViewport *viewport)
 {
-	const ImGuiViewport *viewport = ImGui::GetMainViewport();
-	ImDrawList *draw = ImGui::GetBackgroundDrawList();
-
-	if (m_backgroundTexture != nullptr && m_backgroundTextureSize.x > 0 && m_backgroundTextureSize.y > 0) {
-		// Aspect-fill: crop the image so it covers the viewport.
-		const ImVec2 &v = viewport->WorkSize;
-		const ImVec2 &t = m_backgroundTextureSize;
-		const float scale = std::max(v.x / t.x, v.y / t.y);
-		const ImVec2 shown(t.x * scale, t.y * scale);
-		const ImVec2 crop(0.5F - (v.x / shown.x) * 0.5F, 0.5F - (v.y / shown.y) * 0.5F);
-		draw->AddImage(m_backgroundTexture, viewport->WorkPos, viewport->WorkPos + v,
-		    ImVec2(crop.x, crop.y), ImVec2(1.0F - crop.x, 1.0F - crop.y));
-	}
-
-	// Тлеющие угольки, всплывающие над артом — отсылка к огню в главном
-	// меню Diablo. Частицы бессостоятельные: позиция — чистая функция
-	// времени и индекса, поэтому анимация бесплатна и для паузы в фоне
-	// ничего сохранять не нужно.
 	constexpr int kEmberCount = 26;
 	const float time = static_cast<float>(ImGui::GetTime());
 	for (int i = 0; i < kEmberCount; ++i) {
@@ -319,9 +270,66 @@ void LauncherView::RenderBackground() const
 		    0.16F, alpha);
 		draw->AddCircleFilled(center, radius, ImGui::ColorConvertFloat4ToU32(tint), 6);
 	}
+}
 
-	// Dark vignette so text stays readable over the artwork.
-	// Полупрозрачность сохраняет угольки видимыми сквозь затемнение.
+/// Iris-out: экран закрывается сужающимся кругом перед уходом в движок —
+/// как титры старых игр. Полностью чисто view-слой: Store уже зафиксировал
+/// pendingLaunch, мы лишь догружаем последний кадр анимацией.
+void LauncherView::RenderLaunchIris(const LauncherState &state)
+{
+	if (!state.pendingLaunch.has_value()) {
+		m_irisStartedAt = -1.0;
+		return;
+	}
+	if (m_irisStartedAt < 0.0) {
+		m_irisStartedAt = ImGui::GetTime();
+	}
+	const float eased = EaseInQuad(ElapsedFraction(m_irisStartedAt, ImGui::GetTime(), kIrisDuration));
+
+	const ImGuiViewport *viewport = ImGui::GetMainViewport();
+	const ImVec2 a = viewport->WorkPos;
+	const ImVec2 b = viewport->WorkPos + viewport->WorkSize;
+	const ImVec2 center((a.x + b.x) * 0.5F, (a.y + b.y) * 0.5F);
+	const float maxRadius = std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y)) * 0.5F;
+	const float radius = maxRadius * (1.0F - eased);
+
+	ImDrawList *draw = ImGui::GetForegroundDrawList();
+	const ImU32 dark = ImGui::GetColorU32(ImVec4(0.02F, 0.01F, 0.01F, 1.0F));
+	if (radius <= 1.0F) {
+		draw->AddRectFilled(a, b, dark);
+		return;
+	}
+	DrawIrisHole(draw, center, radius, a, b, dark);
+
+	// Тлеющий обод — круг закрывается не тьмой, а догорающим огнём.
+	const float time = static_cast<float>(ImGui::GetTime());
+	const float flicker = 0.70F + 0.30F * std::sin(time * 17.0F + 2.0F * std::sin(time * 6.3F));
+	const float rimAlpha = 0.55F * flicker * (1.0F - eased * 0.5F);
+	draw->AddCircle(center, radius, ImGui::GetColorU32(ImVec4(1.0F, 0.58F, 0.16F, rimAlpha)), 48, Scale::Px(0.1F));
+	draw->AddCircle(center, radius * 0.96F,
+	    ImGui::GetColorU32(ImVec4(0.91F, 0.55F, 0.16F, rimAlpha * 0.6F)), 48, Scale::Px(0.18F));
+}
+
+void LauncherView::RenderBackground() const
+{
+	const ImGuiViewport *viewport = ImGui::GetMainViewport();
+	ImDrawList *draw = ImGui::GetBackgroundDrawList();
+
+	if (m_backgroundTexture != nullptr && m_backgroundTextureSize.x > 0 && m_backgroundTextureSize.y > 0) {
+		// Aspect-fill: кропим картинку так, чтобы она закрыла весь вьюпорт.
+		const ImVec2 &v = viewport->WorkSize;
+		const ImVec2 &t = m_backgroundTextureSize;
+		const float scale = std::max(v.x / t.x, v.y / t.y);
+		const ImVec2 shown(t.x * scale, t.y * scale);
+		const ImVec2 crop(0.5F - (v.x / shown.x) * 0.5F, 0.5F - (v.y / shown.y) * 0.5F);
+		draw->AddImage(m_backgroundTexture, viewport->WorkPos, viewport->WorkPos + v,
+		    ImVec2(crop.x, crop.y), ImVec2(1.0F - crop.x, 1.0F - crop.y));
+	}
+
+	DrawEmbers(draw, viewport);
+
+	// Лёгкая виньетка, чтобы текст читался поверх арта; полупрозрачность
+	// сохраняет угольки видимыми сквозь затемнение.
 	const ImU32 shade = ImGui::GetColorU32(ImVec4(0.02F, 0.01F, 0.01F, 0.28F));
 	draw->AddRectFilled(viewport->WorkPos, viewport->WorkPos + viewport->WorkSize, shade);
 }

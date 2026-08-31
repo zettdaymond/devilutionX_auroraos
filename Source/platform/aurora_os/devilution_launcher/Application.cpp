@@ -204,15 +204,21 @@ bool Application::Setup()
 	ImGui_ImplSDL2_InitForSDLRenderer(m_window, m_renderer);
 	ImGui_ImplSDLRenderer2_Init(m_renderer);
 
-	// Artwork from the embedded assets: the shared background, optional
-	// per-mode hero panels and golden tile icons (absent files fall back
-	// to bg crops / FontAwesome glyphs).
-	m_backgroundTexture = LoadAssetTexture(m_renderer, "assets/bg.jpg", m_backgroundSize);
+	LoadArtTextures();
+	return true;
+}
+
+/// Грузит арт из вшитых ассетов: общий фон, hero-панели режимов и золотые
+/// иконки плиток. Отсутствующий файл — не ошибка: экраны уходят в фолбэк
+/// (кроп общего фона / FontAwesome-глиф).
+void Application::LoadArtTextures()
+{
 	struct ModeAsset {
 		ExitAction mode;
 		const char *heroPath;
 		const char *iconPath;
 	};
+	m_backgroundTexture = LoadAssetTexture(m_renderer, "assets/bg.jpg", m_backgroundSize);
 	for (const ModeAsset &asset : std::initializer_list<ModeAsset> {
 	         { ExitAction::LaunchDiablo, "assets/hero_diablo.jpg", "assets/icon_diablo.png" },
 	         { ExitAction::LaunchHellfire, "assets/hero_hellfire.jpg", "assets/icon_hellfire.png" },
@@ -223,8 +229,6 @@ bool Application::Setup()
 		m_iconLevelCounts[idx]
 		    = BuildIconLevels(m_renderer, asset.iconPath, m_iconTextures[idx].data(), m_iconSizes[idx].data());
 	}
-
-	return true;
 }
 
 void Application::AttachFileLog()
