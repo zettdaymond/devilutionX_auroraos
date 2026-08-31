@@ -113,10 +113,13 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	RenderBackground();
 
 	// Content area: the nav bar reserves space at the bottom (portrait)
-	// or at the top (landscape).
+	// or at the top (landscape). Правая граница прижата к краю экрана с
+	// минимальным зазором: скроллбар висит у самого края и не съедает
+	// полезную ширину (текст отделяет от него WindowPadding ниже).
 	const ImVec2 windowSize = ImGui::GetWindowSize();
+	const float rightInset = Scale::px(0.15F);
 	const ImVec2 contentPos(pad, Scale::portrait() ? pad : navHeight + pad * 0.5F);
-	const ImVec2 contentSize(windowSize.x - pad * 2.0F,
+	const ImVec2 contentSize(windowSize.x - pad - rightInset,
 	    windowSize.y - navHeight - pad * 1.5F - bottomInset);
 
 	ImGui::SetCursorPos(contentPos);
