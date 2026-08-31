@@ -1,5 +1,6 @@
 #include "LauncherView.hpp"
 
+#include "Animation.hpp"
 #include "Icons.hpp"
 #include "Scale.hpp"
 #include "Theme.hpp"
@@ -114,7 +115,16 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 		    && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
 			ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseDelta.y);
 		}
+		// Появление экрана: fade + лёгкий подъём снизу.
+		if (state.screen != m_lastScreen) {
+			m_lastScreen = state.screen;
+			m_screenShownAt = ImGui::GetTime();
+		}
+		const float appearK = EaseOutCubic(ElapsedFraction(m_screenShownAt, ImGui::GetTime(), 0.20F));
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (1.0F - appearK) * Scale::px(0.6F));
+		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, appearK);
 		RenderScreen(state, guardedDispatch);
+		ImGui::PopStyleVar();
 	}
 	ImGui::EndChild();
 	ImGui::PopStyleVar();
@@ -229,8 +239,15 @@ void LauncherView::RenderDialogs(const LauncherState &state, const Dispatcher &d
 	if (state.dialog != m_lastDialog) {
 		if (state.dialog != Dialog::None) {
 			dialogs::OpenFor(state.dialog);
+			m_dialogShownAt = ImGui::GetTime();
 		}
 		m_lastDialog = state.dialog;
+	}
+
+	// Появление диалога: быстрый fade.
+	const float dialogAlpha = EaseOutCubic(ElapsedFraction(m_dialogShownAt, ImGui::GetTime(), 0.15F));
+	if (dialogAlpha < 1.0F) {
+		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, dialogAlpha);
 	}
 
 	switch (state.dialog) {
@@ -251,6 +268,10 @@ void LauncherView::RenderDialogs(const LauncherState &state, const Dispatcher &d
 		break;
 	case Dialog::None:
 		break;
+	}
+
+	if (dialogAlpha < 1.0F) {
+		ImGui::PopStyleVar();
 	}
 }
 

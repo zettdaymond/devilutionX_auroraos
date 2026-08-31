@@ -15,6 +15,7 @@
 
 #include <cmrc/cmrc.hpp>
 
+#include <chrono>
 #include <filesystem>
 #include <utility>
 
@@ -106,6 +107,11 @@ void Application::AttachFileLog()
 		auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
 		    logPath.string(), 512 * 1024, 2);
 		spdlog::default_logger()->sinks().push_back(std::move(fileSink));
+		// По умолчанию spdlog не сбрасывает буфер ofstream — при убийстве
+		// процесса композитором файл оставался пустым. Сбрасываем каждую
+		// запись и дополнительно раз в секунду.
+		spdlog::flush_on(spdlog::level::debug);
+		spdlog::flush_every(std::chrono::seconds(1));
 		spdlog::info("File log: {}", logPath.string());
 	} catch (const std::exception &err) {
 		spdlog::warn("File log unavailable: {}", err.what());

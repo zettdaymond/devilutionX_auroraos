@@ -50,6 +50,12 @@ private:
 	/// dispatched during the gesture are suppressed so dragging over a
 	/// card does not "press" it.
 	bool m_gestureDrag = false;
+
+	/// Времена появления текущего экрана/диалога — для fade-анимаций
+	/// (чисто презентационное состояние view-слоя).
+	Screen m_lastScreen = Screen::Home;
+	double m_screenShownAt = 0.0;
+	double m_dialogShownAt = 0.0;
 };
 
 } // namespace launcher::ui

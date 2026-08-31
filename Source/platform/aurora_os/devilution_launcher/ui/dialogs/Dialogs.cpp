@@ -257,22 +257,35 @@ void Toast(const LauncherState &state, const Dispatcher &dispatch)
 	if (*state.toast != lastToast) {
 		lastToast = *state.toast;
 		shownAt = std::chrono::steady_clock::now();
-	} else if (std::chrono::steady_clock::now() - shownAt > std::chrono::seconds(3)) {
+	}
+
+	// Плавное появление и растворение перед авто-закрытием.
+	constexpr float kShowTime = 3.0F;
+	const float elapsed = std::chrono::duration<float>(std::chrono::steady_clock::now() - shownAt).count();
+	if (elapsed >= kShowTime) {
 		dispatch(intent::UiDismissToast {});
 		return;
 	}
+	const float alpha = std::clamp(std::min(elapsed / 0.15F, (kShowTime - elapsed) / 0.35F), 0.0F, 1.0F);
 
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
 	const ImVec2 textSize = ImGui::CalcTextSize(state.toast->c_str());
 	const ImVec2 size(textSize.x + Scale::px(2.0F), textSize.y + Scale::px(1.0F));
 	const ImVec2 pos(viewport->WorkPos.x + (viewport->WorkSize.x - size.x) * 0.5F,
-	    viewport->WorkPos.y + viewport->WorkSize.y - size.y - Scale::px(1.4F));
+	    viewport->WorkPos.y + viewport->WorkSize.y - size.y - Scale::px(1.4F)
+	        + (1.0F - alpha) * Scale::px(0.3F));
 
 	ImDrawList *draw = ImGui::GetForegroundDrawList();
-	draw->AddRectFilled(pos, pos + size, Theme::colorU32(ColorRole::Panel), Scale::px(0.3F));
-	draw->AddRect(pos, pos + size, Theme::colorU32(ColorRole::GoldDim), Scale::px(0.3F), 0, Scale::px(0.06F));
+	auto withAlpha = [alpha](ImU32 col) {
+		ImVec4 c = ImGui::ColorConvertU32ToFloat4(col);
+		c.w *= alpha;
+		return ImGui::ColorConvertFloat4ToU32(c);
+	};
+	draw->AddRectFilled(pos, pos + size, withAlpha(Theme::colorU32(ColorRole::Panel)), Scale::px(0.3F));
+	draw->AddRect(pos, pos + size, withAlpha(Theme::colorU32(ColorRole::GoldDim)), Scale::px(0.3F), 0,
+	    Scale::px(0.06F));
 	draw->AddText(Theme::font(FontRole::Body), Scale::px(1.0F), pos + ImVec2(Scale::px(1.0F), Scale::px(0.5F)),
-	    Theme::colorU32(ColorRole::TextBody), state.toast->c_str());
+	    withAlpha(Theme::colorU32(ColorRole::TextBody)), state.toast->c_str());
 }
 
 const char *ConfirmDemoId()

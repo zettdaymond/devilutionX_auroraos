@@ -9,6 +9,7 @@
 
 #include <imgui.h>
 
+#include <cfloat>
 #include <cstring>
 #include <string>
 
@@ -195,24 +196,26 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 		draw->AddRectFilled(min, max,
 		    Theme::colorU32(hovered ? ColorRole::PanelHover : ColorRole::Panel), Scale::px(0.35F));
 		draw->AddRect(min, max, Theme::colorU32(ColorRole::GoldDim), Scale::px(0.35F), 0, Scale::px(0.06F));
-		ImGui::PushFont(Theme::font(FontRole::IconBig));
-		const ImVec2 iconSize = ImGui::CalcTextSize(icons::Music);
-		ImGui::PopFont();
-		ImGui::PushFont(Theme::font(FontRole::IconBig));
-		draw->AddText(ImVec2(min.x + Scale::px(0.7F), min.y + (bannerSize.y - iconSize.y) * 0.5F),
+
+		// Иконки рисуем в меру плачки: у IconBig-шрифта нативный кегль
+		// крупнее тонкого баннера и торчит за его границы.
+		ImFont *bannerIconFont = Theme::font(FontRole::IconBig);
+		const float iconSize = bannerSize.y * 0.55F;
+		const float iconW = bannerIconFont != nullptr ? bannerIconFont->CalcTextSizeA(iconSize, FLT_MAX, 0.0F, icons::Music).x : iconSize;
+		draw->AddText(bannerIconFont, iconSize,
+		    ImVec2(min.x + Scale::px(0.8F), min.y + (bannerSize.y - iconSize) * 0.5F),
 		    Theme::colorU32(ColorRole::GoldBright), icons::Music);
-		ImGui::PopFont();
+
 		draw->AddText(Theme::font(FontRole::Body), Scale::px(0.95F),
-		    ImVec2(min.x + Scale::px(2.6F), min.y + (bannerSize.y - Scale::px(1.1F)) * 0.5F),
+		    ImVec2(min.x + Scale::px(0.8F) + iconW + Scale::px(0.7F), min.y + (bannerSize.y - Scale::px(1.1F)) * 0.5F),
 		    Theme::colorU32(ColorRole::TextBody),
 		    "Русская озвучка и тексты · ru.mpq");
-		ImGui::PushFont(Theme::font(FontRole::IconBig));
-		const ImVec2 chevSize = ImGui::CalcTextSize(icons::Play);
-		ImGui::PopFont();
-		ImGui::PushFont(Theme::font(FontRole::IconBig));
-		draw->AddText(ImVec2(max.x - chevSize.x - Scale::px(0.7F), min.y + (bannerSize.y - chevSize.y) * 0.5F),
+
+		const float chevSize = bannerSize.y * 0.45F;
+		const float chevW = bannerIconFont != nullptr ? bannerIconFont->CalcTextSizeA(chevSize, FLT_MAX, 0.0F, icons::Play).x : chevSize;
+		draw->AddText(bannerIconFont, chevSize,
+		    ImVec2(max.x - chevW - Scale::px(0.7F), min.y + (bannerSize.y - chevSize) * 0.5F),
 		    Theme::colorU32(ColorRole::GoldBright), icons::Play);
-		ImGui::PopFont();
 	}
 }
 
@@ -254,9 +257,13 @@ void RenderChecklist(const LauncherState &state, const Dispatcher &dispatch)
 	auto renderGroup = [&](const FileGroup &group, int groupIndex) {
 		// Заголовок группы + сводка.
 		size_t missing = 0;
+		bool anyDeletable = false;
 		for (KnownFile file : group.files) {
-			if (state.fileSizes[static_cast<size_t>(file)] < 0) {
+			const size_t idx = static_cast<size_t>(file);
+			if (state.fileSizes[idx] < 0) {
 				++missing;
+			} else if (kFileCatalog[idx].downloadable) {
+				anyDeletable = true;
 			}
 		}
 		ImGui::Dummy(ImVec2(0, Scale::px(0.2F)));
@@ -278,14 +285,20 @@ void RenderChecklist(const LauncherState &state, const Dispatcher &dispatch)
 		ImGui::PopFont();
 		ImGui::Dummy(ImVec2(0, Scale::px(0.2F)));
 
+		// Колонка действий добавляется только когда есть хотя бы одна
+		// кнопка — иначе на устройстве она съедала ~140px справа и
+		// список выглядел смещённым влево.
+		const int columnCount = anyDeletable ? 4 : 3;
 		const std::string tableName = "files_" + std::to_string(groupIndex);
-		if (!ImGui::BeginTable(tableName.c_str(), 4, ImGuiTableFlags_SizingStretchProp)) {
+		if (!ImGui::BeginTable(tableName.c_str(), columnCount, ImGuiTableFlags_SizingStretchProp)) {
 			return;
 		}
 		ImGui::TableSetupColumn("status", ImGuiTableColumnFlags_WidthFixed, Scale::px(1.6F));
 		ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthStretch);
 		ImGui::TableSetupColumn("detail", ImGuiTableColumnFlags_WidthStretch);
-		ImGui::TableSetupColumn("actions", ImGuiTableColumnFlags_WidthFixed, Scale::px(2.4F));
+		if (anyDeletable) {
+			ImGui::TableSetupColumn("actions", ImGuiTableColumnFlags_WidthFixed, Scale::px(2.0F));
+		}
 
 		for (KnownFile id : group.files) {
 			const size_t i = static_cast<size_t>(id);
@@ -307,14 +320,16 @@ void RenderChecklist(const LauncherState &state, const Dispatcher &dispatch)
 			}
 			widgets::FileStatusLine(present, spec.displayName.data(), detail.c_str());
 
-			ImGui::TableNextColumn();
-			if (present && spec.downloadable) {
-				Theme::pushButtonStyle(false);
-				const std::string label = std::string(icons::Trash) + "##del" + std::to_string(i);
-				if (ImGui::SmallButton(label.c_str())) {
-					dispatch(intent::DeleteDownloadedFile { id });
+			if (anyDeletable) {
+				ImGui::TableNextColumn();
+				if (present && spec.downloadable) {
+					Theme::pushButtonStyle(false);
+					const std::string label = std::string(icons::Trash) + "##del" + std::to_string(i);
+					if (ImGui::SmallButton(label.c_str())) {
+						dispatch(intent::DeleteDownloadedFile { id });
+					}
+					Theme::popButtonStyle();
 				}
-				Theme::popButtonStyle();
 			}
 		}
 		ImGui::EndTable();
@@ -343,10 +358,9 @@ void Data(const LauncherState &state, const Dispatcher &dispatch)
 		ImGui::TextWrapped("%s", state.dataFolder.string().c_str());
 	}
 
-	widgets::IconButton(icons::Folder, "Изменить папку", false,
-	    ImVec2(std::min(width * 0.6F, Scale::px(16.0F)), Scale::px(2.2F)), [&dispatch] {
-		    dispatch(intent::SelectDataFolder {});
-	    });
+	widgets::IconButton(icons::Folder, "Изменить папку", false, ImVec2(width, Scale::px(2.2F)), [&dispatch] {
+		dispatch(intent::SelectDataFolder {});
+	});
 
 	ImGui::Dummy(ImVec2(0, Scale::px(0.6F)));
 	Theme::drawDivider(ImGui::GetCursorScreenPos(),

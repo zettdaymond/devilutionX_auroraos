@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 #include <cstring>
 #include <string>
 
@@ -70,15 +71,17 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 	// Reserve layout space; interaction happens through the buttons only.
 	ImGui::Dummy(size);
 
-	// Artwork (aspect-fill of the requested crop).
+	// Artwork (aspect-fill of the requested crop). Едва заметное
+	// «дыхание» масштаба оживляет панель, не отвлекая от контента.
 	if (art.texture != nullptr && art.size.x > 0 && art.size.y > 0) {
-		const float cropW = (uv1.x - uv0.x) * art.size.x;
-		const float cropH = (uv1.y - uv0.y) * art.size.y;
+		const float breathe = 0.004F + 0.004F * std::sin(static_cast<float>(ImGui::GetTime()) * 0.15F);
+		const float cropW = (uv1.x - uv0.x) * art.size.x * (1.0F - 2.0F * breathe);
+		const float cropH = (uv1.y - uv0.y) * art.size.y * (1.0F - 2.0F * breathe);
 		const float scale = std::max(size.x / cropW, size.y / cropH);
 		const ImVec2 shown(cropW * scale, cropH * scale);
 		const ImVec2 crop(0.5F - (size.x / shown.x) * 0.5F, 0.5F - (size.y / shown.y) * 0.5F);
-		const ImVec2 cuv0(uv0.x + crop.x * (uv1.x - uv0.x), uv0.y + crop.y * (uv1.y - uv0.y));
-		const ImVec2 cuv1(uv1.x - crop.x * (uv1.x - uv0.x), uv1.y - crop.y * (uv1.y - uv0.y));
+		const ImVec2 cuv0(uv0.x + breathe + crop.x * (uv1.x - uv0.x), uv0.y + breathe + crop.y * (uv1.y - uv0.y));
+		const ImVec2 cuv1(uv1.x - breathe - crop.x * (uv1.x - uv0.x), uv1.y - breathe - crop.y * (uv1.y - uv0.y));
 		draw->AddImageRounded(art.texture, min, max, cuv0, cuv1, IM_COL32_WHITE, rounding);
 	} else {
 		draw->AddRectFilled(min, max, Theme::colorU32(ColorRole::Panel), rounding);
