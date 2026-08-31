@@ -381,6 +381,11 @@ std::vector<std::string> WrapPathAtSlashes(ImFont *font, float size, const std::
 void FileRow(bool present, const char *name, const char *status, const char *path,
     const std::function<void()> &onDownload, const std::function<void()> &onDelete)
 {
+	// У каждого файла свои кнопки с одинаковыми метками («Скачать»,
+	// корзинка) — без собственного пространства id ImGui посчитал бы их
+	// одним и тем же виджетом.
+	ImGui::PushID(name);
+
 	const float startX = ImGui::GetCursorPosX();
 	const float rowWidth = ImGui::GetContentRegionAvail().x;
 	const float buttonSize = Scale::Px(2.2F);
@@ -456,6 +461,7 @@ void FileRow(bool present, const char *name, const char *status, const char *pat
 		ImGui::PopStyleColor();
 	}
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.3F)));
+	ImGui::PopID();
 }
 
 void ScreenHeader(const char *title, const std::function<void()> &onBack)
