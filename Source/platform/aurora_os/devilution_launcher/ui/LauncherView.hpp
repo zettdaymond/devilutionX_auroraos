@@ -52,6 +52,10 @@ private:
 	void RenderFileBrowser(const LauncherState &state, const Dispatcher &dispatch);
 	void RenderLaunchIris(const LauncherState &state);
 
+	/// Тонкий золотой индикатор прокрутки у правого края: появляется при
+	/// скролле и растворяется (замена скрытого родного скроллбара).
+	void RenderScrollIndicator(float scrollY, float scrollMaxY, const ImVec2 &topLeft, float height);
+
 	void *m_backgroundTexture = nullptr;
 	ImVec2 m_backgroundTextureSize { 0.0F, 0.0F };
 	widgets::BackgroundArt m_heroArts[3] = {}; // indexed by ExitAction
@@ -74,6 +78,10 @@ private:
 
 	/// Момент старта iris-анимации запуска (< 0 — не запускалась).
 	double m_irisStartedAt = -1.0;
+
+	/// Оверлей-индикатор прокрутки: последняя позиция и момент активности.
+	float m_lastContentScrollY = 0.0F;
+	double m_scrollActiveAt = -1.0;
 };
 
 } // namespace launcher::ui

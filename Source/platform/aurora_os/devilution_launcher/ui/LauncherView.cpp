@@ -113,18 +113,26 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	RenderBackground();
 
 	// Content area: the nav bar reserves space at the bottom (portrait)
-	// or at the top (landscape). Колонка симметрична: скроллбар прижат к
-	// правому краю экрана и «живёт» в правом поле, а контент держит
-	// одинаковые поля слева и справа (inset + внутренний паддинг).
+	// or at the top (landscape). Родной скроллбар скрыт (десктопная
+	// идиома, крадущая ширину) — позицию прокрутки показывает тонкий
+	// оверлей-индикатор у края, контент держит симметричные поля.
 	const ImVec2 windowSize = ImGui::GetWindowSize();
-	const float sideInset = Scale::px(0.15F);
-	const ImVec2 contentPos(sideInset, Scale::portrait() ? pad : navHeight + pad * 0.5F);
-	const ImVec2 contentSize(windowSize.x - sideInset * 2.0F,
+	const ImVec2 contentPos(0.0F, Scale::portrait() ? pad : navHeight + pad * 0.5F);
+	const ImVec2 contentSize(windowSize.x,
 	    windowSize.y - navHeight - pad * 1.5F - bottomInset);
 
 	ImGui::SetCursorPos(contentPos);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Scale::px(1.55F), 0));
-	if (ImGui::BeginChild("##content", contentSize, ImGuiChildFlags_None)) {
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, 0));
+	float contentScrollY = 0.0F;
+	float contentScrollMaxY = 0.0F;
+	ImVec2 contentTopLeft;
+	float contentHeight = 0.0F;
+	if (ImGui::BeginChild("##content", contentSize, ImGuiChildFlags_None,
+	        ImGuiWindowFlags_NoScrollbar)) {
+		contentTopLeft = ImGui::GetWindowPos();
+		contentHeight = ImGui::GetWindowHeight();
+		contentScrollY = ImGui::GetScrollY();
+		contentScrollMaxY = ImGui::GetScrollMaxY();
 		// Apply the drag delta to the content scroll while the gesture
 		// is active and the pointer is over the content area.
 		if (m_gestureDrag
@@ -135,6 +143,9 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 		if (state.screen != m_lastScreen) {
 			m_lastScreen = state.screen;
 			m_screenShownAt = ImGui::GetTime();
+			// Индикатор мигает при входе на экран: даёт понять, что ниже
+			// есть контент.
+			m_scrollActiveAt = ImGui::GetTime();
 		}
 		const float appearK = EaseOutCubic(ElapsedFraction(m_screenShownAt, ImGui::GetTime(), 0.20F));
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (1.0F - appearK) * Scale::px(0.6F));
@@ -144,6 +155,7 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	}
 	ImGui::EndChild();
 	ImGui::PopStyleVar();
+	RenderScrollIndicator(contentScrollY, contentScrollMaxY, contentTopLeft, contentHeight);
 
 	ImGui::End();
 	ImGui::PopStyleVar();
@@ -304,6 +316,45 @@ void LauncherView::RenderBackground() const
 	// Полупрозрачность сохраняет угольки видимыми сквозь затемнение.
 	const ImU32 shade = ImGui::GetColorU32(ImVec4(0.02F, 0.01F, 0.01F, 0.28F));
 	draw->AddRectFilled(viewport->WorkPos, viewport->WorkPos + viewport->WorkSize, shade);
+}
+
+void LauncherView::RenderScrollIndicator(float scrollY, float scrollMaxY, const ImVec2 &topLeft, float height)
+{
+	if (scrollMaxY <= 0.0F) {
+		m_lastContentScrollY = scrollY;
+		return;
+	}
+	const double now = ImGui::GetTime();
+	if (std::abs(scrollY - m_lastContentScrollY) > 0.1F) {
+		m_scrollActiveAt = now;
+	}
+	m_lastContentScrollY = scrollY;
+	if (m_scrollActiveAt < 0.0) {
+		m_scrollActiveAt = now;
+	}
+
+	// Мгновенное появление, полусекунды покоя, растворение за 0.35 с —
+	// как индикаторы прокрутки на мобильных платформах.
+	const float since = static_cast<float>(now - m_scrollActiveAt);
+	const float alpha = std::clamp((0.85F - since) / 0.35F, 0.0F, 1.0F);
+	if (alpha <= 0.0F) {
+		return;
+	}
+
+	const float barW = Scale::px(0.14F);
+	const float inset = Scale::px(0.1F);
+	const ImGuiViewport *viewport = ImGui::GetMainViewport();
+	const float x0 = viewport->WorkPos.x + viewport->WorkSize.x - inset - barW;
+
+	// Доля видимой части экрана → высота бегунка (не короче 1.5rem).
+	const float fraction = height / (height + scrollMaxY);
+	const float thumbH = std::max(height * fraction, Scale::px(1.5F));
+	const float travel = height - thumbH;
+	const float thumbY = topLeft.y + (scrollMaxY > 0.0F ? travel * (scrollY / scrollMaxY) : 0.0F);
+
+	ImDrawList *draw = ImGui::GetWindowDrawList();
+	draw->AddRectFilled(ImVec2(x0, thumbY), ImVec2(x0 + barW, thumbY + thumbH),
+	    ImGui::GetColorU32(ImVec4(0.91F, 0.78F, 0.49F, 0.85F * alpha)), barW * 0.5F);
 }
 
 void LauncherView::RenderNavBar(const LauncherState &state, const Dispatcher &dispatch)
