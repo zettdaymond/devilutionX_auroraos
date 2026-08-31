@@ -4,15 +4,15 @@
 
 namespace launcher {
 
-/// What the launcher was asked to start when its UI loop finished.
+/// Какую игру лаунчер должен запустить, когда его цикл завершился.
 enum class ExitAction {
 	LaunchDiablo,
 	LaunchHellfire,
 	LaunchDemo,
 };
 
-/// Final answer of the launcher to the host application
-/// (see Source/main.cpp — it maps the action to engine CLI flags).
+/// Итоговый ответ лаунчера главной программе
+/// (см. Source/main.cpp — он превращает действие в аргументы командной строки движка).
 struct AppResult {
 	bool success = false;
 	ExitAction action = ExitAction::LaunchDiablo;

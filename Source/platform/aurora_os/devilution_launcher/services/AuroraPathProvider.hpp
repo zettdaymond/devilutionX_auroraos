@@ -4,13 +4,13 @@
 
 namespace launcher {
 
-/// Aurora OS path provider. Wraps AuroraOsStandartPaths (Qt-based) so
-/// the rest of the launcher stays Qt-free:
-/// - configDir: base dir passed in (SDL preference path on device);
-/// - downloadsDir: the engine's additional MPQ search path
-///   (~/.local/share/org.diasurgical/devilutionx), so downloaded
-///   spawn.mpq / ru.mpq are found by the game without extra setup;
-/// - candidate dirs also include the read-only bundled assets folder.
+/// Пути для Aurora OS. Оборачивает AuroraOsStandartPaths (он на Qt),
+/// чтобы остальной лаунчер жил без Qt:
+/// - папка настроек — базовая, переданная снаружи (на устройстве это
+///   путь SDL); папка загрузок — дополнительный путь поиска MPQ
+///   движка (~/.local/share/org.diasurgical/devilutionx), чтобы игра
+///   находила скачанные spawn.mpq и ru.mpq без лишних настроек;
+/// - среди папок-кандидатов есть и папка вшитых ресурсов (только чтение).
 class AuroraPathProvider final : public IPathProvider {
 public:
 	explicit AuroraPathProvider(std::filesystem::path baseDir);

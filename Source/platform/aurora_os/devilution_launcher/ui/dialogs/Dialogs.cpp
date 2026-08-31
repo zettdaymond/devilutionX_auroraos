@@ -18,9 +18,9 @@ namespace launcher::ui::dialogs {
 
 namespace {
 
-/// Centered modal window helper. The desired width is given in rem and
-/// always capped by the viewport so the dialog can never overflow a
-/// phone screen. Returns true while the dialog is open.
+/// Помощник для модального окна по центру. Ширина задаётся в rem и
+/// всегда ограничена экраном, чтобы диалог не вылез за телефон.
+/// Возвращает true, пока диалог открыт.
 bool BeginModal(const char *name, float widthRem)
 {
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
@@ -40,8 +40,8 @@ bool BeginModal(const char *name, float widthRem)
 	return open;
 }
 
-/// Width for one of a pair of dialog buttons: the preferred rem-based
-/// size, never wider than half of the available row.
+/// Ширина одной из пары кнопок диалога: желаемый размер в rem,
+/// но не больше половины доступного ряда.
 ImVec2 PairedButtonSize(float widthRem, float heightRem)
 {
 	const float avail = ImGui::GetContentRegionAvail().x;
@@ -192,7 +192,7 @@ void Download(const LauncherState &state, const Dispatcher &dispatch)
 	    FormatBytes(download.downloadedBytes).c_str(),
 	    download.totalBytes > 0 ? FormatBytes(download.totalBytes).c_str() : "?");
 
-	// Speed + ETA
+// Скорость и оставшееся время
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 	if (download.active && download.bytesPerSec > 0) {
 		const int64_t remaining = download.bytesPerSec > 0

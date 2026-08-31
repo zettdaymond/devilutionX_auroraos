@@ -7,15 +7,15 @@ namespace launcher::ui::screens {
 using widgets::BackgroundArt;
 using widgets::Dispatcher;
 
-/// Per-mode artwork: the dedicated hero key art and the golden silhouette
-/// icon set for shelf tiles. Both are optional (null textures) — the hero
-/// falls back to a crop of `background`, the icon to a FontAwesome glyph.
+/// Арты режима: собственная картина hero-панели и набор золотых
+/// силуэтов-иконок плиток. Оба необязательны (пустые текстуры):
+/// без арта — обрезка общего фона, без иконки — глиф FontAwesome.
 struct ModeArt {
     BackgroundArt hero;
     widgets::IconSet icon;
 };
 
-/// All artwork the screens render.
+/// Все арты, которыми рисуют экраны.
 struct ArtSet {
     BackgroundArt background;
     ModeArt diablo;
@@ -23,16 +23,16 @@ struct ArtSet {
     ModeArt demo;
 };
 
-/// Main screen: featured-game hero panel (web "key art" banner) plus a
-/// shelf of the remaining modes, or the first-run hero when no game
-/// files are present.
+/// Главный экран: hero-панель выбранного режима (большая обложка с
+/// артом и кнопкой) плюс полка остальных режимов; при отсутствии
+/// файлов — панель первого запуска.
 void Home(const LauncherState &state, const Dispatcher &dispatch, const ArtSet &art);
 
-/// Game data management: folder picker, file checklist, deletions,
-/// free space.
+/// Работа с данными игры: выбор папки, чек-лист файлов, удаление
+/// скачанного, свободное место.
 void Data(const LauncherState &state, const Dispatcher &dispatch);
 
-/// About the port.
+/// Экран «О порте».
 void About(const LauncherState &state);
 
 } // namespace launcher::ui::screens

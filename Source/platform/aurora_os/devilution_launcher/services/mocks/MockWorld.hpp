@@ -10,10 +10,10 @@
 
 namespace launcher {
 
-/// Shared fake environment for mock services: which files "exist",
-/// their sizes and the fake free disk space. MockGameFilesService
-/// reads it; MockDownloadService updates it on success/cancel.
-/// Thread-safe because the download simulation runs on its own thread.
+/// Общая поддельная среда для сервисов-имитаций: какие файлы «существуют»,
+/// их размеры и поддельное свободное место. MockGameFilesService
+/// читает её; MockDownloadService обновляет при успехе и отмене.
+/// Потокобезопасна: имитация загрузки работает в отдельном потоке.
 class MockWorld {
 public:
 	MockWorld();
@@ -29,16 +29,16 @@ public:
 		int64_t freeSpaceBytes = 0;
 	};
 
-	/// Consistent copy of the whole world state.
+	/// Непротиворечивая копия всего состояния «мира».
 	[[nodiscard]] Snapshot Take() const;
 
 	void ApplyDownloadFinished(KnownFile file, bool success);
 
-	/// Apply a named preset ("empty", "diablo-found", "hellfire-partial",
-	/// "full"). Returns false for unknown names.
+	/// Применяет именованный набор ("empty", "diablo-found", "hellfire-partial",
+	/// "full"). Для неизвестного имени возвращает false.
 	bool ApplyPreset(const std::string &name);
 
-	/// All valid preset names, for --help output.
+	/// Все допустимые имена наборов — для вывода в --help.
 	static const std::vector<std::string> &PresetNames();
 
 private:

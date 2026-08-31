@@ -6,29 +6,29 @@
 
 namespace launcher {
 
-/// Downloads one file at a time. Callbacks may be invoked from a
-/// background thread — implementations guarantee they are called,
-/// but the receiver must marshal data to its own thread
-/// (the Store does this via dispatch()).
+/// Качает по одному файлу за раз. Обратные вызовы могут приходить
+/// из фонового потока — реализация гарантирует их вызов,
+/// но получатель обязан сам переносить данные в свой поток
+/// (Store делает это через Dispatch()).
 class IDownloadService {
 public:
 	struct Listener {
-		/// Progress report; bytesPerSec is a smoothed instantaneous speed.
+/// Отчёт о прогрессе; bytesPerSec — сглаженная мгновенная скорость.
 		std::function<void(int64_t totalBytes, int64_t downloadedBytes, int64_t bytesPerSec)> onProgress;
-		/// Terminal event; always called exactly once per Start().
-		/// On cancel or failure `success` is false and `error` explains why.
+/// Завершающее событие; вызывается ровно один раз на каждый Start().
+/// При отмене или ошибке success = false, а error объясняет причину.
 		std::function<void(bool success, std::string error)> onFinished;
 	};
 
 	virtual ~IDownloadService() = default;
 
-	/// Begin downloading `url` into `destination` (file path).
-	/// Starting while another download is active is a programming error;
-	/// implementations log and ignore such calls.
+	/// Начинает загрузку `url` в файл `destination`.
+	/// Параллельный старт второй загрузки — ошибка программирования;
+	/// реализации записывают это в лог и игнорируют вызов.
 	virtual void Start(const std::string &url, const std::filesystem::path &destination, Listener listener) = 0;
 
-	/// Abort the active download. Triggers onFinished(false, "cancelled")
-	/// and removes the partial file.
+	/// Прерывает текущую загрузку: вызывает onFinished(false, "cancelled"),
+	/// и удаляет недокачанный файл.
 	virtual void Cancel() = 0;
 
 	[[nodiscard]] virtual bool IsActive() = 0;

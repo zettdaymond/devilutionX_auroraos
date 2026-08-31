@@ -1,7 +1,7 @@
 #pragma once
 
-/// FontAwesome 4 codepoints (UTF-8 byte sequences) used by the launcher
-/// UI. Render with a font that has the icon range merged in
+/// Коды иконок FontAwesome 4 (байтовые последовательности UTF-8),
+/// используемые интерфейсом. Рисуются шрифтом с вшитым диапазоном иконок
 /// (see Theme::init).
 namespace launcher::ui::icons {
 

@@ -1,15 +1,15 @@
-/// Desktop entry point for the DevilutionX launcher (development build).
+/// Десктопная входная точка лаунчера DevilutionX (сборка для разработки).
 ///
-/// Lets the launcher run standalone for fast UI iteration and user-flow
-/// walkthroughs with scripted mock scenarios — no Aurora OS device and
-/// no network required:
+/// Позволяет запускать лаунчер отдельно — для быстрой работы над интерфейсом
+/// и прохождения пользовательских сценариев по скриптам-имитациям,
+/// сеть не нужна:
 ///
-///   devilution_launcher [--mock-scenario=<name>] [--window=<WxH>]
+///   devilution_launcher [--mock-scenario=<имя>] [--window=<ШxВ]
 ///
-/// Scenarios: empty, slow-download, fail-download, diablo-found,
-/// hellfire-partial, full (see services/mocks/MockScenarios.cpp).
+/// Сценарии: empty, slow-download, fail-download, diablo-found,
+/// hellfire-partial, full (см. services/mocks/MockScenarios.cpp).
 
-// Must precede every SDL include: we provide plain main() ourselves.
+// Должен стоять раньше всех включений SDL: свой обычный main().
 #define SDL_MAIN_HANDLED
 
 #include "Application.hpp"

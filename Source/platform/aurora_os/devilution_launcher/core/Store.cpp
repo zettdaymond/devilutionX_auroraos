@@ -57,8 +57,8 @@ void Store::Dispatch(Intent intent)
 }
 
 // ---- Intent handlers ----
-// (must be defined before Poll()/Reduce() so the specializations are
-// seen before the template is implicitly instantiated there)
+// (определения должны идти до Poll()/Reduce(): специализации
+// должны быть видны до неявного создания шаблона)
 
 template <>
 void Store::ReduceIntent<intent::UiNavigate>(const intent::UiNavigate &i)
@@ -138,7 +138,7 @@ template <>
 void Store::ReduceIntent<intent::UiCloseDialog>(const intent::UiCloseDialog &)
 {
 	if (m_state.dialog == Dialog::DownloadProgress && m_state.download && !m_state.download->active) {
-		// Closing a finished/failed download overlay clears it entirely.
+// Закрытие оверлея завершённой или упавшей загрузки очищает её целиком.
 		m_state.download.reset();
 	}
 	m_state.dialog = Dialog::None;

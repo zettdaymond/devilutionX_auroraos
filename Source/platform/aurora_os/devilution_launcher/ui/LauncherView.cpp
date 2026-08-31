@@ -26,8 +26,8 @@ constexpr float kIrisDuration = 0.35F;
 LauncherView::LauncherView(float dpiScale)
     : m_dpiScale(dpiScale)
 {
-	// Start browsing from the user's home directory — the most likely
-	// place for transferred MPQ files (~/Documents, ~/Downloads).
+	// Начинаем обзор с домашней папки пользователя — вероятнее всего
+	// MPQ лежат именно там (~/Documents, ~/Downloads).
 	std::filesystem::path startDir;
 #ifdef _WIN32
 	if (const char *profile = std::getenv("USERPROFILE")) {
@@ -77,9 +77,9 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 {
 	Scale::BeginFrame(m_dpiScale);
 
-	// Drag-to-scroll gesture: once the pointer moves further than a tap
-	// threshold while held down, the frame is in "scrolling" mode —
-	// intents from clicks are swallowed for its duration.
+	// Жест «потянул — прокрутил»: если палец увести дальше порога нажатия,
+	// кадр считается прокруткой, и клики на время жеста
+	// игнорируются.
 	ImGuiIO &io = ImGui::GetIO();
 	if (ImGui::IsMouseDown(0)) {
 		const float dragDistance = std::sqrt(io.MouseDragMaxDistanceSqr[0]);
@@ -98,19 +98,19 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	// ~16dp на устройстве: как базовые поля мобильных платформ — текст
 	// дышит, интерактив не лазит в жестовую зону у края.
 	const float pad = Scale::Px(1.5F);
-	// Keep a small gap above the screen edge so the nav bar is never
-	// clipped by system gesture areas on phones.
+	// Небольшой отступ от края экрана, чтобы системные жесты телефона
+	// не обрезали панель навигации.
 	const float bottomInset = Scale::Px(0.35F);
 
-	// Root window: covers the viewport, no chrome.
+	// Корневое окно занимает весь экран, без рамок и заголовка.
 	ImGui::SetNextWindowPos(viewport->WorkPos);
 	ImGui::SetNextWindowSize(viewport->WorkSize);
 	ImGui::SetNextWindowViewport(viewport->ID);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
-	// The root is a transparent layout container: NoInputs keeps it from
-	// covering the navbar and stealing clicks when ImGui reorders windows
-	// (children of a NoInputs window remain interactive on their own).
+	// Корень — прозрачный контейнер: флаг NoInputs не даёт ему перекрыть
+	// панель навигации и перехватывать клики при пересортировке окон ImGui
+	// (дочерние окна остаются кликабельными сами по себе).
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove
 	    | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus
 	    | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs;
@@ -118,7 +118,7 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	ImGui::Begin("##launcher-root", nullptr, flags);
 	RenderBackground();
 
-	// Content area: the nav bar reserves space at the bottom (portrait)
+	// Контентная область: панель навигации занимает место снизу (портрет)
 	// or at the top (landscape). Родной скроллбар скрыт (десктопная
 	// идиома, крадущая ширину) — позицию прокрутки показывает тонкий
 	// оверлей-индикатор у края, контент держит симметричные поля.
@@ -141,8 +141,8 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 		contentHeight = ImGui::GetWindowHeight();
 		contentScrollY = ImGui::GetScrollY();
 		contentScrollMaxY = ImGui::GetScrollMaxY();
-		// Apply the drag delta to the content scroll while the gesture
-		// is active and the pointer is over the content area.
+			// Пока жест активен и палец над контентом — применяем дельту
+			// движения к позиции прокрутки.
 		if (m_gestureDrag
 		    && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
 			ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseDelta.y);
@@ -174,8 +174,8 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	dialogs::Toast(state, guardedDispatch);
 	RenderLaunchIris(state);
 
-	// The gesture ends with the button release — reset AFTER rendering so
-	// a click fired on the release frame of a drag is still suppressed.
+	// Жест заканчивается отпусканием кнопки — сброс ПОСЛЕ отрисовки,
+	// чтобы клик в кадре отпускания ещё подавлялся.
 	if (!ImGui::IsMouseDown(0)) {
 		m_gestureDrag = false;
 	}
@@ -378,8 +378,8 @@ void LauncherView::RenderNavBar(const LauncherState &state, const Dispatcher &di
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
 	const float height = Scale::Px(3.2F);
 	const ImVec2 size(viewport->WorkSize.x, height);
-	// Slightly above the screen bottom so system gesture areas never
-	// clip the buttons on phones.
+	// Чуть выше нижнего края экрана, чтобы системные жесты телефона
+	// не обрезали кнопки.
 	const float bottomInset = Scale::Px(0.35F);
 	const ImVec2 pos = Scale::Portrait()
 	    ? ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + viewport->WorkSize.y - height - bottomInset)
@@ -503,7 +503,7 @@ void LauncherView::RenderFileBrowser(const LauncherState &state, const Dispatche
 	m_fileBrowser->Display();
 
 	// The browser closed itself (Отмена / × / Esc) — sync the state,
-	// otherwise the block above would immediately reopen it.
+	// иначе блок выше сразу же открыл бы его снова.
 	if (state.fileBrowserOpen && !m_fileBrowser->IsOpened()) {
 		dispatch(intent::CancelFolderSelection {});
 	}

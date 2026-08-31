@@ -35,9 +35,9 @@ namespace App {
 
 namespace {
 
-/// Wraps raw RGBA/RGB pixels in a surface and uploads them as a texture
-/// with linear filtering (SDL2 defaults textures to nearest-neighbour,
-/// which stair-steps everything we downscale).
+	/// Оборачивает сырые пиксели (RGB или RGBA) в поверхность SDL и
+	/// загружает их как текстуру с линейной фильтрацией. По умолчанию
+	/// SDL2 масштабирует «ближайшим» пикселем — на уменьшении видны ступеньки.
 SDL_Texture *MakeTextureFromPixels(SDL_Renderer *renderer, const unsigned char *pixels, int width,
     int height, int components)
 {
@@ -110,9 +110,9 @@ int BuildIconLevels(SDL_Renderer *renderer, const char *path, SDL_Texture *outTe
 	}
 }
 
-/// Decodes an embedded image (JPEG art / PNG icons) into an SDL texture.
-/// Returns nullptr (and logs) when the asset is not bundled or fails to
-/// decode — callers fall back.
+	/// Раскодирует вшитую в бинарник картинку (JPEG-арт или PNG-иконку)
+	/// в текстуру SDL. Если ассета нет или он битый — вернёт nullptr
+	/// и запишет предупреждение в лог; вызывающий код использует запасной вариант.
 SDL_Texture *LoadAssetTexture(SDL_Renderer *renderer, const char *path, ImVec2 &outSize)
 {
 	try {
@@ -260,8 +260,8 @@ AppResult Application::Run()
 	m_store = std::make_unique<launcher::Store>(
 	    *m_services.config, *m_services.files, *m_services.downloads, *m_services.paths);
 
-	// setup() creates the ImGui context and loads fonts; the view (and
-	// its FileBrowser, which queries the font atlas) must come after it.
+	// Setup() создаёт контекст ImGui и грузит шрифты, поэтому вид (и его
+	// файловый браузер, которому нужен шрифтовый атлас) создаётся после него.
 	if (m_renderer == nullptr && !Setup()) {
 		AppResult result;
 		result.success = false;

@@ -8,25 +8,25 @@
 
 namespace launcher {
 
-/// DevilutionX command-line arguments for the mode the user picked in
-/// the launcher (the program name is NOT included).
+/// Аргументы командной строки DevilutionX для режима, выбранного
+/// в лаунчере (имя самого исполняемого файла не входит).
 ///
-/// - Diablo:    --diablo  (skips the engine's "which game?" dialog when
-///                        both Diablo and Hellfire files are installed)
+/// - Diablo:    --diablo  (пропускает диалог движка «какую игру запустить?»
+///                        при установленных файлах и Diablo, и Hellfire)
 /// - Hellfire:  --hellfire
-/// - Shareware: --spawn   (the engine finds spawn.mpq through its MPQ
-///                        search paths, no extra argument needed)
+/// - Shareware: --spawn   (файл spawn.mpq движок находит сам через
+///                        свои пути поиска, лишние аргументы не нужны)
 ///
-/// For the full games the picked folder is also passed as
-/// `--data-dir <path>`: the engine puts it first in its MPQ search
-/// order, which guarantees DIABDAT.MPQ is found without relying on the
-/// QSettings round-trip (and prevents a silent fallback to the
-/// downloaded shareware spawn.mpq).
+/// Для полных версий выбранная папка передаётся ещё и как
+/// `--data-dir <путь>`: движок ставит её первой в порядок поиска MPQ,
+/// поэтому DIABDAT.MPQ находится гарантированно, без обхода настроек
+/// QSettings (и без риска незаметно подменить игру
+/// скачанной демо-версией).
 [[nodiscard]] std::vector<std::string> EngineArgsFor(ExitAction action, const std::filesystem::path &dataPath = {});
 
-/// Whether the launcher result should ALSO persist `dataPath` as the
-/// engine's user-defined MPQ search path (QSettings on Aurora OS) so
-/// the folder is remembered on the next run.
+/// Должен ли результат лаунчера ещё и запомнить `dataPath` как
+/// пользовательский путь поиска MPQ (QSettings на Aurora OS), чтобы
+/// папка сохранилась и на следующий запуск.
 [[nodiscard]] bool WantsUserMpqPath(ExitAction action);
 
 } // namespace launcher

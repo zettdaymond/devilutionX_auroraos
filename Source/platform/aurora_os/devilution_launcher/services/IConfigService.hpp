@@ -5,15 +5,15 @@
 
 namespace launcher {
 
-/// Launcher settings persisted between runs.
+/// Настройки лаунчера, живущие между запусками.
 struct LauncherConfig {
-	/// Folder with the user's game files (DIABDAT.MPQ, hellfire*.mpq).
-	/// Empty when the user has not picked one yet.
+/// Папка с файлами пользователя (DIABDAT.MPQ, hellfire*.mpq).
+/// Пуста, пока пользователь не выбрал папку.
 	std::optional<std::filesystem::path> dataFolder;
 };
 
-/// Persistence for LauncherConfig. Implementations must be cheap to
-/// construct; Save() writes the whole file atomically (temp + rename).
+/// Хранилище LauncherConfig. Создание должно быть дешёвым;
+/// Save() пишет файл целиком атомарно (временный файл + переименование).
 class IConfigService {
 public:
 	virtual ~IConfigService() = default;

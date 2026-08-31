@@ -13,8 +13,8 @@ namespace {
 constexpr auto kProgressInterval = std::chrono::milliseconds(250);
 constexpr std::string_view kCancelledError = "cancelled";
 
-/// zoe::GlobalInit/GlobalUnInit are process-wide; refcount so multiple
-/// instances (and tests) stay balanced.
+/// zoe::GlobalInit/GlobalUnInit действуют на весь процесс; счётчик
+/// ссылок держит пары вызовов в балансе (включая тесты).
 int &GlobalInitRefCount()
 {
 	static int count = 0;

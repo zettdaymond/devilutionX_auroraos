@@ -4,8 +4,8 @@
 
 namespace launcher {
 
-/// std::filesystem-based implementation, portable between Aurora OS
-/// and desktop builds.
+/// Реализация на std::filesystem — одинакова для Aurora OS и десктопа.
+/// и десктопной.
 class GameFilesService final : public IGameFilesService {
 public:
 	[[nodiscard]] FileScanResult Scan(const std::vector<std::filesystem::path> &folders) override;

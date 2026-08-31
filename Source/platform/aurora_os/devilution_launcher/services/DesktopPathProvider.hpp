@@ -4,9 +4,9 @@
 
 namespace launcher {
 
-/// Portable path provider: everything lives under one base directory
-/// (on desktop builds the SDL preference path, supplied by the caller —
-/// this class stays free of SDL dependencies).
+/// Переносимый вариант путей: всё живёт в одной базовой папке
+/// (в десктопной сборке — путь SDL, его передаёт вызывающий код;
+/// сам класс не зависит от SDL).
 class DesktopPathProvider final : public IPathProvider {
 public:
 	explicit DesktopPathProvider(std::filesystem::path baseDir);

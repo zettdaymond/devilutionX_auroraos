@@ -10,27 +10,27 @@
 
 namespace launcher {
 
-/// Named scenario for desktop user-flow walkthroughs (no device, no
-/// network, no real files). Combines a MockWorld file preset with a
-/// download behavior:
+/// Именованный сценарий для прогонов на десктопе (без устройства,
+/// сети и настоящих файлов). Соединяет набор «существующих» файлов
+/// с поведением загрузки:
 ///
-///   empty          no files, downloads finish instantly
-///   slow-download  no files, downloads take ~12 s (progress/cancel)
-///   fail-download  no files, downloads fail at 50 %
-///   diablo-found   DIABDAT.MPQ present
-///   hellfire-partial DIABDAT + 2 of 4 hellfire files
-///   full           everything present (data management flows)
+///   empty          файлов нет, загрузки завершаются мгновенно
+///   slow-download  файлов нет, загрузка идёт ~12 с (прогресс и отмена)
+///   fail-download  файлов нет, загрузка обрывается на 50 %
+///   diablo-found   есть DIABDAT.MPQ
+///   hellfire-partial DIABDAT + 2 из 4 файлов Hellfire
+///   full           все файлы на месте (работа с данными)
 class MockScenario {
 public:
-	/// Parses a scenario name; returns a scenario using MockWorld
-	/// services. Throws std::invalid_argument for unknown names.
+/// Разбирает имя сценария; возвращает сценарий на сервисах MockWorld.
+/// Для неизвестного имени выбрасывает std::invalid_argument.
 	[[nodiscard]] static MockScenario ByName(const std::string &name);
 
 	[[nodiscard]] ServiceBundle MakeBundle() const;
 
 	[[nodiscard]] const std::string &name() const { return m_name; }
 
-	/// Access to the world, e.g. for tests to mutate state mid-flow.
+/// Доступ к «миру» — например, чтобы тест менял состояние по ходу сценария.
 	[[nodiscard]] MockWorld &world() const { return *m_world; }
 
 	static const std::vector<std::string> &Names();

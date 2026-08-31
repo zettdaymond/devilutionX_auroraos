@@ -9,20 +9,20 @@
 
 namespace launcher {
 
-/// How a mock download behaves.
+/// Как ведёт себя имитируемая загрузка.
 enum class MockDownloadBehavior {
 	InstantSuccess, ///< finishes in ~0.3 s (UI smoke tests)
 	SlowSuccess,    ///< ~12 s of visible progress, cancelable
 	FailAtHalf,     ///< fails at 50 % with an error message
 };
 
-/// Simulated downloader. Runs a background thread that emits progress
-/// events, updates the shared MockWorld on success and supports
-/// cancellation — mirrors the threading contract of ZoeDownloadService.
+/// Имитация загрузчика. Фоновый поток присылает события прогресса,
+/// при успехе обновляет общий MockWorld и поддерживает отмену —
+/// повторяет правила работы с потоками настоящей ZoeDownloadService.
 class MockDownloadService final : public IDownloadService {
 public:
-	/// Owns a share of the world so the service bundle stays valid
-	/// regardless of the MockScenario's lifetime.
+/// Держит долю владения «миром», чтобы набор сервисов оставался жив
+/// независимо от времени жизни сценария-имитации.
 	MockDownloadService(std::shared_ptr<MockWorld> world, MockDownloadBehavior behavior);
 	~MockDownloadService() override;
 

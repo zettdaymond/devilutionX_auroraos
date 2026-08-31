@@ -14,12 +14,12 @@ class FileBrowser;
 
 namespace launcher::ui {
 
-/// Top-level view: background, navigation bar, screen router, modal
-/// dialogs and the MPQ file browser.
+/// Верхний уровень интерфейса: фон, панель навигации, роутер экранов,
+/// модальные диалоги и файловый браузер MPQ.
 ///
-/// MVI role: a pure function of LauncherState. The only way it changes
-/// anything is by dispatching Intents; it owns no business state
-/// (besides the FileBrowser widget instance and popup bookkeeping).
+/// Роль в MVI: чистая функция от LauncherState. Единственный способ
+/// что-то изменить — отправить Intent; бизнес-состояния не хранит
+/// (кроме экземпляра FileBrowser и учёта открытых попапов).
 class LauncherView {
 public:
 	using Dispatcher = widgets::Dispatcher;
@@ -27,7 +27,7 @@ public:
 	explicit LauncherView(float dpiScale = 1.0F);
 	~LauncherView();
 
-	/// Render one frame. `dispatch` is thread-safe (Store::dispatch).
+	/// Рисует один кадр. `dispatch` потокобезопасен (Store::Dispatch).
 	void Render(const LauncherState &state, const Dispatcher &dispatch);
 
 	/// Закончилась ли iris-анимация запуска игры. Главный цикл держит
@@ -36,12 +36,12 @@ public:
 
 	void SetBackgroundTexture(void *texture, ImVec2 size);
 
-	/// Attach a dedicated hero artwork for a game mode; a null texture
-	/// keeps the bg.png-crop fallback for that mode.
+	/// Подключает собственный арт hero-панели режима; пустая текстура —
+	/// остаётся обрезка общего фона.
 	void SetHeroTexture(ExitAction mode, void *texture, ImVec2 size);
 
-	/// Attach the golden silhouette icon levels (largest first) for a game
-	/// mode; zero count keeps the FontAwesome glyph fallback in tiles.
+	/// Подключает уровни золотого силуэта иконки режима (от крупного);
+	/// нулевое число — глиф FontAwesome в плитках.
 	void SetModeIconLevels(ExitAction mode, const widgets::BackgroundArt *levels, int count);
 
 private:
@@ -65,9 +65,9 @@ private:
 	Dialog m_lastDialog = Dialog::None;
 	std::unique_ptr<ImGui::FileBrowser> m_fileBrowser;
 
-	/// True while the user is drag-scrolling the content (touch): clicks
-	/// dispatched during the gesture are suppressed so dragging over a
-	/// card does not "press" it.
+	/// Истинно во время прокрутки перетаскиванием: клики на время жеста
+	/// подавляются, чтобы провести пальцем по карточке — не значит
+	/// «нажать» на неё.
 	bool m_gestureDrag = false;
 
 	/// Времена появления текущего экрана/диалога — для fade-анимаций

@@ -10,9 +10,9 @@
 
 namespace launcher {
 
-/// User actions and internal events, expressed as small value types.
-/// The view dispatches these into the Store; the Store is the only
-/// place that translates them into state changes and side effects.
+/// Действия пользователя и внутренние события — маленькие типы-значения.
+/// Интерфейс отправляет их в Store; только Store превращает их
+/// в изменения состояния и побочные эффекты.
 namespace intent {
 
 // -- UI navigation --
@@ -23,40 +23,40 @@ struct UiOpenDialog {
 	Dialog dialog;
 };
 struct UiCloseDialog {};
-/// The view dismissed the transient toast notification.
+/// Интерфейс закрыл короткое всплывающее уведомление.
 struct UiDismissToast {};
 
 // -- Game files --
-/// Opens the file browser so the user can point the launcher at a folder
-/// with their MPQ files.
+/// Открыть файловый браузер, чтобы пользователь указал папку
+/// со своими MPQ-файлами.
 struct SelectDataFolder {};
-/// The user confirmed a folder in the file browser.
+/// Пользователь выбрал папку в файловом браузере.
 struct DataFolderSelected {
 	std::filesystem::path dir;
 };
-/// The user closed the file browser without choosing a folder.
+/// Пользователь закрыл браузер, не выбрав папку.
 struct CancelFolderSelection {};
-/// Re-scan all candidate folders (after external changes, downloads, deletions).
+/// Пересканировать все папки-кандидаты (после изменений, загрузок, удалений).
 struct RescanFiles {};
-/// Delete a previously downloaded file (spawn.mpq / ru.mpq).
+/// Удалить ранее скачанный файл (spawn.mpq / ru.mpq).
 struct DeleteDownloadedFile {
 	KnownFile file;
 };
 
 // -- Launching --
-/// The user tapped a game card.
+/// Пользователь нажал на карточку игры.
 struct LaunchGame {
 	ExitAction game;
 };
 
 // -- Downloads --
-/// Start downloading (after the user confirmed size / disk space).
+/// Начать загрузку (после подтверждения размера и свободного места).
 struct StartDownload {
 	KnownFile file;
 };
 struct CancelDownload {};
 
-// -- Internal events marshalled from the download thread --
+// -- Внутренние события, переданные из потока загрузки --
 struct EvDownloadProgress {
 	int64_t totalBytes;
 	int64_t downloadedBytes;

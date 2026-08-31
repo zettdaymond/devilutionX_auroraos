@@ -7,22 +7,22 @@
 
 namespace launcher {
 
-/// Platform-specific locations for the launcher. This is the single
-/// seam between portable launcher code and the host platform
-/// (Aurora OS with Qt vs desktop SDL).
+/// Пути, зависящие от платформы. Это единственный шов между
+/// переносимым кодом лаунчера и платформой-хостом
+/// (Aurora OS с Qt против десктопа на SDL).
 class IPathProvider {
 public:
 	virtual ~IPathProvider() = default;
 
-	/// Directory for launcher housekeeping files (launcher.conf, imgui.ini).
+	/// Папка служебных файлов лаунчера (launcher.conf и прочие).
 	[[nodiscard]] virtual std::filesystem::path ConfigDir() = 0;
 
-	/// Writable directory downloadable content (spawn.mpq, ru.mpq)
-	/// is placed into. It is also an MPQ search path of the game itself.
+	/// Папка для скачиваемого (spawn.mpq, ru.mpq), доступная для записи.
+	/// Она же — путь поиска MPQ для самой игры.
 	[[nodiscard]] virtual std::filesystem::path DownloadsDir() = 0;
 
-	/// Folders scanned for game files, in priority order:
-	/// user-selected folder first, then platform locations.
+	/// Папки, в которых ищутся файлы игры, по убыванию приоритета:
+	/// сначала выбранная пользователем, затем пути платформы.
 	[[nodiscard]] virtual std::vector<std::filesystem::path> CandidateDataDirs(const LauncherConfig &config) = 0;
 };
 

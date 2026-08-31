@@ -9,8 +9,8 @@
 
 namespace launcher {
 
-/// In-memory config; records the last saved value so tests can assert
-/// on what the Store persisted.
+/// Настройки в памяти; запоминает последнюю сохранённую версию,
+/// чтобы тест проверял, что именно Store записал.
 class MockConfigService final : public IConfigService {
 public:
 	[[nodiscard]] LauncherConfig Load() override { return m_stored; }
@@ -22,10 +22,10 @@ private:
 	LauncherConfig m_stored;
 };
 
-/// File "system" backed by MockWorld: every scanned folder reports the
-/// same scripted contents, freeSpace mirrors the world, removeFile
-/// clears the entry. Owns a share of the world so the bundle stays
-/// valid regardless of the MockScenario's lifetime.
+/// Файловая «система» поверх MockWorld: любая просканированная папка
+/// выдаёт одно и то же предписанное содержимое, свободное место —
+/// из «мира», удаление убирает запись. Держит долю владения «миром»
+/// ради времени жизни набора сервисов.
 class MockGameFilesService final : public IGameFilesService {
 public:
 	explicit MockGameFilesService(std::shared_ptr<MockWorld> world);

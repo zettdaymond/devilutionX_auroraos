@@ -28,45 +28,45 @@ struct IconSet {
 	int count = 0;
 };
 
-/// A call-to-action button for hero panels.
+/// Кнопка действия для hero-панелей.
 struct HeroAction {
 	const char *label = nullptr;
 	bool primary = false;                 // gold gradient vs outlined
 	std::function<void()> onClick;
 };
 
-/// Featured-game hero panel: artwork with a bottom gradient (web-style
-/// "key art" banner), eyebrow label, large title, status line and up to
-/// two CTA buttons. The whole panel is clickable only via its buttons.
+/// Hero-панель главного режима — большая «обложка» игры: арт с нижним
+/// градиентом, надзаголовок, крупное название, строка статуса и до двух
+/// кнопок действий. Панель нажимается только своими кнопками.
 ///
-/// @param uv0/uv1  crop of the artwork to show (normalized)
-/// @param tint     per-game accent mixed over the artwork; its alpha sets
-///                 the mix strength (bg crops ~0.16, dedicated arts ~0.08)
+/// @param uv0/uv1  видимая часть арта (в долях единицы)
+/// @param tint     цветовой оттенок поверх арта; его альфа — сила
+///                 подкраски (обрезки фона ~0.16, свои арты ~0.08)
 void HeroPanel(const char *eyebrow, const char *title, const char *status, const BackgroundArt &art,
     const ImVec2 &uv0, const ImVec2 &uv1, const ImVec4 &tint, const ImVec2 &size,
     std::initializer_list<HeroAction> actions);
 
-/// Compact shelf tile: icon in a tinted chip, title + status, trailing
-/// play/lock indicator. The chip shows the dedicated silhouette artwork
-/// (nearest suitable level) when available, else the FontAwesome glyph.
+/// Компактная плитка полки: иконка в плашке, название и статус, справа —
+/// значок воспроизведения или замка. В плашке — золотой силуэт
+/// (ближайший по размеру уровень), а без него — глиф FontAwesome.
 void GameTile(const char *title, const char *status, const char *icon, const IconSet *icons,
     bool available, const ImVec4 &accent, const ImVec2 &size, const std::function<void()> &onClick);
 
-/// Gold gradient button with dark bold text — the primary action.
+/// Золотая градиентная кнопка с тёмным жирным текстом — главное действие.
 void PrimaryButton(const char *label, const ImVec2 &size, const std::function<void()> &onClick);
 
-/// Outlined button with gold text — the secondary action.
+/// Контурная кнопка с золотым текстом — второстепенное действие.
 void GhostButton(const char *icon, const char *label, const ImVec2 &size,
     const std::function<void()> &onClick);
 
-/// Secondary button with icon (kept for screens/dialogs).
+/// Второстепенная кнопка с иконкой (для экранов и диалогов).
 void IconButton(const char *icon, const char *label, bool accent, const ImVec2 &size,
     const std::function<void()> &onClick);
 
-/// Text with a given role color, centered in the current content width.
+/// Текст цветом роли, по центру текущей ширины контента.
 void CenteredText(const char *text, ColorRole role = ColorRole::TextBody);
 
-/// Status bullet: green check or dim cross + text + wrapped detail.
+/// Маркер статуса: зелёная галка или тусклый крест + текст + пояснение.
 void FileStatusLine(bool present, const char *text, const char *detail);
 
 } // namespace launcher::ui::widgets

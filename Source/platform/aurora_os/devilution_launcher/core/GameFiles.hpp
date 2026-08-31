@@ -6,8 +6,8 @@
 
 namespace launcher {
 
-/// Identifies every MPQ file the launcher knows about.
-/// Order matters: it is used to index arrays in LauncherState.
+/// Перечисляет все MPQ-файлы, о которых знает лаунчер.
+/// Порядок важен: по нему индексируются массивы в LauncherState.
 enum class KnownFile : uint8_t {
 	Diabdat,
 	Hellfire,
@@ -22,9 +22,9 @@ enum class KnownFile : uint8_t {
 
 constexpr size_t kKnownFileCount = static_cast<size_t>(KnownFile::Count);
 
-/// Static description of a known game file: canonical lower-case name,
-/// alternative spellings found in the wild and the expected download size
-/// (only meaningful for downloadable files, 0 otherwise).
+/// Неизменное описание известного файла: каноничное имя в нижнем регистре,
+/// встречающиеся в жизни варианты написания и ожидаемый размер загрузки
+/// (имеет смысл только для скачиваемых файлов, иначе 0).
 struct FileSpec {
 	KnownFile id;
 	std::string_view canonical;
@@ -33,7 +33,7 @@ struct FileSpec {
 	bool downloadable;
 };
 
-/// Catalog of all known files. Keep in sync with KnownFile.
+/// Каталог всех известных файлов. Держать синхронно с KnownFile.
 inline constexpr std::array<FileSpec, kKnownFileCount> kFileCatalog { {
 	{ KnownFile::Diabdat, "diabdat.mpq", "DIABDAT.MPQ (оригинальный Diablo)", 0, false },
 	{ KnownFile::Hellfire, "hellfire.mpq", "hellfire.mpq (дополнение)", 0, false },
@@ -49,12 +49,12 @@ constexpr const FileSpec &FileSpecOf(KnownFile file)
 	return kFileCatalog[static_cast<size_t>(file)];
 }
 
-/// Case-insensitive comparison of a file name against the known aliases.
-/// Only the plain canonical name is accepted — in practice MPQs ship in
-/// lower or upper case, both covered here.
+/// Сравнение имени файла с известными вариантами без учёта регистра.
+/// Принимается только каноничное имя — на практике MPQ встречаются
+/// в нижнем и верхнем регистрах, оба покрыты.
 bool IsKnownFileName(std::string_view fileName, KnownFile file);
 
-/// URL a downloadable file is fetched from (empty when not downloadable).
+/// Откуда скачивается файл (пусто, если файл не скачивается).
 std::string_view DownloadUrl(KnownFile file);
 
 } // namespace launcher

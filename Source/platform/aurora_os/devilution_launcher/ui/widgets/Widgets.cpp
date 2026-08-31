@@ -17,7 +17,7 @@ namespace {
 /// Доля стороны чипа, которую занимает иконка внутри него.
 constexpr float kChipIconFill = 0.74F;
 
-/// Largest font size (<= startSize) at which text fits maxWidth.
+/// Наибольший кегль (<= startSize), при котором текст влезает в ширину.
 float FitFontSize(ImFont *font, float startSize, const char *text, float maxWidth, float minSize)
 {
 	float size = startSize;
@@ -30,8 +30,8 @@ float FitFontSize(ImFont *font, float startSize, const char *text, float maxWidt
 	return std::max(size, minSize);
 }
 
-/// Truncates text with "…" so it fits maxWidth at the given size.
-/// Removes whole UTF-8 code points so Cyrillic glyphs stay intact.
+/// Обрезает текст с «…», чтобы он влезал в ширину.
+/// Удаляет целые кодовые точки UTF-8 — кириллица не режется пополам.
 std::string FitTextEllipsis(ImFont *font, float size, const char *text, float maxWidth)
 {
 	if (font == nullptr || font->CalcTextSizeA(size, FLT_MAX, 0.0F, text).x <= maxWidth) {
@@ -71,7 +71,7 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 	const ImVec2 max = min + size;
 	const float rounding = Scale::Px(0.5F);
 
-	// Reserve layout space; interaction happens through the buttons only.
+	// Занимаем место в раскладке; клики — только по кнопкам.
 	ImGui::Dummy(size);
 
 	// Artwork (aspect-fill of the requested crop). Едва заметное
@@ -90,7 +90,8 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 		draw->AddRectFilled(min, max, Theme::ColorU32(ColorRole::Panel), rounding);
 	}
 
-	// Legibility: full-canvas tint + bottom gradient (transparent → dark).
+// Читаемость: лёгкая цветная подкраска на всю панель плюс нижний
+	// градиент (от прозрачного к тёмному).
 	draw->AddRectFilled(min, max, ImGui::ColorConvertFloat4ToU32(tint), rounding);
 	const ImU32 transparent = IM_COL32(0, 0, 0, 0);
 	const ImU32 dark = ImGui::GetColorU32(ImVec4(0.03F, 0.02F, 0.01F, 0.88F));
@@ -98,7 +99,8 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 	draw->AddRect(min, max, Theme::ColorU32(ColorRole::BorderGold), rounding, 0, Scale::Px(0.08F));
 	CornerAccents(draw, min, max, rounding);
 
-	// Text block, anchored bottom-left and kept clear of the button row.
+// Текстовый блок прижат к левому нижнему углу и не заходит
+	// на ряд кнопок.
 	const float pad = Scale::Px(0.9F);
 	const size_t actionCount = actions.size();
 	const float btnH = Scale::Px(2.4F);
@@ -115,11 +117,11 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 			++statusLines;
 		}
 	}
-	// The text block sits fully ABOVE the button row, so it always spans
-	// the panel width (buttons are anchored to the bottom edge).
+		// Блок текста целиком НАД рядом кнопок, поэтому он всегда
+	// пользуется всей шириной панели (кнопки прижаты к низу).
 	const float textMaxWidth = size.x - pad * 2.0F;
 
-	// Measure the text block first so it never grows into the buttons.
+	// Сначала измеряем блок текста — он не нарастёт на кнопки.
 	const float eyebrowH = Scale::Px(0.95F);
 	const float titleSize = FitFontSize(Theme::Font(FontRole::Heading), Scale::Px(2.7F), title, textMaxWidth,
 	    Scale::Px(1.2F));
@@ -135,9 +137,9 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 	    Theme::ColorU32(ColorRole::TextHeading), title);
 	textY += titleSize + Scale::Px(0.15F);
 	if (status != nullptr) {
-		// Draw status line by line so embedded '\n' breaks stay aligned.
-		// The font first shrinks to fit (dense phone DPI), ellipsis is the
-		// last resort only.
+			// Строки статуса рисуем по одной, чтобы переносы '\n'
+			// выравнивались. Шрифт сначала уменьшается до нужного размера (плотные экраны),
+			// многоточие — последнее средство.
 		const char *lineStart = status;
 		while (lineStart != nullptr && *lineStart != '\0') {
 			const char *lineEnd = std::strchr(lineStart, '\n');
@@ -153,7 +155,7 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 		}
 	}
 
-	// CTA buttons, anchored bottom-right (first action is rightmost).
+		// Кнопки действий прижаты к правому нижнему углу (первая — правее всех).
 	if (actionCount > 0) {
 		float x = max.x - pad - btnW;
 		const float y = max.y - pad - btnH;
@@ -200,8 +202,8 @@ void GameTile(const char *title, const char *status, const char *icon, const Ico
 	}
 	draw->AddRect(min, max, border, rounding, 0, borderThickness);
 
-	// Icon chip with the game accent: dedicated golden silhouette when
-	// bundled (nearest suitable level), FontAwesome glyph otherwise.
+	// Плашка иконки в цвете режима: золотой силуэт из ассетов
+	// (ближайший по размеру уровень), иначе глиф FontAwesome.
 	const float chip = size.y - Scale::Px(1.0F);
 	const ImVec2 chipMin = min + ImVec2(Scale::Px(0.5F), Scale::Px(0.5F));
 	const ImVec2 chipMax = chipMin + ImVec2(chip, chip);
@@ -237,7 +239,7 @@ void GameTile(const char *title, const char *status, const char *icon, const Ico
 		ImGui::PopFont();
 	}
 
-	// Text block.
+	// Текстовый блок.
 	const float textX = chipMax.x + Scale::Px(0.6F);
 	const float textMaxWidth = max.x - textX - Scale::Px(2.0F);
 	const float titleSize = FitFontSize(Theme::Font(FontRole::BodyBold), Scale::Px(1.15F), title, textMaxWidth,
@@ -252,7 +254,7 @@ void GameTile(const char *title, const char *status, const char *icon, const Ico
 	draw->AddText(Theme::Font(FontRole::Body), Scale::Px(0.8F), textPos,
 	    Theme::ColorU32(available ? ColorRole::TextBody : ColorRole::TextDim), statusText.c_str());
 
-	// Trailing play/lock indicator.
+	// Индикатор справа: воспроизведение или замок.
 	const char *badge = available ? icons::Play : icons::Lock;
 	ImGui::PushFont(Theme::Font(FontRole::IconBig));
 	const ImVec2 badgeSize = ImGui::CalcTextSize(badge);
@@ -274,7 +276,7 @@ void PrimaryButton(const char *label, const ImVec2 &size, const std::function<vo
 	const bool held = ImGui::IsItemActive();
 	const float rounding = Scale::Px(0.45F);
 
-	// Drop shadow, then a vertical gold gradient.
+	// Сначала тень, затем вертикальный золотой градиент.
 	draw->AddRectFilled(min + ImVec2(0, Scale::Px(0.15F)), max + ImVec2(0, Scale::Px(0.15F)),
 	    IM_COL32(0, 0, 0, 110), rounding);
 	ImVec4 top = Theme::Color(held ? ColorRole::GoldDim : ColorRole::GoldBright);
@@ -300,7 +302,7 @@ void PrimaryButton(const char *label, const ImVec2 &size, const std::function<vo
 void GhostButton(const char *icon, const char *label, const ImVec2 &size,
     const std::function<void()> &onClick)
 {
-	// Opaque fill so hero artwork doesn't bleed through the label.
+	// Непрозрачная заливка, чтобы арт не просвечивал сквозь надпись.
 	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.055F, 0.035F, 0.025F, 0.94F));
 	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Theme::Color(ColorRole::PanelHover));
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive, Theme::Color(ColorRole::RedPressed));

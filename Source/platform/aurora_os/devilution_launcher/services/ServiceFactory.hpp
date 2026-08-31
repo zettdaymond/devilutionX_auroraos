@@ -10,8 +10,8 @@
 
 namespace launcher {
 
-/// A complete set of service implementations, ready to be wired into
-/// the Store. Built either from real platform services or from mocks.
+/// Полный набор сервисов, готовый для передачи в Store.
+/// Собирается либо из настоящих сервисов платформы, либо из имитаций.
 struct ServiceBundle {
 	std::unique_ptr<IConfigService> config;
 	std::unique_ptr<IGameFilesService> files;
@@ -19,9 +19,9 @@ struct ServiceBundle {
 	std::unique_ptr<IPathProvider> paths;
 };
 
-/// Real implementations. `baseDir` is the SDL preference path obtained
-/// by the caller (Application / desktop main). On Aurora OS the path
-/// provider additionally exposes the platform MPQ locations.
+/// Настоящие реализации. `baseDir` — путь настроек SDL, который
+/// получает вызывающий код (Application или десктопный main).
+/// На Aurora OS поставщик путей дополнительно отдаёт папки MPQ платформы.
 [[nodiscard]] ServiceBundle MakeRealServices(std::filesystem::path baseDir);
 
 } // namespace launcher

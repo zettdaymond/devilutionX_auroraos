@@ -62,7 +62,7 @@ void ConfigService::Save(const LauncherConfig &config)
 	stream.close();
 	std::filesystem::rename(tmp.string() + ".tmp", m_filePath, ec);
 	if (ec) {
-		// Fall back to a plain overwrite when rename is not possible.
+	// Если переименование невозможно — просто перезаписываем файл.
 		std::ofstream direct(m_filePath, std::ios::trunc);
 		direct << table << std::endl;
 	}

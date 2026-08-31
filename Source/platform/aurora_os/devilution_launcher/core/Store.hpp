@@ -13,13 +13,13 @@
 
 namespace launcher {
 
-/// The MVI "reducer": owns LauncherState and translates Intents into
-/// state changes plus side effects through the injected services.
+/// «Редьюсер» из схемы MVI: владеет LauncherState и превращает Intents
+/// в изменения состояния и побочные эффекты через переданные сервисы.
 ///
-/// Threading contract:
-/// - Dispatch() may be called from any thread (it only enqueues);
-/// - Poll() must be called once per frame on the main thread;
-/// - State() must only be read from the main thread.
+/// Правила работы с потоками:
+/// - Dispatch() можно звать из любого потока (он только кладёт в очередь);
+/// - Poll() вызывается раз в кадр на главном потоке;
+/// - State() читается только на главном потоке.
 class Store {
 public:
 	Store(IConfigService &configService,
@@ -27,14 +27,14 @@ public:
 	      IDownloadService &downloadService,
 	      IPathProvider &pathProvider);
 
-	/// Load the config and perform the initial file scan.
+	/// Читает настройки и делает первичный поиск файлов.
 	void Init();
 
-	/// Enqueue an intent. Thread-safe; the intent is applied on the
-	/// next Poll() on the main thread.
+	/// Ставит интент в очередь. Потокобезопасно; применяется при
+	/// следующем Poll() на главном потоке.
 	void Dispatch(Intent intent);
 
-	/// Apply all queued intents. Call once per frame before rendering.
+	/// Применяет все накопленные интенты. Вызывается раз в кадр перед отрисовкой.
 	void Poll();
 
 	[[nodiscard]] const LauncherState &State() const { return m_state; }
@@ -42,8 +42,8 @@ public:
 private:
 	void Reduce(const Intent &intent);
 
-	// One handler per intent type; specialized in Store.cpp for every
-	// intent listed in the Intent variant.
+	// По одному обработчику на тип интента; специализации определены
+	// в Store.cpp для каждого варианта из Intent.
 	template <typename T>
 	void ReduceIntent(const T &intent);
 

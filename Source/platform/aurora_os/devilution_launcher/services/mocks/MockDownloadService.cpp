@@ -11,8 +11,8 @@ namespace {
 
 using namespace std::chrono_literals;
 
-/// Figure out which known file a download destination refers to,
-/// so the mock can update the right MockWorld entry.
+/// Определяет, какому известному файлу соответствует путь загрузки,
+/// чтобы имитация обновила нужную запись в MockWorld.
 KnownFile KnownFileFromDestination(const std::filesystem::path &destination)
 {
 	const std::string name = destination.filename().string();
@@ -25,7 +25,7 @@ KnownFile KnownFileFromDestination(const std::filesystem::path &destination)
 	return KnownFile::Spawn;
 }
 
-/// Sleep in small slices, waking up early on cancel.
+/// Спит короткими порциями, чтобы быстро проснуться при отмене.
 bool SleepCancelAware(std::atomic<bool> &cancelRequested, std::chrono::milliseconds total)
 {
 	const auto slice = 25ms;

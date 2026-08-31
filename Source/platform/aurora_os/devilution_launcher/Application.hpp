@@ -25,15 +25,15 @@ namespace App {
 using launcher::AppResult;
 using launcher::ExitAction;
 
-/// Owns the SDL renderer, the ImGui context and the MVI trio
-/// (Store + LauncherView over a ServiceBundle), and runs the launcher
-/// UI loop until the user starts a game or closes the window.
+/// Владеет рендерером SDL, контекстом ImGui и тройкой MVI
+/// (Store + LauncherView поверх набора сервисов) и крутит цикл
+/// интерфейса, пока пользователь не запустит игру или не закроет окно.
 ///
-/// Two constructors:
-/// - (window, company, app) builds real platform services (used by the
-///   game entry point in Source/main.cpp);
-/// - (window, services) accepts an externally composed bundle, e.g.
-///   mock scenarios on the desktop.
+/// Два конструктора:
+/// - (окно, компания, приложение) собирает настоящие сервисы платформы
+///   (так лаунчер вызывается из входной точки игры в Source/main.cpp);
+/// - (окно, сервисы) принимает уже готовый набор снаружи — например,
+///   сценарии-имитации на десктопе.
 class Application {
 public:
 	Application(SDL_Window *window, const std::string &companyNamespace, const std::string &appName);
@@ -45,17 +45,17 @@ public:
 	Application &operator=(const Application &) = delete;
 	Application &operator=(Application &&) = delete;
 
-	/// Runs the UI loop; returns what to launch.
+/// Запускает цикл интерфейса; результат — какую игру запустить.
 	[[nodiscard]] AppResult Run();
 
-	/// Override the first screen (desktop development aid).
+/// Задать первый экран (утилита для отладки на десктопе).
 	void SetInitialScreen(launcher::Screen screen) { m_initialScreen = screen; }
 
-	/// Open the MPQ folder browser on startup (desktop development aid).
+/// Открыть выбор папки с MPQ сразу при старте (отладка на десктопе).
 	void SetInitialBrowser(bool open) { m_initialBrowser = open; }
 
-	/// Open a dialog on startup (desktop development aid):
-	/// confirm-demo | confirm-ru | hellfire-missing | error.
+/// Открыть диалог сразу при старте (отладка на десктопе):
+/// confirm-demo | confirm-ru | hellfire-missing | error.
 	void SetInitialDialog(launcher::Dialog dialog) { m_initialDialog = dialog; }
 
 	void Stop();
@@ -85,12 +85,12 @@ private:
 	SDL_Texture *m_backgroundTexture { nullptr };
 	ImVec2 m_backgroundSize { 0.0F, 0.0F };
 
-	/// Dedicated hero artworks, indexed by ExitAction (null = bg.png crop).
+	/// Арты hero-панелей режимов; индекс — значение ExitAction (пусто = обрезка общего фона).
 	std::array<SDL_Texture *, 3> m_heroTextures {};
 	std::array<ImVec2, 3> m_heroSizes {};
 
-	/// Golden tile icons as pre-scaled levels (256/128/64), indexed by
-	/// ExitAction then level; count 3 = FA glyph fallback.
+	/// Золотые иконки плиток в виде заранее уменьшенных копий (256/128/64);
+	/// индексы: сначала режим, затем уровень; 0 уровней = глиф FontAwesome.
 	std::array<std::array<SDL_Texture *, 3>, 3> m_iconTextures {};
 	std::array<std::array<ImVec2, 3>, 3> m_iconSizes {};
 	std::array<int, 3> m_iconLevelCounts {};

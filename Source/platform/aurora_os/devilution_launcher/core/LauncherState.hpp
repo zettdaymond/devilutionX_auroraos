@@ -11,15 +11,15 @@
 
 namespace launcher {
 
-/// Top-level screen the launcher shows. Navigation is exclusive —
-/// one screen at a time, plus at most one modal dialog.
+/// Верхний уровень: какой экран показывает лаунчер. Навигация
+/// взаимоисключающая — один экран, плюс не более одного диалога.
 enum class Screen : uint8_t {
 	Home,
 	Data,
 	About,
 };
 
-/// Modal dialog on top of a screen.
+/// Диалог поверх экрана.
 enum class Dialog : uint8_t {
 	None,
 	ConfirmDownloadDemo,
@@ -29,13 +29,13 @@ enum class Dialog : uint8_t {
 	Error,
 };
 
-/// Availability of one launchable game mode.
+/// Доступность одного запускаемого режима игры.
 struct GameCardState {
 	bool available = false;                     // every required file is present
 	std::vector<KnownFile> missingFiles = {};   // what is missing (for the Hellfire warning)
 };
 
-/// State of a single download (demo or Russian voice pack).
+/// Состояние одной загрузки (демо или русская озвучка).
 struct DownloadState {
 	KnownFile file = KnownFile::Spawn;
 	bool active = false;
@@ -46,39 +46,39 @@ struct DownloadState {
 	std::string error;              // non-empty => failed panel in the overlay
 };
 
-/// Single source of truth for the whole launcher UI.
-/// The view is a pure function of this struct; it is mutated
-/// only by Store on the main thread.
+/// Единственный источник истины для всего интерфейса лаунчера.
+/// Интерфейс — чистая функция от этой структуры; меняет её
+/// только Store, и только на главном потоке.
 struct LauncherState {
-	// Navigation
+// Навигация
 	Screen screen = Screen::Home;
 	Dialog dialog = Dialog::None;
 
-	// Detected game files
+// Найденные файлы игры
 	std::filesystem::path dataFolder;                                // user-selected folder (may be empty)
 	std::array<int64_t, kKnownFileCount> fileSizes {};               // -1 = not found
 	std::array<std::filesystem::path, kKnownFileCount> fileFolders {};// where the file was found
 	int64_t freeDiskBytes = 0;
 
-	// Derived availability
+// Вычисленная доступность режимов
 	GameCardState diablo;
 	GameCardState hellfire;
 	GameCardState demo;
 	bool russianVoiceInstalled = false;
 
-	// Download in flight
+// Текущая загрузка
 	std::optional<DownloadState> download;
 
-	// Modal payload
+// Данные для диалога
 	std::vector<KnownFile> hellfireMissing; // for Dialog::HellfireMissingFiles
 	std::string errorText;                  // for Dialog::Error
 
-	// Transient UI state
+// Краткоживущее состояние интерфейса
 	bool fileBrowserOpen = false;
 	bool exitRequested = false;             // window close / SDL_QUIT
 	std::optional<ExitAction> pendingLaunch;// set => the UI loop ends and the game starts
 
-	// Short-lived notification shown at the bottom of the screen
+// Короткое уведомление внизу экрана
 	std::optional<std::string> toast;
 
 	[[nodiscard]] bool HasAnyFiles() const

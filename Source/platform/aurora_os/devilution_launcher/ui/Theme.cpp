@@ -17,7 +17,7 @@ namespace launcher::ui::Theme {
 
 namespace {
 
-// Palette — dark browns, Diablo gold and deep red.
+// Палитра: тёмно-коричневые, золото Diablo и глубокий красный.
 constexpr ImVec4 kColors[] {
 	/* Bg */ ImVec4(0.040F, 0.027F, 0.020F, 1.00F),      // #0A0705
 	/* Panel */ ImVec4(0.102F, 0.059F, 0.039F, 0.92F),  // #1A0F0A
@@ -53,7 +53,7 @@ ImFont *loadFont(const std::string &asset, float pixelSize, const ImWchar *range
 		return nullptr;
 	}
 
-	// ImGui owns the copied buffer after Build.
+// Скопированным буфером владеет ImGui после Build.
 	void *data = IM_ALLOC(file.size());
 	std::memcpy(data, file.begin(), file.size());
 
@@ -63,7 +63,7 @@ ImFont *loadFont(const std::string &asset, float pixelSize, const ImWchar *range
 	return ImGui::GetIO().Fonts->AddFontFromMemoryTTF(data, static_cast<int>(file.size()), pixelSize, &config, ranges);
 }
 
-// FontAwesome 4 glyph range used by the launcher icons.
+// Диапазон глифов FontAwesome 4 для иконок лаунчера.
 const ImWchar *iconRanges()
 {
 	static const ImWchar ranges[] = { 0xF000, 0xF3FF, 0 };
@@ -76,7 +76,7 @@ void Init(float dpiScale)
 {
 	auto &io = ImGui::GetIO();
 
-	// Discard any previously loaded fonts (desktop restart support).
+// Сбрасываем ранее загруженные шрифты (перезапуск на десктопе).
 	io.Fonts->Clear();
 	fonts().clear();
 

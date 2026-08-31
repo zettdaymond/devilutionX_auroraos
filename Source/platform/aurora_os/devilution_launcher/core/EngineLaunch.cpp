@@ -18,8 +18,8 @@ std::vector<std::string> EngineArgsFor(ExitAction action, const std::filesystem:
 		return args;
 	}
 
-	// The shareware demo relies on the engine's own search paths
-	// (spawn.mpq is downloaded into the additional MPQ directory).
+	// Демо-версия рассчитывает на стандартные пути поиска движка
+	// (spawn.mpq скачивается в дополнительную папку MPQ).
 	if (!dataPath.empty()) {
 		args.push_back("--data-dir");
 		args.push_back(dataPath.string());

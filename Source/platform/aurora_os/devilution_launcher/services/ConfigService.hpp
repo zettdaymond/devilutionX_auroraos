@@ -4,8 +4,8 @@
 
 namespace launcher {
 
-/// TOML-backed config (launcher.conf). The file is written atomically:
-/// first to a temporary file next to the target, then renamed over it.
+/// Настройки в TOML (launcher.conf). Файл записывается атомарно:
+/// сначала во временный файл рядом с целевым, затем переименовывается.
 class ConfigService final : public IConfigService {
 public:
 	explicit ConfigService(std::filesystem::path configFilePath);

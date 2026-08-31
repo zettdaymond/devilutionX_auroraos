@@ -7,28 +7,28 @@
 
 namespace launcher {
 
-/// Result of scanning one or more folders for known game files.
-/// sizes[i] is the file size in bytes, or -1 when the file was not found.
+/// Результат поиска известных файлов игры в одной или нескольких папках:
+/// sizes[i] — размер файла в байтах или -1, если файл не найден.
 struct FileScanResult {
 	std::array<int64_t, kKnownFileCount> sizes {};
 	std::array<std::filesystem::path, kKnownFileCount> folders {}; // folder the file was found in
 };
 
-/// File system access for game data. All methods are synchronous and
-/// safe to call on the main thread (folders are small).
+/// Доступ к файловой системе для данных игры. Все методы синхронные,
+/// их можно звать на главном потоке (папки маленькие).
 class IGameFilesService {
 public:
 	virtual ~IGameFilesService() = default;
 
-	/// Scan folders in order; the first hit per file wins.
-	/// Comparison of file names is case-insensitive.
+	/// Сканирует папки по порядку; побеждает первое найденное место.
+	/// Имена файлов сравниваются без учёта регистра.
 	[[nodiscard]] virtual FileScanResult Scan(const std::vector<std::filesystem::path> &folders) = 0;
 
-	/// Free space on the filesystem the path lives on, in bytes.
+	/// Свободное место на разделе, где лежит путь, в байтах.
 	[[nodiscard]] virtual int64_t FreeSpace(const std::filesystem::path &dir) = 0;
 
-	/// Remove a known file from dir. Returns true when the file existed
-	/// and was removed.
+	/// Удаляет известный файл из папки. true, если файл существовал
+/// и файл удалён; false, если файла не было.
 	virtual bool RemoveFile(const std::filesystem::path &dir, KnownFile file) = 0;
 };
 
