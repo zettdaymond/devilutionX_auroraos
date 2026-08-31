@@ -4,9 +4,18 @@
 Файлы кладём сюда: `hero_diablo.png`, `hero_hellfire.png`, `hero_demo.png`
 (1216×832 для SDXL или 1568×1056 для GLM-Image / CogView-4; PNG, тёмный низ под текст).
 
-После появления файлов нужно подключить инфраструктуру per-mode артов:
-`GameStyle` (ui/screens/Screens.cpp) получает собственный `BackgroundArt`,
-`Application` загружает `assets/hero_*.png` с фолбэком на кроп `bg.png`, если файла нет.
+**Сгенерировано 2026-08-31** через A1111 REST API (`--api`, http://127.0.0.1:7860;
+запросы шли мимо прокси — `ProxyHandler({})` в urllib / `--noproxy "*"` в curl):
+
+| Файл | Сид | Примечание |
+|---|---|---|
+| `hero_diablo.png` | 1307 | Тристрам, 8/10 по ревью |
+| `hero_hellfire.png` | 2607 | сигил над монастырём, 7.5–8/10 |
+| `hero_demo.png` | 5111 | склеп с факелом, 8/10, чистая (сид 3904 брак — псевдо-подпись в углу) |
+
+Инфраструктура подключена: `ArtSet` (ui/screens/Screens.hpp) несёт per-mode
+текстуры, `Application` грузит `assets/hero_*.png` с фолбэком на кроп `bg.png`.
+Перегенерация: замените PNG и пересоберите — файлы вшиты через CMakeRC.
 
 ## Diablo (главный)
 

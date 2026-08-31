@@ -17,11 +17,39 @@
 
 #include <chrono>
 #include <filesystem>
+#include <iterator>
 #include <utility>
 
 CMRC_DECLARE(assets);
 
 namespace App {
+
+namespace {
+
+/// Decodes an embedded PNG into an SDL texture. Returns nullptr (and logs)
+/// when the asset is not bundled or fails to decode — callers fall back.
+SDL_Texture *LoadAssetTexture(SDL_Renderer *renderer, const char *path, ImVec2 &outSize)
+{
+	try {
+		auto file = cmrc::assets::get_filesystem().open(path);
+		SDL_RWops *rw = SDL_RWFromMem(const_cast<void *>(static_cast<const void *>(file.begin())),
+		    static_cast<int>(file.size()));
+		SDL_Surface *surface = IMG_Load_RW(rw, 1);
+		if (surface == nullptr) {
+			spdlog::warn("IMG_Load_RW({}) failed: {}", path, IMG_GetError());
+			return nullptr;
+		}
+		SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+		outSize = ImVec2(static_cast<float>(surface->w), static_cast<float>(surface->h));
+		SDL_FreeSurface(surface);
+		return texture;
+	} catch (const std::system_error &err) {
+		spdlog::info("{} not bundled ({}), using fallback", path, err.what());
+		return nullptr;
+	}
+}
+
+} // namespace
 
 Application::Application(SDL_Window *window, const std::string &companyNamespace, const std::string &appName)
     : m_window(window)
@@ -47,6 +75,11 @@ Application::~Application()
 
 	if (m_backgroundTexture != nullptr) {
 		SDL_DestroyTexture(m_backgroundTexture);
+	}
+	for (SDL_Texture *texture : m_heroTextures) {
+		if (texture != nullptr) {
+			SDL_DestroyTexture(texture);
+		}
 	}
 	if (m_renderer != nullptr) {
 		SDL_DestroyRenderer(m_renderer);
@@ -76,21 +109,22 @@ bool Application::setup()
 	ImGui_ImplSDL2_InitForSDLRenderer(m_window, m_renderer);
 	ImGui_ImplSDLRenderer2_Init(m_renderer);
 
-	// Background artwork from the embedded assets.
-	try {
-		auto file = cmrc::assets::get_filesystem().open("assets/bg.png");
-		SDL_RWops *rw = SDL_RWFromMem(const_cast<void *>(static_cast<const void *>(file.begin())),
-		    static_cast<int>(file.size()));
-		SDL_Surface *surface = IMG_Load_RW(rw, 1);
-		if (surface != nullptr) {
-			m_backgroundTexture = SDL_CreateTextureFromSurface(m_renderer, surface);
-			m_backgroundSize = ImVec2(static_cast<float>(surface->w), static_cast<float>(surface->h));
-			SDL_FreeSurface(surface);
-		} else {
-			spdlog::warn("IMG_Load_RW(bg.png) failed: {}", IMG_GetError());
-		}
-	} catch (const std::system_error &err) {
-		spdlog::warn("bg.png asset missing: {}", err.what());
+	// Artwork from the embedded assets: the shared background and the
+	// optional per-mode hero panels (absent files fall back to bg crops).
+	m_backgroundTexture = LoadAssetTexture(m_renderer, "assets/bg.png", m_backgroundSize);
+	struct HeroAsset {
+		ExitAction mode;
+		const char *path;
+	};
+	for (const HeroAsset &hero : std::initializer_list<HeroAsset> {
+	         { ExitAction::LaunchDiablo, "assets/hero_diablo.png" },
+	         { ExitAction::LaunchHellfire, "assets/hero_hellfire.png" },
+	         { ExitAction::LaunchDemo, "assets/hero_demo.png" },
+	     }) {
+		ImVec2 size;
+		const size_t idx = static_cast<size_t>(hero.mode);
+		m_heroTextures[idx] = LoadAssetTexture(m_renderer, hero.path, size);
+		m_heroSizes[idx] = size;
 	}
 
 	return true;
@@ -135,6 +169,11 @@ AppResult Application::run()
 	m_view = std::make_unique<launcher::ui::LauncherView>(DPIHandler::get_scale());
 	if (m_backgroundTexture != nullptr) {
 		m_view->SetBackgroundTexture(m_backgroundTexture, m_backgroundSize);
+	}
+	for (size_t i = 0; i < std::size(m_heroTextures); ++i) {
+		if (m_heroTextures[i] != nullptr) {
+			m_view->SetHeroTexture(static_cast<launcher::ExitAction>(i), m_heroTextures[i], m_heroSizes[i]);
+		}
 	}
 
 	m_store->init();

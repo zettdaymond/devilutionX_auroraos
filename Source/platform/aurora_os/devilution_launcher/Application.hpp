@@ -7,6 +7,7 @@
 #include "core/LauncherState.hpp"
 #include "services/ServiceFactory.hpp"
 
+#include <array>
 #include <memory>
 #include <optional>
 #include <string>
@@ -80,6 +81,10 @@ private:
 
 	SDL_Texture *m_backgroundTexture { nullptr };
 	ImVec2 m_backgroundSize { 0.0F, 0.0F };
+
+	/// Dedicated hero artworks, indexed by ExitAction (null = bg.png crop).
+	std::array<SDL_Texture *, 3> m_heroTextures {};
+	std::array<ImVec2, 3> m_heroSizes {};
 
 	bool m_running { true };
 	std::optional<launcher::Screen> m_initialScreen;

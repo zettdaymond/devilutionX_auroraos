@@ -14,6 +14,8 @@ const std::vector<std::string> kPresets {
 	"empty",
 	"diablo-found",
 	"hellfire-partial",
+	"hellfire-files-only",
+	"demo-installed",
 	"full",
 };
 
@@ -86,6 +88,14 @@ bool MockWorld::applyPreset(const std::string &name)
 		m_files[static_cast<size_t>(KnownFile::Diabdat)] = kFakeOriginalSize;
 		m_files[static_cast<size_t>(KnownFile::Hellfire)] = kFakeOriginalSize;
 		m_files[static_cast<size_t>(KnownFile::HfMonk)] = kFakeOriginalSize;
+	} else if (name == "hellfire-files-only") {
+		// All four Hellfire MPQs without DIABDAT: nothing is playable, the
+		// hero falls back to the "files required" state.
+		for (const KnownFile file : { KnownFile::Hellfire, KnownFile::HfMonk, KnownFile::HfMusic, KnownFile::HfVoice }) {
+			m_files[static_cast<size_t>(file)] = kFakeOriginalSize;
+		}
+	} else if (name == "demo-installed") {
+		m_files[static_cast<size_t>(KnownFile::Spawn)] = FileSpecOf(KnownFile::Spawn).expectedSizeBytes;
 	} else if (name == "full") {
 		for (size_t i = 0; i < kKnownFileCount; ++i) {
 			const FileSpec &spec = kFileCatalog[i];

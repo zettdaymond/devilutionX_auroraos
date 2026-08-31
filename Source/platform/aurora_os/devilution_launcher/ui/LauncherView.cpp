@@ -54,6 +54,11 @@ void LauncherView::SetBackgroundTexture(void *texture, ImVec2 size)
 	m_backgroundTextureSize = size;
 }
 
+void LauncherView::SetHeroTexture(ExitAction mode, void *texture, ImVec2 size)
+{
+	m_heroArts[static_cast<size_t>(mode)] = widgets::BackgroundArt { texture, size };
+}
+
 void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch)
 {
 	Scale::beginFrame(m_dpiScale);
@@ -251,7 +256,12 @@ void LauncherView::RenderNavBar(const LauncherState &state, const Dispatcher &di
 
 void LauncherView::RenderScreen(const LauncherState &state, const Dispatcher &dispatch)
 {
-	const widgets::BackgroundArt art { m_backgroundTexture, m_backgroundTextureSize };
+	const screens::ArtSet art {
+		{ m_backgroundTexture, m_backgroundTextureSize },
+		m_heroArts[static_cast<size_t>(ExitAction::LaunchDiablo)],
+		m_heroArts[static_cast<size_t>(ExitAction::LaunchHellfire)],
+		m_heroArts[static_cast<size_t>(ExitAction::LaunchDemo)],
+	};
 	switch (state.screen) {
 	case Screen::Home:
 		screens::Home(state, dispatch, art);

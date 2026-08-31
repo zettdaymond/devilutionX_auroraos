@@ -21,16 +21,37 @@ namespace launcher::ui::screens {
 
 namespace {
 
-/// Per-mode visual identity: accent color and artwork crop (uv).
+/// Per-mode visual identity: accent color (alpha = hero tint strength)
+/// and the fallback artwork crop used when no dedicated art is bundled.
 struct GameStyle {
 	ImVec4 accent;
 	ImVec2 uv0;
 	ImVec2 uv1;
 };
 
-const GameStyle kDiabloStyle { ImVec4(0.545F, 0.10F, 0.06F, 1.0F), ImVec2(0.04F, 0.04F), ImVec2(0.72F, 0.86F) };
-const GameStyle kHellfireStyle { ImVec4(0.70F, 0.39F, 0.10F, 1.0F), ImVec2(0.30F, 0.0F), ImVec2(1.0F, 0.80F) };
-const GameStyle kDemoStyle { ImVec4(0.42F, 0.36F, 0.20F, 1.0F), ImVec2(0.14F, 0.20F), ImVec2(0.86F, 0.95F) };
+const GameStyle kDiabloStyle { ImVec4(0.545F, 0.10F, 0.06F, 0.16F), ImVec2(0.04F, 0.04F), ImVec2(0.72F, 0.86F) };
+const GameStyle kHellfireStyle { ImVec4(0.70F, 0.39F, 0.10F, 0.16F), ImVec2(0.30F, 0.0F), ImVec2(1.0F, 0.80F) };
+const GameStyle kDemoStyle { ImVec4(0.42F, 0.36F, 0.20F, 0.16F), ImVec2(0.14F, 0.20F), ImVec2(0.86F, 0.95F) };
+
+/// What a hero panel draws: artwork plus the crop and tint to apply.
+struct HeroArtRef {
+	const BackgroundArt *art;
+	ImVec2 uv0;
+	ImVec2 uv1;
+	ImVec4 tint;
+};
+
+/// Prefers the dedicated per-mode artwork (composed with its own palette,
+/// so only a whisper of tint is needed); crops the shared background as
+/// a fallback when the file is not bundled.
+HeroArtRef ResolveHeroArt(const ArtSet &arts, const BackgroundArt &modeArt, const GameStyle &style)
+{
+	if (modeArt.texture != nullptr && modeArt.size.x > 0.0F && modeArt.size.y > 0.0F) {
+		return { &modeArt, ImVec2(0.0F, 0.0F), ImVec2(1.0F, 1.0F),
+			ImVec4(style.accent.x, style.accent.y, style.accent.z, 0.08F) };
+	}
+	return { &arts.background, style.uv0, style.uv1, style.accent };
+}
 
 std::string PluralFiles(size_t count)
 {
@@ -47,15 +68,16 @@ std::string PluralFiles(size_t count)
 // First run: no game files at all.
 // ---------------------------------------------------------------------------
 
-void RenderFirstRun(const LauncherState &state, const Dispatcher &dispatch, const BackgroundArt &art)
+void RenderFirstRun(const LauncherState &state, const Dispatcher &dispatch, const ArtSet &art)
 {
 	const float width = ImGui::GetContentRegionAvail().x;
 	const float height = ImGui::GetContentRegionAvail().y;
 	const float heroHeight = std::min(height * 0.62F, Scale::px(17.0F));
 
+	const HeroArtRef hero = ResolveHeroArt(art, art.diablo, kDiabloStyle);
 	widgets::HeroPanel("DEVILUTIONX ДЛЯ AURORA OS", "DIABLO",
 	    "Файлы оригинальной игры не найдены.\nСкопируйте DIABDAT.MPQ с диска или купите на GoG,\nлибо скачайте бесплатное демо.",
-	    art, kDiabloStyle.uv0, kDiabloStyle.uv1, kDiabloStyle.accent, ImVec2(width, heroHeight),
+	    *hero.art, hero.uv0, hero.uv1, hero.tint, ImVec2(width, heroHeight),
 	    {
 	        widgets::HeroAction { "Скачать демо", true, [&dispatch] {
 		                             dispatch(intent::UiOpenDialog { Dialog::ConfirmDownloadDemo });
@@ -94,7 +116,7 @@ struct ShelfItem {
 	const GameStyle *style;
 };
 
-void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, const BackgroundArt &art)
+void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, const ArtSet &art)
 {
 	const float width = ImGui::GetContentRegionAvail().x;
 	const float height = ImGui::GetContentRegionAvail().y;
@@ -134,8 +156,12 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 	const bool demoFeatured = (featured.game == ExitAction::LaunchDemo && featured.playable);
 
 	const float heroHeight = portrait ? std::min(height * 0.52F, Scale::px(14.0F)) : Scale::px(11.0F);
-	widgets::HeroPanel(featured.eyebrow, featured.title, featured.status.c_str(), art, featured.style->uv0,
-	    featured.style->uv1, featured.style->accent, ImVec2(width, heroHeight),
+	const BackgroundArt &featuredArt = featured.game == ExitAction::LaunchDiablo ? art.diablo
+	    : featured.game == ExitAction::LaunchHellfire                     ? art.hellfire
+	                                                                     : art.demo;
+	const HeroArtRef hero = ResolveHeroArt(art, featuredArt, *featured.style);
+	widgets::HeroPanel(featured.eyebrow, featured.title, featured.status.c_str(), *hero.art, hero.uv0, hero.uv1,
+	    hero.tint, ImVec2(width, heroHeight),
 	    {
 	        widgets::HeroAction { featured.playable ? "Играть" : "Выбрать папку", true, [&dispatch, featured] {
 		                             if (featured.playable) {
@@ -221,7 +247,7 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 
 } // namespace
 
-void Home(const LauncherState &state, const Dispatcher &dispatch, const BackgroundArt &art)
+void Home(const LauncherState &state, const Dispatcher &dispatch, const ArtSet &art)
 {
 	if (!state.hasAnyFiles()) {
 		RenderFirstRun(state, dispatch, art);

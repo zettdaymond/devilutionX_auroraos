@@ -88,8 +88,7 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 	}
 
 	// Legibility: full-canvas tint + bottom gradient (transparent → dark).
-	draw->AddRectFilled(min, max, ImGui::ColorConvertFloat4ToU32(ImVec4(tint.x, tint.y, tint.z, 0.16F)),
-	    rounding);
+	draw->AddRectFilled(min, max, ImGui::ColorConvertFloat4ToU32(tint), rounding);
 	const ImU32 transparent = IM_COL32(0, 0, 0, 0);
 	const ImU32 dark = ImGui::GetColorU32(ImVec4(0.03F, 0.02F, 0.01F, 0.88F));
 	draw->AddRectFilledMultiColor(min, max, transparent, transparent, dark, dark);

@@ -31,7 +31,8 @@ struct HeroAction {
 /// two CTA buttons. The whole panel is clickable only via its buttons.
 ///
 /// @param uv0/uv1  crop of the artwork to show (normalized)
-/// @param tint     per-game accent mixed over the artwork
+/// @param tint     per-game accent mixed over the artwork; its alpha sets
+///                 the mix strength (bg crops ~0.16, dedicated arts ~0.08)
 void HeroPanel(const char *eyebrow, const char *title, const char *status, const BackgroundArt &art,
     const ImVec2 &uv0, const ImVec2 &uv1, const ImVec4 &tint, const ImVec2 &size,
     std::initializer_list<HeroAction> actions);

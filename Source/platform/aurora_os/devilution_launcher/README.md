@@ -94,6 +94,8 @@ devilution_launcher [--mock-scenario=<имя>] [--screen=home|data|about] [--win
 | `fail-download` | файлов нет, обрыв на 50 % | панель ошибки, «Повторить» |
 | `diablo-found` | есть DIABDAT.MPQ | карточка DIABLO активна, предложение ru.mpq |
 | `hellfire-partial` | DIABDAT + 2 из 4 файлов Hellfire | диалог недостающих файлов |
+| `hellfire-files-only` | 4 файла Hellfire без DIABDAT | hero-панель HELLFIRE «Требуются файлы» |
+| `demo-installed` | только spawn.mpq | hero-панель DEMO с играбельной демо-версией |
 | `full` | все файлы | чек-лист, удаление скачанного, свободное место |
 
 `--screen=` открывает приложение сразу на нужном экране (удобно для

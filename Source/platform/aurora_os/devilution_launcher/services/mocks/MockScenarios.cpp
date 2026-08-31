@@ -26,6 +26,8 @@ const std::vector<ScenarioDef> &scenarioDefs()
 		{ "fail-download", MockDownloadBehavior::FailAtHalf, nullptr },
 		{ "diablo-found", MockDownloadBehavior::InstantSuccess, "diablo-found" },
 		{ "hellfire-partial", MockDownloadBehavior::InstantSuccess, "hellfire-partial" },
+		{ "hellfire-files-only", MockDownloadBehavior::InstantSuccess, "hellfire-files-only" },
+		{ "demo-installed", MockDownloadBehavior::InstantSuccess, "demo-installed" },
 		{ "full", MockDownloadBehavior::InstantSuccess, "full" },
 	};
 	return defs;
