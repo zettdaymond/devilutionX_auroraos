@@ -66,11 +66,13 @@ void IconButton(const char *icon, const char *label, bool accent, const ImVec2 &
 /// Текст цветом роли, по центру текущей ширины контента.
 void CenteredText(const char *text, ColorRole role = ColorRole::TextBody);
 
-/// Маркер статуса файла: галка/крест, имя и статус (размер либо
-/// «не найден»). Для найденного файла вторыми строками идут путь
-/// (обрезанный посередине многоточием до ширины колонки) и пометка
-/// «скачан лаунчером».
-void FileStatusLine(bool present, const char *name, const char *status, const char *path, bool downloaded);
+/// Строка файла в чек-листе. Первая строка: маркер, имя, справа размер
+/// (или «можно скачать»/«не найден») и действие — корзинка для
+/// скачанного, кнопка «Скачать» для отсутствующего скачиваемого.
+/// Ниже — путь целиком на всю ширину (перенос только по разделителям
+/// «/» и «\\») и пометка «скачан».
+void FileRow(bool present, const char *name, const char *status, const char *path,
+    const std::function<void()> &onDownload, const std::function<void()> &onDelete);
 
 /// Шапка второстепенного экрана: кнопка «←» слева (возврат на главный),
 /// заголовок, золотой разделитель снизу.

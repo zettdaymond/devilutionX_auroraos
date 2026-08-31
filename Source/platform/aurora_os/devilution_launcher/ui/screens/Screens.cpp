@@ -299,17 +299,13 @@ struct FileGroup {
 	std::vector<KnownFile> files;
 };
 
-/// Рисует одну группу чек-листа: заголовок со сводкой и таблицу файлов.
-void RenderFileGroup(const LauncherState &state, const Dispatcher &dispatch, const FileGroup &group, int groupIndex)
+/// Рисует одну группу чек-листа: заголовок со сводкой и строки файлов.
+void RenderFileGroup(const LauncherState &state, const Dispatcher &dispatch, const FileGroup &group)
 {
 	size_t missing = 0;
-	bool anyDeletable = false;
 	for (KnownFile file : group.files) {
-		const size_t idx = static_cast<size_t>(file);
-		if (state.fileSizes[idx] < 0) {
+		if (state.fileSizes[static_cast<size_t>(file)] < 0) {
 			++missing;
-		} else if (kFileCatalog[idx].downloadable) {
-			anyDeletable = true;
 		}
 	}
 
@@ -322,38 +318,21 @@ void RenderFileGroup(const LauncherState &state, const Dispatcher &dispatch, con
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(missing == 0 ? ColorRole::Success : ColorRole::TextDim));
 	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + Scale::Px(0.15F));
 	if (strcmp(group.title, "Прочее") == 0) {
-		ImGui::TextUnformatted("— не обязательны для запуска");
+		ImGui::TextWrapped("— не обязательны для запуска · свободно %s", FormatBytes(state.freeDiskBytes).c_str());
 	} else if (missing == 0) {
 		ImGui::TextUnformatted("— всё на месте");
+	} else if (group.files.size() == 1) {
+		ImGui::TextUnformatted("— файл не найден");
 	} else {
-		ImGui::Text("— не хватает %zu из %zu", missing, group.files.size());
+		ImGui::TextWrapped("— не хватает %zu из %zu", missing, group.files.size());
 	}
 	ImGui::PopStyleColor();
 	ImGui::PopFont();
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.2F)));
 
-	// Колонка действий добавляется только когда есть хотя бы одна кнопка:
-	// иначе на устройстве она съедала ~140px справа, и список выглядел
-	// смещённым влево.
-	const int columnCount = anyDeletable ? 4 : 3;
-	const std::string tableName = "files_" + std::to_string(groupIndex);
-	// FixedFit: колонка имени сжимается ровно под самое длинное имя файла,
-	// а всё свободное место достаётся размеру и пути.
-	if (!ImGui::BeginTable(tableName.c_str(), columnCount, ImGuiTableFlags_SizingFixedFit)) {
-		return;
-	}
-	ImGui::TableSetupColumn("status", ImGuiTableColumnFlags_WidthFixed, Scale::Px(1.6F));
-	ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthFixed);
-	ImGui::TableSetupColumn("detail", ImGuiTableColumnFlags_WidthStretch);
-	if (anyDeletable) {
-		ImGui::TableSetupColumn("actions", ImGuiTableColumnFlags_WidthFixed, Scale::Px(2.0F));
-	}
-
 	for (KnownFile id : group.files) {
 		const size_t i = static_cast<size_t>(id);
 		const FileSpec &spec = kFileCatalog[i];
-		ImGui::TableNextRow();
-
 		const bool present = state.fileSizes[i] >= 0;
 		std::string status;
 		std::string path;
@@ -363,22 +342,21 @@ void RenderFileGroup(const LauncherState &state, const Dispatcher &dispatch, con
 		} else {
 			status = spec.downloadable ? "можно скачать" : "не найден";
 		}
-		widgets::FileStatusLine(present, spec.displayName.data(), status.c_str(),
-		    path.empty() ? nullptr : path.c_str(), present && spec.downloadable);
 
-		if (anyDeletable) {
-			ImGui::TableNextColumn();
-			if (present && spec.downloadable) {
-				Theme::PushButtonStyle(false);
-				const std::string label = std::string(icons::Trash) + "##del" + std::to_string(i);
-				if (ImGui::SmallButton(label.c_str())) {
-					dispatch(intent::DeleteDownloadedFile { id });
-				}
-				Theme::PopButtonStyle();
-			}
+		std::function<void()> onDownload;
+		if (!present && spec.downloadable) {
+			const Dialog dialog
+			    = (id == KnownFile::Spawn) ? Dialog::ConfirmDownloadDemo : Dialog::ConfirmDownloadRu;
+			onDownload = [&dispatch, dialog] { dispatch(intent::UiOpenDialog { dialog }); };
 		}
+		std::function<void()> onDelete;
+		if (present && spec.downloadable) {
+			onDelete = [&dispatch, id] { dispatch(intent::DeleteDownloadedFile { id }); };
+		}
+
+		widgets::FileRow(present, spec.displayName.data(), status.c_str(),
+		    path.empty() ? nullptr : path.c_str(), onDownload, onDelete);
 	}
-	ImGui::EndTable();
 }
 
 /// Чек-лист файлов по группам режимов: пользователь сразу видит, что для
@@ -390,8 +368,8 @@ void RenderChecklist(const LauncherState &state, const Dispatcher &dispatch)
 		{ "Hellfire", { KnownFile::Hellfire, KnownFile::HfMonk, KnownFile::HfMusic, KnownFile::HfVoice } },
 		{ "Прочее", { KnownFile::Spawn, KnownFile::RuVoice } },
 	};
-	for (int i = 0; i < 3; ++i) {
-		RenderFileGroup(state, dispatch, groups[i], i);
+	for (const FileGroup &group : groups) {
+		RenderFileGroup(state, dispatch, group);
 	}
 }
 
@@ -429,10 +407,6 @@ void Data(const LauncherState &state, const Dispatcher &dispatch)
 	ImGui::PopFont();
 	RenderChecklist(state, dispatch);
 
-	ImGui::Dummy(ImVec2(0, Scale::Px(0.6F)));
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
-	ImGui::Text("%s Свободно: %s", icons::Hdd, FormatBytes(state.freeDiskBytes).c_str());
-	ImGui::PopStyleColor();
 }
 
 void About(const LauncherState &, const Dispatcher &dispatch)

@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstring>
 #include <string>
+#include <vector>
 
 namespace launcher::ui::widgets {
 
@@ -338,100 +339,123 @@ void CenteredText(const char *text, ColorRole role)
 	ImGui::PopStyleColor();
 }
 
-/// Обрезает текст посередине: голова + «…» + хвост. Для пути важны
-/// начало (корень/диск) и конец (имя файла) — жертвуем серединой,
-/// а не краями, и никогда не рвём строку посреди слова.
-std::string MiddleEllipsis(ImFont *font, float size, const std::string &text, float maxWidth)
+/// Разбивает путь на строки по разделителям «/» и «\»: перенос никогда
+/// не рвёт имя каталога посередине, путь виден целиком.
+std::vector<std::string> WrapPathAtSlashes(ImFont *font, float size, const std::string &path, float maxWidth)
 {
-	if (font == nullptr || maxWidth <= font->CalcTextSizeA(size, FLT_MAX, 0.0F, "...").x) {
-		return text;
-	}
-	if (font->CalcTextSizeA(size, FLT_MAX, 0.0F, text.c_str()).x <= maxWidth) {
-		return text;
-	}
-	auto popBackCodePoint = [](std::string &s) {
-		s.pop_back();
-		while (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xC0) == 0x80) {
-			s.pop_back();
+	std::vector<std::string> parts;
+	std::string current;
+	for (char c : path) {
+		current += c;
+		if ((c == '/' || c == '\\') && current.size() > 1) {
+			parts.push_back(current);
+			current.clear();
 		}
-	};
-	auto popFrontCodePoint = [](std::string &s) {
-		const auto *begin = reinterpret_cast<const unsigned char *>(s.data());
-		size_t len = 1;
-		while (len < s.size() && (begin[len] & 0xC0) == 0x80) {
-			++len;
-		}
-		s.erase(0, len);
-	};
+	}
+	if (!current.empty()) {
+		parts.push_back(current);
+	}
 
-	// Делим примерно пополам по код-точкам: хвост чуть длиннее — имя
-	// файла в конце пути обычно важнее корня.
-	std::string head = text;
-	std::string tail;
-	size_t codePoints = 0;
-	for (auto it = head.begin(); it != head.end();) {
-		size_t len = 1;
-		while (it + len != head.end() && (static_cast<unsigned char>(it[len]) & 0xC0) == 0x80) {
-			++len;
+	std::vector<std::string> lines;
+	std::string line;
+	auto lineWidth = [&](const std::string &s) {
+		return font != nullptr ? font->CalcTextSizeA(size, FLT_MAX, 0.0F, s.c_str()).x : 0.0F;
+	};
+	for (const std::string &part : parts) {
+		if (!line.empty() && lineWidth(line + part) > maxWidth) {
+			lines.push_back(line);
+			line.clear();
 		}
-		++codePoints;
-		it += len;
-	}
-	size_t kept = 0;
-	std::string::iterator split = head.begin();
-	while (kept < codePoints * 2 / 5) {
-		size_t len = 1;
-		while (split + len != head.end() && (static_cast<unsigned char>(split[len]) & 0xC0) == 0x80) {
-			++len;
-		}
-		++kept;
-		split += len;
-	}
-	tail = std::string(split, head.end());
-	head.erase(split, head.end());
-
-	while (!head.empty() || !tail.empty()) {
-		const std::string candidate = head + "..." + tail;
-		if (font->CalcTextSizeA(size, FLT_MAX, 0.0F, candidate.c_str()).x <= maxWidth) {
-			return candidate;
-		}
-		if (head.size() >= tail.size() && !head.empty()) {
-			popBackCodePoint(head);
-		} else if (!tail.empty()) {
-			popFrontCodePoint(tail);
+		line += part;
+		if (lineWidth(line) > maxWidth) {
+			lines.push_back(line); // даже один сегмент шире строки — оставляем его целиком
+			line.clear();
 		}
 	}
-	return "...";
+	if (!line.empty()) {
+		lines.push_back(line);
+	}
+	return lines;
 }
 
-void FileStatusLine(bool present, const char *name, const char *status, const char *path, bool downloaded)
+void FileRow(bool present, const char *name, const char *status, const char *path,
+    const std::function<void()> &onDownload, const std::function<void()> &onDelete)
 {
-	ImGui::TableNextColumn();
+	const float startX = ImGui::GetCursorPosX();
+	const float rowWidth = ImGui::GetContentRegionAvail().x;
+	const float buttonSize = Scale::Px(2.2F);
+	const float gap = Scale::Px(0.5F);
+	const float rightEdge = startX + rowWidth;
+
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(present ? ColorRole::Success : ColorRole::TextDim));
 	ImGui::TextUnformatted(present ? icons::Check : icons::Times);
 	ImGui::PopStyleColor();
 
-	ImGui::TableNextColumn();
-	if (!present) {
-		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
-	}
+	ImGui::SameLine();
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(present ? ColorRole::TextBody : ColorRole::TextDim));
 	ImGui::TextUnformatted(name);
-	if (!present) {
+	ImGui::PopStyleColor();
+
+	float actionWidth = 0.0F;
+	if (onDelete) {
+		actionWidth = buttonSize;
+	} else if (onDownload) {
+		actionWidth = ImGui::CalcTextSize("Скачать").x + Scale::Px(1.2F);
+	}
+
+	// Статус справа: у отсутствующего скачиваемого файла кнопка «Скачать»
+	// сама говорит всё — статус не дублируем. Если статус не влезает до
+	// действия, уводим его строкой ниже (с отступом, как путь), а не
+	// печатаем поверх имени.
+	const ImVec2 statusSize = ImGui::CalcTextSize(status);
+	const float nameWidth = ImGui::CalcTextSize(present ? icons::Check : icons::Times).x
+	    + ImGui::GetStyle().ItemSpacing.x + ImGui::CalcTextSize(name).x;
+	const float statusX = rightEdge - actionWidth - (actionWidth > 0.0F ? gap : 0.0F) - statusSize.x;
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
+	if (!onDownload && startX + nameWidth + gap <= statusX) {
+		ImGui::SameLine(statusX);
+		ImGui::TextUnformatted(status);
+		ImGui::PopStyleColor();
+	} else if (!onDownload) {
+		ImGui::PopStyleColor();
+		ImGui::SetCursorPosX(startX + Scale::Px(1.6F));
+		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
+		ImGui::TextUnformatted(status);
+		ImGui::PopStyleColor();
+	} else {
 		ImGui::PopStyleColor();
 	}
 
-	ImGui::TableNextColumn();
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
-	ImGui::TextUnformatted(status);
+	if (onDelete || onDownload) {
+		ImGui::SameLine(rightEdge - actionWidth);
+		Theme::PushButtonStyle(false);
+		if (onDelete) {
+			if (ImGui::Button(icons::Trash, ImVec2(buttonSize, buttonSize))) {
+				onDelete();
+			}
+		} else {
+			if (ImGui::Button("Скачать", ImVec2(actionWidth, buttonSize))) {
+				onDownload();
+			}
+		}
+		Theme::PopButtonStyle();
+	}
+
 	if (present && path != nullptr && path[0] != '\0') {
-		const std::string fitted = MiddleEllipsis(ImGui::GetFont(), ImGui::GetFontSize(), path,
-		    ImGui::GetContentRegionAvail().x);
-		ImGui::TextUnformatted(fitted.c_str());
-		if (downloaded) {
+		const float indent = Scale::Px(1.6F);
+		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
+		for (const std::string &line : WrapPathAtSlashes(ImGui::GetFont(), ImGui::GetFontSize(), path,
+		     rowWidth - indent)) {
+			ImGui::SetCursorPosX(startX + indent);
+			ImGui::TextUnformatted(line.c_str());
+		}
+		if (onDelete) {
+			ImGui::SetCursorPosX(startX + indent);
 			ImGui::Text("%s скачан", icons::Download);
 		}
+		ImGui::PopStyleColor();
 	}
-	ImGui::PopStyleColor();
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.3F)));
 }
 
 void ScreenHeader(const char *title, const std::function<void()> &onBack)
