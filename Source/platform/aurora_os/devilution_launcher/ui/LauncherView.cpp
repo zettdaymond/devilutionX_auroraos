@@ -104,7 +104,9 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	    windowSize.y - navHeight - pad * 1.5F - bottomInset);
 
 	ImGui::SetCursorPos(contentPos);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+	// Горизонтальный паддинг внутри контентной области: текст и таблицы
+	// не упираются в экранный край и не перекрываются скроллбаром.
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Scale::px(0.5F), 0));
 	if (ImGui::BeginChild("##content", contentSize, ImGuiChildFlags_None)) {
 		// Apply the drag delta to the content scroll while the gesture
 		// is active and the pointer is over the content area.

@@ -402,9 +402,9 @@ void About(const LauncherState &)
 	ImGui::PushFont(Theme::font(FontRole::BodyBold));
 	ImGui::TextUnformatted("Ссылки");
 	ImGui::PopFont();
-	ImGui::Text("%s  github.com/diasurgical/DevilutionX", icons::Globe);
-	ImGui::Text("%s  github.com/zettdaymond/devilutionX_auroraos", icons::Globe);
-	ImGui::Text("%s  Diablo © 1996 Blizzard Entertainment", icons::Book);
+	ImGui::TextWrapped("%s  github.com/diasurgical/DevilutionX", icons::Globe);
+	ImGui::TextWrapped("%s  github.com/zettdaymond/devilutionX_auroraos", icons::Globe);
+	ImGui::TextWrapped("%s  Diablo © 1996 Blizzard Entertainment", icons::Book);
 
 	ImGui::Dummy(ImVec2(0, Scale::px(0.4F)));
 	ImGui::PushFont(Theme::font(FontRole::BodyBold));

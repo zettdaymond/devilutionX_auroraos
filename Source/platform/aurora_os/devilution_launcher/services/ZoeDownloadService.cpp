@@ -44,6 +44,18 @@ ZoeDownloadService::ZoeDownloadService()
 	m_zoe = std::make_unique<zoe::Zoe>();
 	m_zoe->setThreadNum(1);
 	m_zoe->setUncompletedSliceSavePolicy(zoe::UncompletedSliceSavePolicy::AlwaysDiscard);
+	// Совместимость с мобильными сетями: GET вместо HEAD (некоторые
+	// прокси/фаерволы режут HEAD), больше повторов, мягкий таймаут и
+	// отключённая проверка сертификата — на устройстве может не быть
+	// CA-бандла, доступного libcurl.
+	m_zoe->setFetchFileInfoHeadMethodEnabled(false);
+	m_zoe->setRetryTimesOfFetchFileInfo(5);
+	m_zoe->setNetworkConnectionTimeout(15000);
+	m_zoe->setVerifyCAEnabled(false, "");
+	m_zoe->setVerifyHostEnabled(false);
+	m_zoe->setVerboseOutput([](const std::string &verbose) {
+		spdlog::debug("zoe: {}", verbose);
+	});
 }
 
 ZoeDownloadService::~ZoeDownloadService()
@@ -97,9 +109,17 @@ void ZoeDownloadService::start(const std::string &url, const std::filesystem::pa
 			    return;
 		    }
 
-		    const std::string error = cancelled
-		        ? std::string(kCancelledError)
-		        : std::string("Ошибка загрузки: ") + zoe::Zoe::GetResultString(result);
+		    std::string error;
+		    if (cancelled) {
+			    error = kCancelledError;
+		    } else if (result == zoe::ZoeResult::FETCH_FILE_INFO_FAILED) {
+			    // Типично для недоступного GitHub из мобильной сети.
+			    error = "Не удалось получить информацию о файле — проверьте "
+			            "подключение к интернету (при необходимости включите VPN). "
+			            "[" + std::string(zoe::Zoe::GetResultString(result)) + "]";
+		    } else {
+			    error = std::string("Ошибка загрузки: ") + zoe::Zoe::GetResultString(result);
+		    }
 		    if (!cancelled) {
 			    std::error_code removeEc;
 			    std::filesystem::remove(destination, removeEc);
