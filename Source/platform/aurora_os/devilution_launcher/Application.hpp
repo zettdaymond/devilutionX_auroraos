@@ -64,6 +64,10 @@ private:
 	/// Common SDL/ImGui bootstrap. Returns false on failure.
 	bool setup();
 
+	/// Adds a rotating file sink next to the console logger so on-device
+	/// issues can be read without root access to the system journal.
+	void AttachFileLog();
+
 	SDL_Window *m_window { nullptr };
 	SDL_Renderer *m_renderer { nullptr };
 

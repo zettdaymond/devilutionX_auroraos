@@ -10,6 +10,7 @@
 #include <backends/imgui_impl_sdl2.h>
 #include <backends/imgui_impl_sdlrenderer2.h>
 #include <imgui.h>
+#include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/spdlog.h>
 
 #include <cmrc/cmrc.hpp>
@@ -94,8 +95,27 @@ bool Application::setup()
 	return true;
 }
 
+void Application::AttachFileLog()
+{
+	// Дублируем лог в файл рядом с настройками: на устройстве системный
+	// журнал читается только рутом, а файл доступен пользователю напрямую.
+	try {
+		std::error_code ec;
+		std::filesystem::create_directories(m_services.paths->configDir(), ec);
+		const auto logPath = m_services.paths->configDir() / "launcher.log";
+		auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+		    logPath.string(), 512 * 1024, 2);
+		spdlog::default_logger()->sinks().push_back(std::move(fileSink));
+		spdlog::info("File log: {}", logPath.string());
+	} catch (const std::exception &err) {
+		spdlog::warn("File log unavailable: {}", err.what());
+	}
+}
+
 AppResult Application::run()
 {
+	AttachFileLog();
+
 	m_store = std::make_unique<launcher::Store>(
 	    *m_services.config, *m_services.files, *m_services.downloads, *m_services.paths);
 
