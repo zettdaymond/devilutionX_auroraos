@@ -86,6 +86,10 @@ private:
 	std::array<SDL_Texture *, 3> m_heroTextures {};
 	std::array<ImVec2, 3> m_heroSizes {};
 
+	/// Golden tile icons, indexed by ExitAction (null = FA glyph).
+	std::array<SDL_Texture *, 3> m_iconTextures {};
+	std::array<ImVec2, 3> m_iconSizes {};
+
 	bool m_running { true };
 	std::optional<launcher::Screen> m_initialScreen;
 	bool m_initialBrowser = false;

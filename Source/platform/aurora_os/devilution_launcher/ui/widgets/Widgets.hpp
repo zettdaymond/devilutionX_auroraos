@@ -38,9 +38,10 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
     std::initializer_list<HeroAction> actions);
 
 /// Compact shelf tile: icon in a tinted chip, title + status, trailing
-/// play/lock indicator.
-void GameTile(const char *title, const char *status, const char *icon, bool available,
-    const ImVec4 &accent, const ImVec2 &size, const std::function<void()> &onClick);
+/// play/lock indicator. The chip shows the dedicated silhouette artwork
+/// when available and falls back to the FontAwesome glyph.
+void GameTile(const char *title, const char *status, const char *icon, const BackgroundArt *iconArt,
+    bool available, const ImVec4 &accent, const ImVec2 &size, const std::function<void()> &onClick);
 
 /// Gold gradient button with dark bold text — the primary action.
 void PrimaryButton(const char *label, const ImVec2 &size, const std::function<void()> &onClick);

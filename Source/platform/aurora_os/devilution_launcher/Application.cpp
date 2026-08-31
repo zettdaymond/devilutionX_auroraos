@@ -81,6 +81,11 @@ Application::~Application()
 			SDL_DestroyTexture(texture);
 		}
 	}
+	for (SDL_Texture *texture : m_iconTextures) {
+		if (texture != nullptr) {
+			SDL_DestroyTexture(texture);
+		}
+	}
 	if (m_renderer != nullptr) {
 		SDL_DestroyRenderer(m_renderer);
 	}
@@ -109,22 +114,23 @@ bool Application::setup()
 	ImGui_ImplSDL2_InitForSDLRenderer(m_window, m_renderer);
 	ImGui_ImplSDLRenderer2_Init(m_renderer);
 
-	// Artwork from the embedded assets: the shared background and the
-	// optional per-mode hero panels (absent files fall back to bg crops).
+	// Artwork from the embedded assets: the shared background, optional
+	// per-mode hero panels and golden tile icons (absent files fall back
+	// to bg crops / FontAwesome glyphs).
 	m_backgroundTexture = LoadAssetTexture(m_renderer, "assets/bg.png", m_backgroundSize);
-	struct HeroAsset {
+	struct ModeAsset {
 		ExitAction mode;
-		const char *path;
+		const char *heroPath;
+		const char *iconPath;
 	};
-	for (const HeroAsset &hero : std::initializer_list<HeroAsset> {
-	         { ExitAction::LaunchDiablo, "assets/hero_diablo.png" },
-	         { ExitAction::LaunchHellfire, "assets/hero_hellfire.png" },
-	         { ExitAction::LaunchDemo, "assets/hero_demo.png" },
+	for (const ModeAsset &asset : std::initializer_list<ModeAsset> {
+	         { ExitAction::LaunchDiablo, "assets/hero_diablo.png", "assets/icon_diablo.png" },
+	         { ExitAction::LaunchHellfire, "assets/hero_hellfire.png", "assets/icon_hellfire.png" },
+	         { ExitAction::LaunchDemo, "assets/hero_demo.png", "assets/icon_demo.png" },
 	     }) {
-		ImVec2 size;
-		const size_t idx = static_cast<size_t>(hero.mode);
-		m_heroTextures[idx] = LoadAssetTexture(m_renderer, hero.path, size);
-		m_heroSizes[idx] = size;
+		const size_t idx = static_cast<size_t>(asset.mode);
+		m_heroTextures[idx] = LoadAssetTexture(m_renderer, asset.heroPath, m_heroSizes[idx]);
+		m_iconTextures[idx] = LoadAssetTexture(m_renderer, asset.iconPath, m_iconSizes[idx]);
 	}
 
 	return true;
@@ -173,6 +179,9 @@ AppResult Application::run()
 	for (size_t i = 0; i < std::size(m_heroTextures); ++i) {
 		if (m_heroTextures[i] != nullptr) {
 			m_view->SetHeroTexture(static_cast<launcher::ExitAction>(i), m_heroTextures[i], m_heroSizes[i]);
+		}
+		if (m_iconTextures[i] != nullptr) {
+			m_view->SetModeIconTexture(static_cast<launcher::ExitAction>(i), m_iconTextures[i], m_iconSizes[i]);
 		}
 	}
 

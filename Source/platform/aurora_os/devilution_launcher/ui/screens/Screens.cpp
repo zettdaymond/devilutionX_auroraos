@@ -74,7 +74,7 @@ void RenderFirstRun(const LauncherState &state, const Dispatcher &dispatch, cons
 	const float height = ImGui::GetContentRegionAvail().y;
 	const float heroHeight = std::min(height * 0.62F, Scale::px(17.0F));
 
-	const HeroArtRef hero = ResolveHeroArt(art, art.diablo, kDiabloStyle);
+	const HeroArtRef hero = ResolveHeroArt(art, art.diablo.hero, kDiabloStyle);
 	widgets::HeroPanel("DEVILUTIONX ДЛЯ AURORA OS", "DIABLO",
 	    "Файлы оригинальной игры не найдены.\nСкопируйте DIABDAT.MPQ с диска или купите на GoG,\nлибо скачайте бесплатное демо.",
 	    *hero.art, hero.uv0, hero.uv1, hero.tint, ImVec2(width, heroHeight),
@@ -112,7 +112,8 @@ struct ShelfItem {
 	const char *title;
 	std::string status;
 	bool playable;
-	const char *icon;
+	const char *icon;             // FontAwesome fallback glyph
+	const BackgroundArt *iconArt; // dedicated silhouette (may be null)
 	const GameStyle *style;
 };
 
@@ -140,26 +141,26 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 
 	ShelfItem diabloTile { ExitAction::LaunchDiablo, "DIABLO",
 		state.diablo.available ? "Готово к запуску" : "Нужен DIABDAT.MPQ", state.diablo.available, icons::Fire,
-		&kDiabloStyle };
+		&art.diablo.icon, &kDiabloStyle };
 	ShelfItem hellfireTile { ExitAction::LaunchHellfire, "HELLFIRE",
 		state.hellfire.available ? "Готово к запуску"
 		    : (state.diablo.available ? "Не хватает: " + PluralFiles(state.hellfire.missingFiles.size())
 		                              : "Нужны файлы Diablo и Hellfire"),
-		state.hellfire.available, icons::Gamepad, &kHellfireStyle };
+		state.hellfire.available, icons::Gamepad, &art.hellfire.icon, &kHellfireStyle };
 	ShelfItem demoTile { ExitAction::LaunchDemo, "DEMO",
 		state.demo.available ? "Бесплатная демо-версия"
 		    : "Скачать · " + FormatBytes(FileSpecOf(KnownFile::Spawn).expectedSizeBytes),
-		true, icons::Download, &kDemoStyle };
+		true, icons::Download, &art.demo.icon, &kDemoStyle };
 
 	const bool diabloFeatured = (featured.game == ExitAction::LaunchDiablo && featured.playable);
 	const bool hellfireFeatured = (featured.game == ExitAction::LaunchHellfire && featured.playable);
 	const bool demoFeatured = (featured.game == ExitAction::LaunchDemo && featured.playable);
 
 	const float heroHeight = portrait ? std::min(height * 0.52F, Scale::px(14.0F)) : Scale::px(11.0F);
-	const BackgroundArt &featuredArt = featured.game == ExitAction::LaunchDiablo ? art.diablo
-	    : featured.game == ExitAction::LaunchHellfire                     ? art.hellfire
-	                                                                     : art.demo;
-	const HeroArtRef hero = ResolveHeroArt(art, featuredArt, *featured.style);
+	const ModeArt &featuredMode = featured.game == ExitAction::LaunchDiablo ? art.diablo
+	    : featured.game == ExitAction::LaunchHellfire                    ? art.hellfire
+	                                                                    : art.demo;
+	const HeroArtRef hero = ResolveHeroArt(art, featuredMode.hero, *featured.style);
 	widgets::HeroPanel(featured.eyebrow, featured.title, featured.status.c_str(), *hero.art, hero.uv0, hero.uv1,
 	    hero.tint, ImVec2(width, heroHeight),
 	    {
@@ -184,8 +185,8 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 
 	auto renderTile = [&](const ShelfItem &item) {
 		const ImVec2 tileSize(portrait ? width : width * 0.5F - Scale::px(0.25F), Scale::px(4.2F));
-		widgets::GameTile(item.title, item.status.c_str(), item.icon, item.playable, item.style->accent, tileSize,
-		    [&dispatch, item] { dispatch(intent::LaunchGame { item.game }); });
+		widgets::GameTile(item.title, item.status.c_str(), item.icon, item.iconArt, item.playable,
+		    item.style->accent, tileSize, [&dispatch, item] { dispatch(intent::LaunchGame { item.game }); });
 	};
 
 	if (!diabloFeatured) {

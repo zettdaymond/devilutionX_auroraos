@@ -40,6 +40,10 @@ public:
 	/// keeps the bg.png-crop fallback for that mode.
 	void SetHeroTexture(ExitAction mode, void *texture, ImVec2 size);
 
+	/// Attach the golden silhouette icon for a game mode; null keeps the
+	/// FontAwesome glyph fallback in tiles.
+	void SetModeIconTexture(ExitAction mode, void *texture, ImVec2 size);
+
 private:
 	void RenderBackground() const;
 	void RenderNavBar(const LauncherState &state, const Dispatcher &dispatch);
@@ -51,6 +55,7 @@ private:
 	void *m_backgroundTexture = nullptr;
 	ImVec2 m_backgroundTextureSize { 0.0F, 0.0F };
 	widgets::BackgroundArt m_heroArts[3] = {}; // indexed by ExitAction
+	widgets::BackgroundArt m_iconArts[3] = {}; // indexed by ExitAction
 	float m_dpiScale = 1.0F;
 
 	Dialog m_lastDialog = Dialog::None;

@@ -119,6 +119,9 @@ cmrc_add_resource_library(launcher_assets
         assets/hero_diablo.png
         assets/hero_hellfire.png
         assets/hero_demo.png
+        assets/icon_diablo.png
+        assets/icon_hellfire.png
+        assets/icon_demo.png
         assets/Beaufort-Bold.ttf
         assets/Beaufort-Regular.ttf
         assets/Roboto-Bold.ttf

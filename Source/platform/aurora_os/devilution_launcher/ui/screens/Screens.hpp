@@ -7,13 +7,21 @@ namespace launcher::ui::screens {
 using widgets::BackgroundArt;
 using widgets::Dispatcher;
 
-/// All artwork the screens render. The per-mode entries are optional
-/// (null texture): hero panels then fall back to a crop of `background`.
+/// Per-mode artwork: the dedicated hero key art and the golden silhouette
+/// icon for shelf tiles. Both entries are optional (null texture) — the
+/// hero falls back to a crop of `background`, the icon to a FontAwesome
+/// glyph.
+struct ModeArt {
+    BackgroundArt hero;
+    BackgroundArt icon;
+};
+
+/// All artwork the screens render.
 struct ArtSet {
     BackgroundArt background;
-    BackgroundArt diablo;
-    BackgroundArt hellfire;
-    BackgroundArt demo;
+    ModeArt diablo;
+    ModeArt hellfire;
+    ModeArt demo;
 };
 
 /// Main screen: featured-game hero panel (web "key art" banner) plus a

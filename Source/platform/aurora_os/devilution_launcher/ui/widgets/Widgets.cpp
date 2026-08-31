@@ -166,8 +166,8 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 	}
 }
 
-void GameTile(const char *title, const char *status, const char *icon, bool available,
-    const ImVec4 &accent, const ImVec2 &size, const std::function<void()> &onClick)
+void GameTile(const char *title, const char *status, const char *icon, const BackgroundArt *iconArt,
+    bool available, const ImVec4 &accent, const ImVec2 &size, const std::function<void()> &onClick)
 {
 	if (ImGui::InvisibleButton(title, size, ImGuiButtonFlags_None)) {
 		onClick();
@@ -197,18 +197,29 @@ void GameTile(const char *title, const char *status, const char *icon, bool avai
 	}
 	draw->AddRect(min, max, border, rounding, 0, borderThickness);
 
-	// Icon chip with the game accent.
+	// Icon chip with the game accent: dedicated golden silhouette when
+	// bundled, FontAwesome glyph otherwise.
 	const float chip = size.y - Scale::px(1.0F);
 	const ImVec2 chipMin = min + ImVec2(Scale::px(0.5F), Scale::px(0.5F));
 	const ImVec2 chipMax = chipMin + ImVec2(chip, chip);
 	draw->AddRectFilled(chipMin, chipMax,
 	    ImGui::ColorConvertFloat4ToU32(ImVec4(accent.x, accent.y, accent.z, available ? 0.35F : 0.15F)),
 	    Scale::px(0.3F));
-	ImGui::PushFont(Theme::font(FontRole::IconBig));
-	const ImVec2 iconSize = ImGui::CalcTextSize(icon);
-	draw->AddText(ImVec2((chipMin.x + chipMax.x - iconSize.x) * 0.5F, (chipMin.y + chipMax.y - iconSize.y) * 0.5F),
-	    Theme::colorU32(available ? ColorRole::GoldBright : ColorRole::TextDim), icon);
-	ImGui::PopFont();
+	if (iconArt != nullptr && iconArt->texture != nullptr && iconArt->size.x > 0 && iconArt->size.y > 0) {
+		const float fit = chip * 0.74F;
+		const float w = iconArt->size.x >= iconArt->size.y ? fit : fit * iconArt->size.x / iconArt->size.y;
+		const float h = iconArt->size.y >= iconArt->size.x ? fit : fit * iconArt->size.y / iconArt->size.x;
+		const ImVec2 iconMin((chipMin.x + chipMax.x - w) * 0.5F, (chipMin.y + chipMax.y - h) * 0.5F);
+		draw->AddImage(iconArt->texture, iconMin, iconMin + ImVec2(w, h), ImVec2(0, 0), ImVec2(1, 1),
+		    available ? IM_COL32_WHITE : Theme::colorU32(ColorRole::TextDim));
+	} else {
+		ImGui::PushFont(Theme::font(FontRole::IconBig));
+		const ImVec2 iconSize = ImGui::CalcTextSize(icon);
+		draw->AddText(
+		    ImVec2((chipMin.x + chipMax.x - iconSize.x) * 0.5F, (chipMin.y + chipMax.y - iconSize.y) * 0.5F),
+		    Theme::colorU32(available ? ColorRole::GoldBright : ColorRole::TextDim), icon);
+		ImGui::PopFont();
+	}
 
 	// Text block.
 	const float textX = chipMax.x + Scale::px(0.6F);
