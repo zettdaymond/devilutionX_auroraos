@@ -18,11 +18,11 @@ class MockWorld {
 public:
 	MockWorld();
 
-	void setPresent(KnownFile file, int64_t sizeBytes);
-	void setAbsent(KnownFile file);
-	[[nodiscard]] bool isPresent(KnownFile file) const;
+	void SetPresent(KnownFile file, int64_t sizeBytes);
+	void SetAbsent(KnownFile file);
+	[[nodiscard]] bool IsPresent(KnownFile file) const;
 
-	void setFreeSpace(int64_t bytes);
+	void SetFreeSpace(int64_t bytes);
 
 	struct Snapshot {
 		std::array<int64_t, kKnownFileCount> files {};
@@ -30,16 +30,16 @@ public:
 	};
 
 	/// Consistent copy of the whole world state.
-	[[nodiscard]] Snapshot take() const;
+	[[nodiscard]] Snapshot Take() const;
 
-	void applyDownloadFinished(KnownFile file, bool success);
+	void ApplyDownloadFinished(KnownFile file, bool success);
 
 	/// Apply a named preset ("empty", "diablo-found", "hellfire-partial",
 	/// "full"). Returns false for unknown names.
-	bool applyPreset(const std::string &name);
+	bool ApplyPreset(const std::string &name);
 
 	/// All valid preset names, for --help output.
-	static const std::vector<std::string> &presetNames();
+	static const std::vector<std::string> &PresetNames();
 
 private:
 	mutable std::mutex m_mutex;

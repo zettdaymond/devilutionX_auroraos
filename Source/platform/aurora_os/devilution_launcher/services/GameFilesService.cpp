@@ -9,7 +9,7 @@
 
 namespace launcher {
 
-FileScanResult GameFilesService::scan(const std::vector<std::filesystem::path> &folders)
+FileScanResult GameFilesService::Scan(const std::vector<std::filesystem::path> &folders)
 {
 	FileScanResult result;
 	result.sizes.fill(-1);
@@ -52,7 +52,7 @@ FileScanResult GameFilesService::scan(const std::vector<std::filesystem::path> &
 	return result;
 }
 
-int64_t GameFilesService::freeSpace(const std::filesystem::path &dir)
+int64_t GameFilesService::FreeSpace(const std::filesystem::path &dir)
 {
 	std::error_code ec;
 	const auto space = std::filesystem::space(dir, ec);
@@ -63,7 +63,7 @@ int64_t GameFilesService::freeSpace(const std::filesystem::path &dir)
 	return static_cast<int64_t>(space.available);
 }
 
-bool GameFilesService::removeFile(const std::filesystem::path &dir, KnownFile file)
+bool GameFilesService::RemoveFile(const std::filesystem::path &dir, KnownFile file)
 {
 	const auto path = dir / FileSpecOf(file).canonical.data();
 	std::error_code ec;

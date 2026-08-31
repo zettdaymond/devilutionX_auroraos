@@ -277,7 +277,7 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 
 void Home(const LauncherState &state, const Dispatcher &dispatch, const ArtSet &art)
 {
-	if (!state.hasAnyFiles()) {
+	if (!state.HasAnyFiles()) {
 		RenderFirstRun(state, dispatch, art);
 		return;
 	}

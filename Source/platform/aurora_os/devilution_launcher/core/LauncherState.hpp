@@ -81,7 +81,7 @@ struct LauncherState {
 	// Short-lived notification shown at the bottom of the screen
 	std::optional<std::string> toast;
 
-	[[nodiscard]] bool hasAnyFiles() const
+	[[nodiscard]] bool HasAnyFiles() const
 	{
 		for (int64_t size : fileSizes) {
 			if (size >= 0)
@@ -90,7 +90,7 @@ struct LauncherState {
 		return false;
 	}
 
-	[[nodiscard]] bool downloadInProgress() const { return download.has_value() && download->active; }
+	[[nodiscard]] bool DownloadInProgress() const { return download.has_value() && download->active; }
 };
 
 } // namespace launcher

@@ -44,40 +44,40 @@ Store::Store(IConfigService &configService,
 {
 }
 
-void Store::init()
+void Store::Init()
 {
-	m_config = m_configService.load();
-	rescanAndDerive();
+	m_config = m_configService.Load();
+	RescanAndDerive();
 }
 
-void Store::dispatch(Intent intent)
+void Store::Dispatch(Intent intent)
 {
 	std::lock_guard<std::mutex> lock(m_queueMutex);
 	m_queue.push_back(std::move(intent));
 }
 
 // ---- Intent handlers ----
-// (must be defined before poll()/reduce() so the specializations are
+// (must be defined before Poll()/Reduce() so the specializations are
 // seen before the template is implicitly instantiated there)
 
 template <>
-void Store::reduceIntent<intent::UiNavigate>(const intent::UiNavigate &i)
+void Store::ReduceIntent<intent::UiNavigate>(const intent::UiNavigate &i)
 {
 	m_state.screen = i.screen;
 	m_state.dialog = Dialog::None;
 }
 
-void Store::rescanAndDerive()
+void Store::RescanAndDerive()
 {
-	const FileScanResult scan = m_filesService.scan(m_pathProvider.candidateDataDirs(m_config));
+	const FileScanResult scan = m_filesService.Scan(m_pathProvider.CandidateDataDirs(m_config));
 	m_state.fileSizes = scan.sizes;
 	m_state.fileFolders = scan.folders;
 	m_state.dataFolder = m_config.dataFolder.value_or(std::filesystem::path {});
-	m_state.freeDiskBytes = m_filesService.freeSpace(m_pathProvider.downloadsDir());
-	deriveGameCards();
+	m_state.freeDiskBytes = m_filesService.FreeSpace(m_pathProvider.DownloadsDir());
+	DeriveGameCards();
 }
 
-void Store::deriveGameCards()
+void Store::DeriveGameCards()
 {
 	const auto &sizes = m_state.fileSizes;
 
@@ -93,10 +93,10 @@ void Store::deriveGameCards()
 	m_state.russianVoiceInstalled = sizes[static_cast<size_t>(KnownFile::RuVoice)] >= 0;
 }
 
-void Store::beginDownload(KnownFile file)
+void Store::BeginDownload(KnownFile file)
 {
 	const FileSpec &spec = FileSpecOf(file);
-	const int64_t freeBytes = m_filesService.freeSpace(m_pathProvider.downloadsDir());
+	const int64_t freeBytes = m_filesService.FreeSpace(m_pathProvider.DownloadsDir());
 	if (spec.expectedSizeBytes > 0 && freeBytes >= 0 && freeBytes < spec.expectedSizeBytes) {
 		m_state.errorText = "Недостаточно свободного места для загрузки";
 		m_state.dialog = Dialog::Error;
@@ -112,21 +112,21 @@ void Store::beginDownload(KnownFile file)
 
 	IDownloadService::Listener listener;
 	listener.onProgress = [this](int64_t total, int64_t downloaded, int64_t bytesPerSec) {
-		dispatch(intent::EvDownloadProgress { total, downloaded, bytesPerSec });
+		Dispatch(intent::EvDownloadProgress { total, downloaded, bytesPerSec });
 	};
 	listener.onFinished = [this](bool success, std::string error) {
-		dispatch(intent::EvDownloadFinished { success, std::move(error) });
+		Dispatch(intent::EvDownloadFinished { success, std::move(error) });
 	};
 
-	m_downloadService.start(std::string(DownloadUrl(file)),
-	    m_pathProvider.downloadsDir() / spec.canonical.data(),
+	m_downloadService.Start(std::string(DownloadUrl(file)),
+	    m_pathProvider.DownloadsDir() / spec.canonical.data(),
 	    std::move(listener));
 }
 
 // ---- Intent handlers ----
 
 template <>
-void Store::reduceIntent<intent::UiOpenDialog>(const intent::UiOpenDialog &i)
+void Store::ReduceIntent<intent::UiOpenDialog>(const intent::UiOpenDialog &i)
 {
 	if (i.dialog == Dialog::HellfireMissingFiles) {
 		m_state.hellfireMissing = m_state.hellfire.missingFiles;
@@ -135,7 +135,7 @@ void Store::reduceIntent<intent::UiOpenDialog>(const intent::UiOpenDialog &i)
 }
 
 template <>
-void Store::reduceIntent<intent::UiCloseDialog>(const intent::UiCloseDialog &)
+void Store::ReduceIntent<intent::UiCloseDialog>(const intent::UiCloseDialog &)
 {
 	if (m_state.dialog == Dialog::DownloadProgress && m_state.download && !m_state.download->active) {
 		// Closing a finished/failed download overlay clears it entirely.
@@ -145,57 +145,57 @@ void Store::reduceIntent<intent::UiCloseDialog>(const intent::UiCloseDialog &)
 }
 
 template <>
-void Store::reduceIntent<intent::UiDismissToast>(const intent::UiDismissToast &)
+void Store::ReduceIntent<intent::UiDismissToast>(const intent::UiDismissToast &)
 {
 	m_state.toast.reset();
 }
 
 template <>
-void Store::reduceIntent<intent::SelectDataFolder>(const intent::SelectDataFolder &)
+void Store::ReduceIntent<intent::SelectDataFolder>(const intent::SelectDataFolder &)
 {
 	m_state.fileBrowserOpen = true;
 }
 
 template <>
-void Store::reduceIntent<intent::DataFolderSelected>(const intent::DataFolderSelected &i)
+void Store::ReduceIntent<intent::DataFolderSelected>(const intent::DataFolderSelected &i)
 {
 	if (std::filesystem::is_directory(i.dir)) {
 		m_config.dataFolder = i.dir;
-		m_configService.save(m_config);
+		m_configService.Save(m_config);
 		m_state.toast = "Папка с файлами игры обновлена";
 	}
-	rescanAndDerive();
+	RescanAndDerive();
 	m_state.fileBrowserOpen = false;
 }
 
 template <>
-void Store::reduceIntent<intent::RescanFiles>(const intent::RescanFiles &)
+void Store::ReduceIntent<intent::RescanFiles>(const intent::RescanFiles &)
 {
-	rescanAndDerive();
+	RescanAndDerive();
 }
 
 template <>
-void Store::reduceIntent<intent::CancelFolderSelection>(const intent::CancelFolderSelection &)
+void Store::ReduceIntent<intent::CancelFolderSelection>(const intent::CancelFolderSelection &)
 {
 	m_state.fileBrowserOpen = false;
 }
 
 template <>
-void Store::reduceIntent<intent::DeleteDownloadedFile>(const intent::DeleteDownloadedFile &i)
+void Store::ReduceIntent<intent::DeleteDownloadedFile>(const intent::DeleteDownloadedFile &i)
 {
-	if (m_state.downloadInProgress()) {
+	if (m_state.DownloadInProgress()) {
 		return;
 	}
-	if (m_filesService.removeFile(m_pathProvider.downloadsDir(), i.file)) {
+	if (m_filesService.RemoveFile(m_pathProvider.DownloadsDir(), i.file)) {
 		m_state.toast = "Файл удалён";
 	} else {
 		m_state.toast = "Не удалось удалить файл";
 	}
-	rescanAndDerive();
+	RescanAndDerive();
 }
 
 template <>
-void Store::reduceIntent<intent::LaunchGame>(const intent::LaunchGame &i)
+void Store::ReduceIntent<intent::LaunchGame>(const intent::LaunchGame &i)
 {
 	switch (i.game) {
 	case ExitAction::LaunchDiablo:
@@ -208,7 +208,7 @@ void Store::reduceIntent<intent::LaunchGame>(const intent::LaunchGame &i)
 	case ExitAction::LaunchHellfire:
 		if (m_state.hellfire.available) {
 			m_state.pendingLaunch = ExitAction::LaunchHellfire;
-		} else if (m_state.hasAnyFiles() || m_config.dataFolder) {
+		} else if (m_state.HasAnyFiles() || m_config.dataFolder) {
 			m_state.hellfireMissing = m_state.hellfire.missingFiles;
 			m_state.dialog = Dialog::HellfireMissingFiles;
 		} else {
@@ -226,24 +226,24 @@ void Store::reduceIntent<intent::LaunchGame>(const intent::LaunchGame &i)
 }
 
 template <>
-void Store::reduceIntent<intent::StartDownload>(const intent::StartDownload &i)
+void Store::ReduceIntent<intent::StartDownload>(const intent::StartDownload &i)
 {
-	if (m_state.downloadInProgress() || !FileSpecOf(i.file).downloadable) {
+	if (m_state.DownloadInProgress() || !FileSpecOf(i.file).downloadable) {
 		return;
 	}
-	beginDownload(i.file);
+	BeginDownload(i.file);
 }
 
 template <>
-void Store::reduceIntent<intent::CancelDownload>(const intent::CancelDownload &)
+void Store::ReduceIntent<intent::CancelDownload>(const intent::CancelDownload &)
 {
-	if (m_state.downloadInProgress()) {
-		m_downloadService.cancel();
+	if (m_state.DownloadInProgress()) {
+		m_downloadService.Cancel();
 	}
 }
 
 template <>
-void Store::reduceIntent<intent::EvDownloadProgress>(const intent::EvDownloadProgress &i)
+void Store::ReduceIntent<intent::EvDownloadProgress>(const intent::EvDownloadProgress &i)
 {
 	if (!m_state.download || !m_state.download->active) {
 		return;
@@ -257,7 +257,7 @@ void Store::reduceIntent<intent::EvDownloadProgress>(const intent::EvDownloadPro
 }
 
 template <>
-void Store::reduceIntent<intent::EvDownloadFinished>(const intent::EvDownloadFinished &i)
+void Store::ReduceIntent<intent::EvDownloadFinished>(const intent::EvDownloadFinished &i)
 {
 	if (!m_state.download) {
 		return;
@@ -267,7 +267,7 @@ void Store::reduceIntent<intent::EvDownloadFinished>(const intent::EvDownloadFin
 		m_state.download.reset();
 		m_state.dialog = Dialog::None;
 		m_state.toast = "Загрузка завершена";
-		rescanAndDerive();
+		RescanAndDerive();
 		return;
 	}
 
@@ -281,7 +281,7 @@ void Store::reduceIntent<intent::EvDownloadFinished>(const intent::EvDownloadFin
 	m_state.download->error = i.error;
 }
 
-void Store::poll()
+void Store::Poll()
 {
 	std::deque<Intent> pending;
 	{
@@ -289,13 +289,13 @@ void Store::poll()
 		pending.swap(m_queue);
 	}
 	for (const Intent &intent : pending) {
-		reduce(intent);
+		Reduce(intent);
 	}
 }
 
-void Store::reduce(const Intent &intent)
+void Store::Reduce(const Intent &intent)
 {
-	std::visit([this](const auto &i) { reduceIntent(i); }, intent);
+	std::visit([this](const auto &i) { ReduceIntent(i); }, intent);
 }
 
 } // namespace launcher

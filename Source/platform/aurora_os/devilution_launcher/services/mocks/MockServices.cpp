@@ -7,9 +7,9 @@ MockGameFilesService::MockGameFilesService(std::shared_ptr<MockWorld> world)
 {
 }
 
-FileScanResult MockGameFilesService::scan(const std::vector<std::filesystem::path> &folders)
+FileScanResult MockGameFilesService::Scan(const std::vector<std::filesystem::path> &folders)
 {
-	const MockWorld::Snapshot snapshot = m_world->take();
+	const MockWorld::Snapshot snapshot = m_world->Take();
 
 	FileScanResult result;
 	result.sizes = snapshot.files;
@@ -19,15 +19,15 @@ FileScanResult MockGameFilesService::scan(const std::vector<std::filesystem::pat
 	return result;
 }
 
-int64_t MockGameFilesService::freeSpace(const std::filesystem::path &)
+int64_t MockGameFilesService::FreeSpace(const std::filesystem::path &)
 {
-	return m_world->take().freeSpaceBytes;
+	return m_world->Take().freeSpaceBytes;
 }
 
-bool MockGameFilesService::removeFile(const std::filesystem::path &, KnownFile file)
+bool MockGameFilesService::RemoveFile(const std::filesystem::path &, KnownFile file)
 {
-	const bool existed = m_world->isPresent(file);
-	m_world->setAbsent(file);
+	const bool existed = m_world->IsPresent(file);
+	m_world->SetAbsent(file);
 	return existed;
 }
 

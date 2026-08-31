@@ -17,7 +17,7 @@ ConfigService::ConfigService(std::filesystem::path configFilePath)
 {
 }
 
-LauncherConfig ConfigService::load()
+LauncherConfig ConfigService::Load()
 {
 	LauncherConfig config;
 
@@ -37,7 +37,7 @@ LauncherConfig ConfigService::load()
 	return config;
 }
 
-void ConfigService::save(const LauncherConfig &config)
+void ConfigService::Save(const LauncherConfig &config)
 {
 	toml::table table;
 	if (config.dataFolder) {

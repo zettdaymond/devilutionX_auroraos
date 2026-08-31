@@ -76,7 +76,7 @@ Args ParseArgs(int argc, char **argv)
 		} else if (arg == "--help" || arg == "-h") {
 			spdlog::info("Usage: devilution_launcher [--mock-scenario=<name>] [--screen=home|data|about] [--window=<WxH>]");
 			spdlog::info("Scenarios:");
-			for (const auto &name : launcher::MockScenario::names()) {
+			for (const auto &name : launcher::MockScenario::Names()) {
 				spdlog::info("  {}", name);
 			}
 			std::exit(0);
@@ -112,9 +112,9 @@ int main(int argc, char **argv)
 	std::optional<launcher::ServiceBundle> services;
 	if (args.mockScenario.has_value()) {
 		try {
-			const launcher::MockScenario scenario = launcher::MockScenario::byName(*args.mockScenario);
+			const launcher::MockScenario scenario = launcher::MockScenario::ByName(*args.mockScenario);
 			spdlog::info("Mock scenario: {}", scenario.name());
-			services = scenario.makeBundle();
+			services = scenario.MakeBundle();
 		} catch (const std::invalid_argument &err) {
 			spdlog::error("{}", err.what());
 			SDL_DestroyWindow(window);

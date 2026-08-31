@@ -15,15 +15,15 @@ public:
 	virtual ~IPathProvider() = default;
 
 	/// Directory for launcher housekeeping files (launcher.conf, imgui.ini).
-	[[nodiscard]] virtual std::filesystem::path configDir() = 0;
+	[[nodiscard]] virtual std::filesystem::path ConfigDir() = 0;
 
 	/// Writable directory downloadable content (spawn.mpq, ru.mpq)
 	/// is placed into. It is also an MPQ search path of the game itself.
-	[[nodiscard]] virtual std::filesystem::path downloadsDir() = 0;
+	[[nodiscard]] virtual std::filesystem::path DownloadsDir() = 0;
 
 	/// Folders scanned for game files, in priority order:
 	/// user-selected folder first, then platform locations.
-	[[nodiscard]] virtual std::vector<std::filesystem::path> candidateDataDirs(const LauncherConfig &config) = 0;
+	[[nodiscard]] virtual std::vector<std::filesystem::path> CandidateDataDirs(const LauncherConfig &config) = 0;
 };
 
 } // namespace launcher

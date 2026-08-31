@@ -13,10 +13,10 @@ namespace launcher {
 /// on what the Store persisted.
 class MockConfigService final : public IConfigService {
 public:
-	[[nodiscard]] LauncherConfig load() override { return m_stored; }
-	void save(const LauncherConfig &config) override { m_stored = config; }
+	[[nodiscard]] LauncherConfig Load() override { return m_stored; }
+	void Save(const LauncherConfig &config) override { m_stored = config; }
 
-	[[nodiscard]] const LauncherConfig &lastSaved() const { return m_stored; }
+	[[nodiscard]] const LauncherConfig &LastSaved() const { return m_stored; }
 
 private:
 	LauncherConfig m_stored;
@@ -30,9 +30,9 @@ class MockGameFilesService final : public IGameFilesService {
 public:
 	explicit MockGameFilesService(std::shared_ptr<MockWorld> world);
 
-	[[nodiscard]] FileScanResult scan(const std::vector<std::filesystem::path> &folders) override;
-	[[nodiscard]] int64_t freeSpace(const std::filesystem::path &dir) override;
-	bool removeFile(const std::filesystem::path &dir, KnownFile file) override;
+	[[nodiscard]] FileScanResult Scan(const std::vector<std::filesystem::path> &folders) override;
+	[[nodiscard]] int64_t FreeSpace(const std::filesystem::path &dir) override;
+	bool RemoveFile(const std::filesystem::path &dir, KnownFile file) override;
 
 private:
 	std::shared_ptr<MockWorld> m_world;

@@ -26,12 +26,12 @@ public:
 	MockDownloadService(std::shared_ptr<MockWorld> world, MockDownloadBehavior behavior);
 	~MockDownloadService() override;
 
-	void start(const std::string &url, const std::filesystem::path &destination, Listener listener) override;
-	void cancel() override;
-	[[nodiscard]] bool isActive() override;
+	void Start(const std::string &url, const std::filesystem::path &destination, Listener listener) override;
+	void Cancel() override;
+	[[nodiscard]] bool IsActive() override;
 
 private:
-	void run(Listener listener, int64_t totalBytes, KnownFile file);
+	void Run(Listener listener, int64_t totalBytes, KnownFile file);
 
 	std::shared_ptr<MockWorld> m_world;
 	MockDownloadBehavior m_behavior;

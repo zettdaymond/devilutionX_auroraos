@@ -35,7 +35,7 @@ const std::vector<ScenarioDef> &scenarioDefs()
 
 } // namespace
 
-MockScenario MockScenario::byName(const std::string &name)
+MockScenario MockScenario::ByName(const std::string &name)
 {
 	const auto &defs = scenarioDefs();
 	const auto it = std::find_if(defs.begin(), defs.end(), [&](const ScenarioDef &d) { return d.name == name; });
@@ -45,7 +45,7 @@ MockScenario MockScenario::byName(const std::string &name)
 	return MockScenario(it->name, it->behavior);
 }
 
-const std::vector<std::string> &MockScenario::names()
+const std::vector<std::string> &MockScenario::Names()
 {
 	static const std::vector<std::string> names = [] {
 		std::vector<std::string> result;
@@ -64,12 +64,12 @@ MockScenario::MockScenario(std::string name, MockDownloadBehavior behavior)
 {
 	for (const ScenarioDef &def : scenarioDefs()) {
 		if (def.name == m_name && def.worldPreset != nullptr) {
-			m_world->applyPreset(def.worldPreset);
+			m_world->ApplyPreset(def.worldPreset);
 		}
 	}
 }
 
-ServiceBundle MockScenario::makeBundle() const
+ServiceBundle MockScenario::MakeBundle() const
 {
 	ServiceBundle bundle;
 	bundle.config = std::make_unique<MockConfigService>();

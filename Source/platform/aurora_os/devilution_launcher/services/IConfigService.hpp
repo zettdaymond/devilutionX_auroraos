@@ -13,13 +13,13 @@ struct LauncherConfig {
 };
 
 /// Persistence for LauncherConfig. Implementations must be cheap to
-/// construct; save() writes the whole file atomically (temp + rename).
+/// construct; Save() writes the whole file atomically (temp + rename).
 class IConfigService {
 public:
 	virtual ~IConfigService() = default;
 
-	[[nodiscard]] virtual LauncherConfig load() = 0;
-	virtual void save(const LauncherConfig &config) = 0;
+	[[nodiscard]] virtual LauncherConfig Load() = 0;
+	virtual void Save(const LauncherConfig &config) = 0;
 };
 
 } // namespace launcher

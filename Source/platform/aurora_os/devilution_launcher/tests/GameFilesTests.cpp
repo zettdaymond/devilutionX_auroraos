@@ -43,7 +43,7 @@ TEST_F(GameFilesServiceTest, ScanIsCaseInsensitive)
 	makeFile("DIABDAT.MPQ", 128);
 	GameFilesService service;
 
-	const FileScanResult result = service.scan({ m_dir });
+	const FileScanResult result = service.Scan({ m_dir });
 
 	EXPECT_EQ(result.sizes[static_cast<size_t>(KnownFile::Diabdat)], 128);
 	EXPECT_EQ(result.folders[static_cast<size_t>(KnownFile::Diabdat)], m_dir);
@@ -53,7 +53,7 @@ TEST_F(GameFilesServiceTest, MissingFilesAreNegative)
 {
 	GameFilesService service;
 
-	const FileScanResult result = service.scan({ m_dir });
+	const FileScanResult result = service.Scan({ m_dir });
 
 	for (size_t i = 0; i < kKnownFileCount; ++i) {
 		EXPECT_EQ(result.sizes[i], -1) << "index " << i;
@@ -65,7 +65,7 @@ TEST_F(GameFilesServiceTest, EarlierFolderWins)
 	makeFile("spawn.mpq", 64);
 	GameFilesService service;
 
-	const FileScanResult result = service.scan({ m_dir, m_dir });
+	const FileScanResult result = service.Scan({ m_dir, m_dir });
 
 	EXPECT_EQ(result.sizes[static_cast<size_t>(KnownFile::Spawn)], 64);
 }
@@ -73,7 +73,7 @@ TEST_F(GameFilesServiceTest, EarlierFolderWins)
 TEST_F(GameFilesServiceTest, FreeSpaceIsPositive)
 {
 	GameFilesService service;
-	EXPECT_GT(service.freeSpace(m_dir), 0);
+	EXPECT_GT(service.FreeSpace(m_dir), 0);
 }
 
 TEST_F(GameFilesServiceTest, RemoveFileDeletesAndReports)
@@ -81,9 +81,9 @@ TEST_F(GameFilesServiceTest, RemoveFileDeletesAndReports)
 	makeFile("spawn.mpq", 32);
 	GameFilesService service;
 
-	EXPECT_TRUE(service.removeFile(m_dir, KnownFile::Spawn));
+	EXPECT_TRUE(service.RemoveFile(m_dir, KnownFile::Spawn));
 	EXPECT_FALSE(std::filesystem::exists(m_dir / "spawn.mpq"));
-	EXPECT_FALSE(service.removeFile(m_dir, KnownFile::Spawn));
+	EXPECT_FALSE(service.RemoveFile(m_dir, KnownFile::Spawn));
 }
 
 } // namespace

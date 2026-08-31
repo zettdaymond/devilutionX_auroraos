@@ -10,8 +10,8 @@ class ConfigService final : public IConfigService {
 public:
 	explicit ConfigService(std::filesystem::path configFilePath);
 
-	[[nodiscard]] LauncherConfig load() override;
-	void save(const LauncherConfig &config) override;
+	[[nodiscard]] LauncherConfig Load() override;
+	void Save(const LauncherConfig &config) override;
 
 private:
 	std::filesystem::path m_filePath;

@@ -69,7 +69,7 @@ ZoeDownloadService::~ZoeDownloadService()
 	ReleaseZoeGlobal();
 }
 
-void ZoeDownloadService::start(const std::string &url, const std::filesystem::path &destination, Listener listener)
+void ZoeDownloadService::Start(const std::string &url, const std::filesystem::path &destination, Listener listener)
 {
 	{
 		std::lock_guard<std::mutex> lock(m_mutex);
@@ -146,12 +146,12 @@ void ZoeDownloadService::start(const std::string &url, const std::filesystem::pa
 	    });
 }
 
-void ZoeDownloadService::cancel()
+void ZoeDownloadService::Cancel()
 {
 	m_zoe->stop();
 }
 
-bool ZoeDownloadService::isActive()
+bool ZoeDownloadService::IsActive()
 {
 	std::lock_guard<std::mutex> lock(m_mutex);
 	return m_active;

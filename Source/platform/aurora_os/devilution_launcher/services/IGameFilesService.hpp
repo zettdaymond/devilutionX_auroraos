@@ -22,14 +22,14 @@ public:
 
 	/// Scan folders in order; the first hit per file wins.
 	/// Comparison of file names is case-insensitive.
-	[[nodiscard]] virtual FileScanResult scan(const std::vector<std::filesystem::path> &folders) = 0;
+	[[nodiscard]] virtual FileScanResult Scan(const std::vector<std::filesystem::path> &folders) = 0;
 
 	/// Free space on the filesystem the path lives on, in bytes.
-	[[nodiscard]] virtual int64_t freeSpace(const std::filesystem::path &dir) = 0;
+	[[nodiscard]] virtual int64_t FreeSpace(const std::filesystem::path &dir) = 0;
 
 	/// Remove a known file from dir. Returns true when the file existed
 	/// and was removed.
-	virtual bool removeFile(const std::filesystem::path &dir, KnownFile file) = 0;
+	virtual bool RemoveFile(const std::filesystem::path &dir, KnownFile file) = 0;
 };
 
 } // namespace launcher

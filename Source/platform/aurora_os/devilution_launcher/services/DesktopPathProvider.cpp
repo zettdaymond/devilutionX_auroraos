@@ -9,17 +9,17 @@ DesktopPathProvider::DesktopPathProvider(std::filesystem::path baseDir)
 {
 }
 
-std::filesystem::path DesktopPathProvider::configDir()
+std::filesystem::path DesktopPathProvider::ConfigDir()
 {
 	return m_baseDir;
 }
 
-std::filesystem::path DesktopPathProvider::downloadsDir()
+std::filesystem::path DesktopPathProvider::DownloadsDir()
 {
 	return m_baseDir;
 }
 
-std::vector<std::filesystem::path> DesktopPathProvider::candidateDataDirs(const LauncherConfig &config)
+std::vector<std::filesystem::path> DesktopPathProvider::CandidateDataDirs(const LauncherConfig &config)
 {
 	std::vector<std::filesystem::path> dirs;
 	if (config.dataFolder) {

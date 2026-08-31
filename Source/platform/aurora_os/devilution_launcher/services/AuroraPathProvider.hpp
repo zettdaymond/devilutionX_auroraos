@@ -15,9 +15,9 @@ class AuroraPathProvider final : public IPathProvider {
 public:
 	explicit AuroraPathProvider(std::filesystem::path baseDir);
 
-	[[nodiscard]] std::filesystem::path configDir() override;
-	[[nodiscard]] std::filesystem::path downloadsDir() override;
-	[[nodiscard]] std::vector<std::filesystem::path> candidateDataDirs(const LauncherConfig &config) override;
+	[[nodiscard]] std::filesystem::path ConfigDir() override;
+	[[nodiscard]] std::filesystem::path DownloadsDir() override;
+	[[nodiscard]] std::vector<std::filesystem::path> CandidateDataDirs(const LauncherConfig &config) override;
 
 private:
 	std::filesystem::path m_baseDir;

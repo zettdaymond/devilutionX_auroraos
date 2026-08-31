@@ -24,16 +24,16 @@ class MockScenario {
 public:
 	/// Parses a scenario name; returns a scenario using MockWorld
 	/// services. Throws std::invalid_argument for unknown names.
-	[[nodiscard]] static MockScenario byName(const std::string &name);
+	[[nodiscard]] static MockScenario ByName(const std::string &name);
 
-	[[nodiscard]] ServiceBundle makeBundle() const;
+	[[nodiscard]] ServiceBundle MakeBundle() const;
 
 	[[nodiscard]] const std::string &name() const { return m_name; }
 
 	/// Access to the world, e.g. for tests to mutate state mid-flow.
 	[[nodiscard]] MockWorld &world() const { return *m_world; }
 
-	static const std::vector<std::string> &names();
+	static const std::vector<std::string> &Names();
 
 private:
 	MockScenario(std::string name, MockDownloadBehavior behavior);

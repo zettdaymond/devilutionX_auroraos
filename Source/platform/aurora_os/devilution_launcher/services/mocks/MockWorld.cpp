@@ -27,31 +27,31 @@ MockWorld::MockWorld()
 	m_freeSpaceBytes = kFakeFreeSpace;
 }
 
-void MockWorld::setPresent(KnownFile file, int64_t sizeBytes)
+void MockWorld::SetPresent(KnownFile file, int64_t sizeBytes)
 {
 	std::lock_guard<std::mutex> lock(m_mutex);
 	m_files[static_cast<size_t>(file)] = sizeBytes;
 }
 
-void MockWorld::setAbsent(KnownFile file)
+void MockWorld::SetAbsent(KnownFile file)
 {
 	std::lock_guard<std::mutex> lock(m_mutex);
 	m_files[static_cast<size_t>(file)] = -1;
 }
 
-bool MockWorld::isPresent(KnownFile file) const
+bool MockWorld::IsPresent(KnownFile file) const
 {
 	std::lock_guard<std::mutex> lock(m_mutex);
 	return m_files[static_cast<size_t>(file)] >= 0;
 }
 
-void MockWorld::setFreeSpace(int64_t bytes)
+void MockWorld::SetFreeSpace(int64_t bytes)
 {
 	std::lock_guard<std::mutex> lock(m_mutex);
 	m_freeSpaceBytes = bytes;
 }
 
-MockWorld::Snapshot MockWorld::take() const
+MockWorld::Snapshot MockWorld::Take() const
 {
 	std::lock_guard<std::mutex> lock(m_mutex);
 	Snapshot snapshot;
@@ -60,7 +60,7 @@ MockWorld::Snapshot MockWorld::take() const
 	return snapshot;
 }
 
-void MockWorld::applyDownloadFinished(KnownFile file, bool success)
+void MockWorld::ApplyDownloadFinished(KnownFile file, bool success)
 {
 	std::lock_guard<std::mutex> lock(m_mutex);
 	if (success) {
@@ -72,7 +72,7 @@ void MockWorld::applyDownloadFinished(KnownFile file, bool success)
 	}
 }
 
-bool MockWorld::applyPreset(const std::string &name)
+bool MockWorld::ApplyPreset(const std::string &name)
 {
 	if (std::find(kPresets.begin(), kPresets.end(), name) == kPresets.end()) {
 		return false;
@@ -105,7 +105,7 @@ bool MockWorld::applyPreset(const std::string &name)
 	return true;
 }
 
-const std::vector<std::string> &MockWorld::presetNames()
+const std::vector<std::string> &MockWorld::PresetNames()
 {
 	return kPresets;
 }

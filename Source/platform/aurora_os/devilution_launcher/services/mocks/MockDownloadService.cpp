@@ -54,7 +54,7 @@ MockDownloadService::~MockDownloadService()
 	}
 }
 
-void MockDownloadService::start(const std::string &, const std::filesystem::path &destination, Listener listener)
+void MockDownloadService::Start(const std::string &, const std::filesystem::path &destination, Listener listener)
 {
 	if (m_active.load()) {
 		return;
@@ -69,21 +69,21 @@ void MockDownloadService::start(const std::string &, const std::filesystem::path
 		m_thread.join();
 	}
 	m_thread = std::thread([this, listener = std::move(listener), totalBytes, file]() mutable {
-		run(std::move(listener), totalBytes, file);
+		Run(std::move(listener), totalBytes, file);
 	});
 }
 
-void MockDownloadService::cancel()
+void MockDownloadService::Cancel()
 {
 	m_cancelRequested.store(true);
 }
 
-bool MockDownloadService::isActive()
+bool MockDownloadService::IsActive()
 {
 	return m_active.load();
 }
 
-void MockDownloadService::run(Listener listener, int64_t totalBytes, KnownFile file)
+void MockDownloadService::Run(Listener listener, int64_t totalBytes, KnownFile file)
 {
 	const int stepCount = m_behavior == MockDownloadBehavior::InstantSuccess ? 10 : 60;
 	const auto stepDelay = m_behavior == MockDownloadBehavior::InstantSuccess ? 30ms : 200ms;
@@ -101,7 +101,7 @@ void MockDownloadService::run(Listener listener, int64_t totalBytes, KnownFile f
 
 		if (m_behavior == MockDownloadBehavior::FailAtHalf && step == stepCount / 2) {
 			m_active.store(false);
-			m_world->applyDownloadFinished(file, false);
+			m_world->ApplyDownloadFinished(file, false);
 			if (listener.onFinished) {
 				listener.onFinished(false, "Ошибка сети: соединение прервано");
 			}
@@ -111,14 +111,14 @@ void MockDownloadService::run(Listener listener, int64_t totalBytes, KnownFile f
 
 	m_active.store(false);
 	if (m_cancelRequested.load()) {
-		m_world->applyDownloadFinished(file, false);
+		m_world->ApplyDownloadFinished(file, false);
 		if (listener.onFinished) {
 			listener.onFinished(false, "cancelled");
 		}
 		return;
 	}
 
-	m_world->applyDownloadFinished(file, true);
+	m_world->ApplyDownloadFinished(file, true);
 	if (listener.onFinished) {
 		listener.onFinished(true, {});
 	}

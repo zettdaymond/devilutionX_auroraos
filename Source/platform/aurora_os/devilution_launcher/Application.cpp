@@ -237,8 +237,8 @@ void Application::AttachFileLog()
 	// журнал читается только рутом, а файл доступен пользователю напрямую.
 	try {
 		std::error_code ec;
-		std::filesystem::create_directories(m_services.paths->configDir(), ec);
-		const auto logPath = m_services.paths->configDir() / "launcher.log";
+		std::filesystem::create_directories(m_services.paths->ConfigDir(), ec);
+		const auto logPath = m_services.paths->ConfigDir() / "launcher.log";
 		auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
 		    logPath.string(), 512 * 1024, 2);
 		spdlog::default_logger()->sinks().push_back(std::move(fileSink));
@@ -284,19 +284,19 @@ AppResult Application::Run()
 		}
 	}
 
-	m_store->init();
+	m_store->Init();
 	if (m_initialScreen.has_value()) {
-		m_store->dispatch(launcher::intent::UiNavigate { *m_initialScreen });
+		m_store->Dispatch(launcher::intent::UiNavigate { *m_initialScreen });
 	}
 	if (m_initialBrowser) {
-		m_store->dispatch(launcher::intent::SelectDataFolder {});
+		m_store->Dispatch(launcher::intent::SelectDataFolder {});
 	}
 	if (m_initialDialog.has_value()) {
-		m_store->dispatch(launcher::intent::UiOpenDialog { *m_initialDialog });
+		m_store->Dispatch(launcher::intent::UiOpenDialog { *m_initialDialog });
 	}
 
 	auto dispatch = [this](launcher::Intent intent) {
-		m_store->dispatch(std::move(intent));
+		m_store->Dispatch(std::move(intent));
 	};
 
 	auto processEvent = [this](const SDL_Event &event) {
@@ -314,7 +314,7 @@ AppResult Application::Run()
 	// После «Играть» цикл дорисовывает iris-анимацию (сужающийся круг
 	// поверх последнего кадра) и только затем отдаёт управление движку.
 	while (m_running
-	    && (!m_store->state().pendingLaunch.has_value() || !m_view->LaunchIrisDone())) {
+	    && (!m_store->State().pendingLaunch.has_value() || !m_view->LaunchIrisDone())) {
 		// В фоне (свёрнуто/скрыто) цикл продолжает обслуживать события и
 		// загрузки, но не рендерит. Вместо слепого сна ждём событие в ОС:
 		// разворачивание обрабатывается мгновенно, а таймаут 250 мс равен
@@ -327,7 +327,7 @@ AppResult Application::Run()
 		if (hidden) {
 			// Анимировать закрытое окно не для кого: iris не стартует без
 			// рендера, и цикл выше никогда не увидел бы его завершения.
-			if (m_store->state().pendingLaunch.has_value()) {
+			if (m_store->State().pendingLaunch.has_value()) {
 				break;
 			}
 			SDL_Event wake {};
@@ -341,7 +341,7 @@ AppResult Application::Run()
 			processEvent(event);
 		}
 
-		m_store->poll();
+		m_store->Poll();
 		if (hidden) {
 			continue;
 		}
@@ -350,7 +350,7 @@ AppResult Application::Run()
 		ImGui_ImplSDL2_NewFrame();
 		ImGui::NewFrame();
 
-		m_view->Render(m_store->state(), dispatch);
+		m_view->Render(m_store->State(), dispatch);
 
 		ImGui::Render();
 
@@ -361,10 +361,10 @@ AppResult Application::Run()
 	}
 
 	AppResult result;
-	if (const auto launch = m_store->state().pendingLaunch) {
+	if (const auto launch = m_store->State().pendingLaunch) {
 		result.success = true;
 		result.action = *launch;
-		result.dataPath = m_store->state().dataFolder;
+		result.dataPath = m_store->State().dataFolder;
 	}
 	return result;
 }

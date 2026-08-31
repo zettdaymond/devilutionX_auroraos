@@ -11,23 +11,23 @@ AuroraPathProvider::AuroraPathProvider(std::filesystem::path baseDir)
 {
 }
 
-std::filesystem::path AuroraPathProvider::configDir()
+std::filesystem::path AuroraPathProvider::ConfigDir()
 {
 	return m_baseDir;
 }
 
-std::filesystem::path AuroraPathProvider::downloadsDir()
+std::filesystem::path AuroraPathProvider::DownloadsDir()
 {
 	return std::filesystem::path { devilution::AuroraOsStandartPaths::GetAdditionalMPQSearchPath() };
 }
 
-std::vector<std::filesystem::path> AuroraPathProvider::candidateDataDirs(const LauncherConfig &config)
+std::vector<std::filesystem::path> AuroraPathProvider::CandidateDataDirs(const LauncherConfig &config)
 {
 	std::vector<std::filesystem::path> dirs;
 	if (config.dataFolder) {
 		dirs.push_back(*config.dataFolder);
 	}
-	dirs.push_back(downloadsDir());
+	dirs.push_back(DownloadsDir());
 	dirs.emplace_back(devilution::AuroraOsStandartPaths::GetBundledAssetsPath());
 	return dirs;
 }

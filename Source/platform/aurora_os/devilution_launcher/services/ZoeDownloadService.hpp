@@ -13,19 +13,19 @@ namespace launcher {
 
 /// IDownloadService implementation backed by the zoe downloader.
 ///
-/// - One download at a time; a second start() while active is ignored.
+/// - One download at a time; a second Start() while active is ignored.
 /// - Progress reports are throttled to ~4 per second; speed is sampled
 ///   from zoe's realtime-speed callback and sent along with progress.
-/// - cancel() aborts; the listener then receives onFinished(false,
+/// - Cancel() aborts; the listener then receives onFinished(false,
 ///   "cancelled") and the partial file is removed.
 class ZoeDownloadService final : public IDownloadService {
 public:
 	ZoeDownloadService();
 	~ZoeDownloadService() override;
 
-	void start(const std::string &url, const std::filesystem::path &destination, Listener listener) override;
-	void cancel() override;
-	[[nodiscard]] bool isActive() override;
+	void Start(const std::string &url, const std::filesystem::path &destination, Listener listener) override;
+	void Cancel() override;
+	[[nodiscard]] bool IsActive() override;
 
 private:
 	/// Guards m_active, m_listener and throttle state (zoe callbacks
