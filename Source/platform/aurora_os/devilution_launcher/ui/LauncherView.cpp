@@ -91,7 +91,9 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
 	const float navHeight = Scale::px(3.2F);
-	const float pad = Scale::px(1.2F);
+	// ~16dp на устройстве: как базовые поля мобильных платформ — текст
+	// дышит, интерактив не лазит в жестовую зону у края.
+	const float pad = Scale::px(1.5F);
 	// Keep a small gap above the screen edge so the nav bar is never
 	// clipped by system gesture areas on phones.
 	const float bottomInset = Scale::px(0.35F);
