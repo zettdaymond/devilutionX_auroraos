@@ -397,12 +397,32 @@ void ToggleSwitch(const char *strId, bool value, const std::function<void(bool)>
 	draw->AddCircle(center, knobD * 0.5F, Theme::ColorU32(ColorRole::BorderGold), 16, Scale::Px(0.05F));
 }
 
+namespace {
+/// Слайдер сейчас тащат — вид сообщает жесту прокрутки, что движение
+/// принадлежит перетаскиванию, а не прокрутке страницы. Флаг живёт с
+/// прошлой кадра: жест проверяется до отрисовки виджетов.
+int s_sliderDragFrame = -1;
+bool s_sliderDragging = false;
+} // namespace
+
+bool IsSliderDragging()
+{
+	return s_sliderDragging;
+}
+
 void OptionSlider(const char *strId, int value, int minValue, int maxValue,
     const std::function<void(int)> &onChange)
 {
 	const float height = Scale::Px(2.1F);
 	const ImVec2 size(ImGui::GetContentRegionAvail().x, height);
 	ImGui::InvisibleButton(strId, size, ImGuiButtonFlags_None);
+
+	const ImGuiID frame = static_cast<ImGuiID>(ImGui::GetFrameCount());
+	if (s_sliderDragFrame != frame) {
+		s_sliderDragFrame = frame;
+		s_sliderDragging = false;
+	}
+	s_sliderDragging = s_sliderDragging || ImGui::IsItemActive();
 
 	const ImVec2 min = ImGui::GetItemRectMin();
 	const ImVec2 max = ImGui::GetItemRectMax();

@@ -80,9 +80,10 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 
 	// Жест «потянул — прокрутил»: если палец увести дальше порога нажатия,
 	// кадр считается прокруткой, и клики на время жеста
-	// игнорируются.
+	// игнорируются. Исключение — перетаскивание слайдера: движение
+	// принадлежит ползунку и страницу прокручивать не должно.
 	ImGuiIO &io = ImGui::GetIO();
-	if (ImGui::IsMouseDown(0)) {
+	if (ImGui::IsMouseDown(0) && !widgets::IsSliderDragging()) {
 		const float dragDistance = std::sqrt(io.MouseDragMaxDistanceSqr[0]);
 		if (dragDistance > Scale::Px(0.6F)) {
 			m_gestureDrag = true;

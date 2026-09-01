@@ -81,6 +81,10 @@ void ToggleSwitch(const char *strId, bool value, const std::function<void(bool)>
 void OptionSlider(const char *strId, int value, int minValue, int maxValue,
     const std::function<void(int)> &onChange);
 
+/// Тащат ли сейчас слайдер (данные прошлого кадра) — жест прокрутки
+/// страницы на это время не включается.
+[[nodiscard]] bool IsSliderDragging();
+
 /// Строка файла в чек-листе. Первая строка: маркер, имя, справа размер
 /// (или «можно скачать»/«не найден») и действие — корзинка для
 /// скачанного, кнопка «Скачать» для отсутствующего скачиваемого.
