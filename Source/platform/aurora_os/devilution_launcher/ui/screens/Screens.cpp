@@ -478,34 +478,27 @@ StepperGeometry StepperMetricsOf(const SettingSpec &spec)
 	return metrics;
 }
 
-/// Строка настройки: имя и описание на всю ширину, контрол справа на
-/// линии имени (тумблер или степпер вариантов), у слайдеров — значение
-/// текстом и полоса под описанием. Контролы только отправляют интенты:
-/// новое значение приедет из состояния на следующем кадре.
+/// Строка настройки — та же схема, что у FileRow на экране данных:
+/// имя и прижатый вправо контрол на первой линии, описание прямо под
+/// именем (SetCursorPosY под линию имени, как путь у файла), перенос
+/// описания не заезжает под контрол, а следующая строка не наезжает
+/// на его низ. Контролы только отправляют интенты.
 void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &dispatch)
 {
 	ImGui::PushID(spec.key.data());
+
 	const float startX = ImGui::GetCursorPosX();
-	const float avail = ImGui::GetContentRegionAvail().x;
+	const float rowWidth = ImGui::GetContentRegionAvail().x;
+	const float rightEdge = startX + rowWidth;
 
-	// Ширина правого контрола строки — до границы переносится имя.
-	const StepperGeometry stepper = StepperMetricsOf(spec);
-	float reserveRight = Scale::Px(0.9F);
-	if (spec.kind == SettingKind::Toggle) {
-		reserveRight += Scale::Px(2.4F);
-	} else if (spec.kind == SettingKind::Cycle) {
-		reserveRight += stepper.totalWidth;
-	} else {
-		reserveRight += Scale::Px(1.6F);
-	}
-	ImGui::PushTextWrapPos(startX + avail - reserveRight);
 	ImGui::TextUnformatted(spec.nameRu.data());
-	ImGui::PopTextWrapPos();
 
+	const StepperGeometry stepper = StepperMetricsOf(spec);
+	float controlWidth = 0.0F; // правая зона, в которую не заезжает описание
 	switch (spec.kind) {
 	case SettingKind::Toggle:
-		ImGui::SameLine(startX + avail - Scale::Px(2.4F));
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY() - Scale::Px(0.05F));
+		controlWidth = Scale::Px(2.4F);
+		ImGui::SameLine(rightEdge - controlWidth);
 		widgets::ToggleSwitch("switch", value != 0, [&dispatch, id = spec.id](bool next) {
 			dispatch(intent::SettingChanged { id, next ? 1 : 0 });
 		});
@@ -514,8 +507,8 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 		// Степпер «‹ значение ›»: компактнее кнопки с названием варианта
 		// и очевидно, что значение переключается. Ячейка значения — по
 		// самому широкому варианту, чтобы степпер не прыгал при смене.
-		const std::string current = SettingValueText(spec, value);
-		ImGui::SameLine(startX + avail - stepper.totalWidth);
+		controlWidth = stepper.totalWidth;
+		ImGui::SameLine(rightEdge - controlWidth);
 		widgets::GhostButton(icons::ChevronLeft, "", ImVec2(stepper.button, stepper.button), [&dispatch, &spec, value] {
 			const int count = static_cast<int>(spec.optionCount);
 			dispatch(intent::SettingChanged { spec.id, (value + count - 1) % count });
@@ -529,6 +522,7 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 			dispatch(intent::SettingChanged { spec.id, (value + 1) % static_cast<int>(spec.optionCount) });
 		});
 
+		const std::string current = SettingValueText(spec, value);
 		ImFont *font = ImGui::GetFont();
 		const float font_size = ImGui::GetFontSize();
 		const ImVec2 textSize = font->CalcTextSizeA(font_size, FLT_MAX, 0.0F, current.c_str());
@@ -540,7 +534,7 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 	case SettingKind::Slider:
 	case SettingKind::PercentVolume: {
 		const std::string text = SettingValueText(spec, value);
-		ImGui::SameLine(startX + avail - ImGui::CalcTextSize(text.c_str()).x);
+		ImGui::SameLine(rightEdge - ImGui::CalcTextSize(text.c_str()).x);
 		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextHeading));
 		ImGui::TextUnformatted(text.c_str());
 		ImGui::PopStyleColor();
@@ -548,19 +542,33 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 	}
 	}
 
-	// Контрол занял правую часть строки имени — описание с новой строки.
-	ImGui::NewLine();
+	// Конец линии имени — как textBottom в FileRow.
+	const float textBottom = ImGui::GetCursorPosY();
+
 	if (!spec.descriptionRu.empty()) {
+		ImGui::SetCursorPosY(textBottom);
+		// Перенос описания — левее контрола, висящего справа.
+		const float controlGap = controlWidth > 0.0F ? controlWidth + Scale::Px(0.6F) : 0.0F;
+		ImGui::PushTextWrapPos(startX + rowWidth - controlGap);
 		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
-		ImGui::TextWrapped("%s", spec.descriptionRu.data());
+		ImGui::TextUnformatted(spec.descriptionRu.data());
 		ImGui::PopStyleColor();
+		ImGui::PopTextWrapPos();
 	}
 	if (spec.kind == SettingKind::Slider || spec.kind == SettingKind::PercentVolume) {
-		ImGui::Dummy(ImVec2(0, Scale::Px(0.15F)));
+		ImGui::Dummy(ImVec2(0, Scale::Px(0.25F)));
 		widgets::OptionSlider("slider", value, spec.minValue, spec.maxValue,
 		    [&dispatch, id = spec.id](int next) { dispatch(intent::SettingChanged { id, next }); });
 	}
 
+	// Контрол может висеть ниже последней строки описания — не даём
+	// следующей строке наехать на него (guard из FileRow).
+	const float controlBottom = textBottom + Scale::Px(0.35F);
+	if (ImGui::GetCursorPosY() < controlBottom) {
+		ImGui::SetCursorPosY(controlBottom);
+	}
+
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.55F)));
 	ImGui::PopID();
 }
 
@@ -568,16 +576,9 @@ void Settings(const LauncherState &state, const Dispatcher &dispatch)
 {
 	widgets::ScreenHeader("Настройки", [&dispatch] { dispatch(intent::UiNavigate { Screen::Home }); });
 
-	const float fullWidth = ImGui::GetContentRegionAvail().x;
-	// В ландшафте строки во всю ширину растягиваются — ограничиваем и
-	// центрируем контентный блок, как на главном экране.
-	const bool portrait = Scale::Portrait();
-	const float width = portrait ? fullWidth : std::min(fullWidth, Scale::Px(kLandscapeContentMaxRem));
-	const float sidePad = portrait ? 0.0F : std::max(0.0F, (fullWidth - width) * 0.5F);
-	if (sidePad > 0.0F) {
-		ImGui::Indent(sidePad);
-	}
-
+	// Раскладка как на экране данных: строки на всю ширину контента,
+	// без капа и Indent — SameLine-выравнивание FileRow на Indent не
+	// рассчитывает.
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 	ImGui::TextWrapped("%s", "Настройки применяются при следующем запуске игры.");
 	ImGui::PopStyleColor();
@@ -589,26 +590,22 @@ void Settings(const LauncherState &state, const Dispatcher &dispatch)
 		ImGui::PopFont();
 		ImGui::Dummy(ImVec2(0, Scale::Px(0.35F)));
 		Theme::DrawDivider(ImGui::GetCursorScreenPos(),
-		    ImGui::GetCursorScreenPos() + ImVec2(width, 0), 0.6F);
-		ImGui::Dummy(ImVec2(0, Scale::Px(0.45F)));
+		    ImGui::GetCursorScreenPos() + ImVec2(ImGui::GetContentRegionAvail().x, 0), 0.6F);
+		ImGui::Dummy(ImVec2(0, Scale::Px(0.5F)));
 
 		for (const SettingSpec &spec : kSettingCatalog) {
 			if (spec.group != group.group) {
 				continue;
 			}
 			RenderSettingRow(spec, state.settingValues[static_cast<size_t>(spec.id)], dispatch);
-			ImGui::Dummy(ImVec2(0, Scale::Px(0.5F)));
 		}
 	}
 
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.9F)));
-	widgets::GhostButton(icons::Refresh, "Сбросить настройки", ImVec2(width, Scale::Px(2.2F)), [&dispatch] {
-		dispatch(intent::UiOpenDialog { Dialog::ConfirmResetSettings });
-	});
-
-	if (sidePad > 0.0F) {
-		ImGui::Unindent(sidePad);
-	}
+	widgets::GhostButton(icons::Refresh, "Сбросить настройки",
+	    ImVec2(ImGui::GetContentRegionAvail().x, Scale::Px(2.2F)), [&dispatch] {
+		    dispatch(intent::UiOpenDialog { Dialog::ConfirmResetSettings });
+	    });
 }
 
 void About(const LauncherState &, const Dispatcher &dispatch)
