@@ -27,6 +27,9 @@ namespace {
 constexpr float kFirstRunHeroMaxRem = 17.0F;
 constexpr float kPortraitHeroMaxRem = 14.0F;
 constexpr float kLandscapeHeroRem = 11.0F;
+// В широком окне полка с плитками во всю ширину растягивается в лоскуты —
+// контентный блок ограничен и центрирован; на узких окнах кап не срабатывает.
+constexpr float kLandscapeContentMaxRem = 30.0F;
 constexpr float kTileHeightRem = 4.2F;
 constexpr float kVoiceBannerHeightRem = 2.4F;
 
@@ -213,9 +216,17 @@ void RenderVoiceBanner(const LauncherState &state, const Dispatcher &dispatch, f
 
 void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, const ArtSet &art)
 {
-	const float width = ImGui::GetContentRegionAvail().x;
+	const float fullWidth = ImGui::GetContentRegionAvail().x;
 	const float height = ImGui::GetContentRegionAvail().y;
 	const bool portrait = Scale::Portrait();
+	const float width = portrait ? fullWidth : std::min(fullWidth, Scale::Px(kLandscapeContentMaxRem));
+
+	// Центрируем ограниченный блок. Indent, а не SetCursorPosX: тот действует
+	// лишь до первого переноса строки, а заголовок и плитки начинаются с новой.
+	const float sidePad = portrait ? 0.0F : std::max(0.0F, (fullWidth - width) * 0.5F);
+	if (sidePad > 0.0F) {
+		ImGui::Indent(sidePad);
+	}
 
 	const Featured featured = MakeFeatured(state);
 	const std::array<ShelfItem, 3> tiles = MakeShelfItems(state, art);
@@ -270,6 +281,10 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 
 	if (state.diablo.available && !state.russianVoiceInstalled) {
 		RenderVoiceBanner(state, dispatch, width);
+	}
+
+	if (sidePad > 0.0F) {
+		ImGui::Unindent(sidePad);
 	}
 }
 
