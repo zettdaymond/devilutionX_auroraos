@@ -14,7 +14,7 @@ class IPathProvider {
 public:
 	virtual ~IPathProvider() = default;
 
-	/// Папка служебных файлов лаунчера (launcher.conf и прочие).
+	/// Папка служебных файлов лаунчера (launcher.ini и прочие).
 	[[nodiscard]] virtual std::filesystem::path ConfigDir() = 0;
 
 	/// Папка для скачиваемого (spawn.mpq, ru.mpq), доступная для записи.

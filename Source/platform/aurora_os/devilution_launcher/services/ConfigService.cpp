@@ -1,15 +1,23 @@
 #include "ConfigService.hpp"
 
-#include <spdlog/spdlog.h>
-#include <toml++/toml.hpp>
+#include <SimpleIni.h>
 
-#include <fstream>
-#include <string_view>
+#include <spdlog/spdlog.h>
+
+#include <utility>
 
 namespace launcher {
 
 namespace {
-constexpr std::string_view kDataFolderKey = "data_folder";
+
+/// Те же флаги формата, что у движкового diablo.ini: одна библиотека,
+/// один стиль на оба конфига лаунчера.
+void ConfigureIni(CSimpleIniA &ini)
+{
+	ini.SetSpaces(false);
+	ini.SetMultiKey();
+}
+
 } // namespace
 
 ConfigService::ConfigService(std::filesystem::path configFilePath)
@@ -21,50 +29,56 @@ LauncherConfig ConfigService::Load()
 {
 	LauncherConfig config;
 
-	if (!std::filesystem::exists(m_filePath)) {
+	CSimpleIniA ini;
+	ConfigureIni(ini);
+	const SI_Error rc = ini.LoadFile(m_filePath.string().c_str());
+	if (rc < SI_OK) {
+		if (std::filesystem::exists(m_filePath)) {
+			spdlog::warn("Failed to parse {}, using defaults", m_filePath.string());
+		}
 		return config;
 	}
 
-	try {
-		auto table = toml::parse_file(m_filePath.string());
-		if (auto folder = table[kDataFolderKey].value<std::string>()) {
-			config.dataFolder = std::filesystem::path(*folder);
-		}
-	} catch (const toml::parse_error &err) {
-		spdlog::error("Failed to parse {}: {}. Using defaults.", m_filePath.string(), err.description());
+	const char *folder = ini.GetValue("Storage", "DataFolder", nullptr);
+	if (folder != nullptr && folder[0] != '\0') {
+		config.dataFolder = std::filesystem::path(folder);
 	}
-
 	return config;
 }
 
 void ConfigService::Save(const LauncherConfig &config)
 {
-	toml::table table;
-	if (config.dataFolder) {
-		table.insert(kDataFolderKey, config.dataFolder->string());
+	// Файл целиком наш — читаем перед записью только ради сохранения
+	// чужих ключей, если их когда-нибудь добавят.
+	CSimpleIniA ini;
+	ConfigureIni(ini);
+	const SI_Error rc = ini.LoadFile(m_filePath.string().c_str());
+	if (rc < SI_OK && std::filesystem::exists(m_filePath)) {
+		spdlog::error("Failed to parse {}, refusing to overwrite", m_filePath.string());
+		return;
+	}
+
+	if (config.dataFolder.has_value()) {
+		ini.SetValue("Storage", "DataFolder", config.dataFolder->string().c_str());
+	} else {
+		ini.Delete("Storage", "DataFolder");
 	}
 
 	std::error_code ec;
-	const std::filesystem::path tmp = m_filePath;
-	auto stream = std::ofstream(tmp.string() + ".tmp", std::ios::trunc);
-	if (!stream) {
-		spdlog::error("Failed to open {} for writing", tmp.string());
+	std::filesystem::create_directories(m_filePath.parent_path(), ec);
+
+	const std::string tmp = m_filePath.string() + ".tmp";
+	if (ini.SaveFile(tmp.c_str()) < SI_OK) {
+		spdlog::error("Failed to write {}", tmp);
 		return;
 	}
-
-	stream << table << std::endl;
-
-	if (!stream.good()) {
-		spdlog::error("Failed to write {}", tmp.string());
-		return;
-	}
-
-	stream.close();
-	std::filesystem::rename(tmp.string() + ".tmp", m_filePath, ec);
+	std::filesystem::rename(tmp, m_filePath, ec);
 	if (ec) {
-	// Если переименование невозможно — просто перезаписываем файл.
-		std::ofstream direct(m_filePath, std::ios::trunc);
-		direct << table << std::endl;
+		// Переименование поверх существующего файла иногда невозможно —
+		// пишем напрямую (как EngineOptionsService).
+		if (ini.SaveFile(m_filePath.string().c_str()) < SI_OK) {
+			spdlog::error("Failed to write {}", m_filePath.string());
+		}
 	}
 }
 

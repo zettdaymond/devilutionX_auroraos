@@ -18,7 +18,7 @@ namespace launcher {
 ServiceBundle MakeRealServices(std::filesystem::path baseDir, std::filesystem::path engineIniPath)
 {
 	ServiceBundle bundle;
-	bundle.config = std::make_unique<ConfigService>(baseDir / "launcher.conf");
+	bundle.config = std::make_unique<ConfigService>(baseDir / "launcher.ini");
 	bundle.files = std::make_unique<GameFilesService>();
 	bundle.downloads = std::make_unique<ZoeDownloadService>();
 	bundle.engineOptions = std::make_unique<EngineOptionsService>(std::move(engineIniPath));

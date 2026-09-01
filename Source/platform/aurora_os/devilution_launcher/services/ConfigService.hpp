@@ -4,7 +4,8 @@
 
 namespace launcher {
 
-/// Настройки в TOML (launcher.conf). Файл записывается атомарно:
+/// Настройки лаунчера в ini (launcher.ini, SimpleIni — та же библиотека
+/// и формат, что у движкового diablo.ini). Файл записывается атомарно:
 /// сначала во временный файл рядом с целевым, затем переименовывается.
 class ConfigService final : public IConfigService {
 public:

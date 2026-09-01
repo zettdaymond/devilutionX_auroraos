@@ -62,15 +62,6 @@ if(NOT TARGET zoe::zoe)
   add_library(zoe::zoe ALIAS zoe)
 endif()
 
-FetchContent_Declare(
-  tomlplusplus
-  GIT_REPOSITORY "https://github.com/marzer/tomlplusplus"
-  GIT_TAG v3.4.0
-  GIT_SHALLOW
-  EXCLUDE_FROM_ALL
-)
-FetchContent_MakeAvailable(tomlplusplus)
-
 # SimpleIni уже используется движком (3rdParty/simpleini — тот же
 # pinned-тарбалл). На Aurora цель создаёт корневая сборка, здесь весь
 # блок пропускается; в standalone-десктопе подтягиваем копию сами.
@@ -182,7 +173,7 @@ if(LAUNCHER_DESKTOP)
 
   add_library(launcher_core OBJECT ${LAUNCHER_CORE_SOURCES})
   target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty)
-  target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe tomlplusplus::tomlplusplus simpleini)
+  target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe simpleini)
 
   add_executable(devilution_launcher
       ${LAUNCHER_UI_SOURCES}
@@ -195,7 +186,6 @@ if(LAUNCHER_DESKTOP)
           launcher_core
           spdlog::spdlog
           zoe::zoe
-          tomlplusplus::tomlplusplus
           imgui
           launcher::assets
           SDL2::SDL2
@@ -215,7 +205,7 @@ else()
   target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
   # Цель simpleini к этому моменту уже создана корневой сборкой
   # (CMake/Dependencies.cmake -> 3rdParty/simpleini).
-  target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe tomlplusplus::tomlplusplus simpleini)
+  target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe simpleini)
 
   add_devilutionx_object_library(devilution_launcher ${LAUNCHER_UI_SOURCES})
   target_include_directories(devilution_launcher PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

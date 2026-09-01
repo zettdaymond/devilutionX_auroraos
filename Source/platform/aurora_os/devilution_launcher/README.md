@@ -46,7 +46,8 @@ services/                                    — IConfigService, IGameFilesServi
 
 ### Сервисы и платформы
 
-- **Портабельные** (десктоп и Aurora): `ConfigService` (toml++, атомарная запись),
+- **Портабельные** (десктоп и Aurora): `ConfigService` (SimpleIni-конфиг
+  `launcher.ini`, атомарная запись),
   `GameFilesService` (std::filesystem, регистронезависимый поиск MPQ),
   `ZoeDownloadService` (zoe, троттлинг прогресса ~4 Гц, отмена),
   `EngineOptionsService` (diablo.ini движка поверх вендоренного SimpleIni —
@@ -118,7 +119,7 @@ devilution_launcher [--mock-scenario=<имя>] [--screen=home|data|settings|abou
 1. **Первый запуск** (файлов нет): hero-экран с двумя путями —
    «Выбрать файлы игры» (проводник MPQ) или «Скачать бесплатное демо».
 2. **Выбор папки**: сканирование известных MPQ (регистронезависимо),
-   статус каждой карточки обновляется; путь сохраняется в `launcher.conf`.
+   статус каждой карточки обновляется; путь сохраняется в `launcher.ini`.
 3. **Запуск**: тап по карточке. Diablo/Hellfire — только при полном
    наборе файлов (для Hellfire — все 4 доп. файла, иначе диалог со
    списком недостающих). Demo без spawn.mpq → подтверждение загрузки.
