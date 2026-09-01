@@ -25,6 +25,83 @@ libSDL2_image.a), поэтому лаунчер не зависит от SDL_ima
 RGB24, PNG-иконки → RGBA32,Linear-скейл ставится на каждую текстуру.
 Heroes перегенерируются теми же сидами (детерминированы), demo — 5111.
 
+## Фон лаунчера (bg.jpg) — перегенерация 2026-09-01
+
+Прежний фон (2048×1200) хорош в портрете, но в ландшафте капюшонная фигура
+слева (0–43.5% кадра) перетягивала внимание с плиток режимов. Новая версия —
+img2img от старого фона: наследует композицию и «почти чёрный» характер
+(оригинал: vis 13.7% / yellow 88.6% / sat 0.39 / mean 9.7), фигуру убирает.
+
+**Чекпоинт:** `dreamshaperXL10.safetensors` — полный DreamShaper XL 1.0
+Alpha2 (Lykon; CivitAI 126688, SHA256 `0F1B80CF…B1FA4`; HF-зеркало
+`jayparmr/DreamShaper_XL1_0_Alpha2`). НЕ Lightning-дистиллят: 30 шагов,
+CFG 5.5, DPM++ 2M Karras. Общий режим: img2img, init = прежний bg.jpg,
+1344×768. Negative (общий для всех): `text, watermark, signature, logo,
+blurry, modern, photorealistic, people, person, characters, figure, hooded
+figure, faces, creature, monster, skull, statue, bright colors, low quality,
+deformed, close-up, busy composition, bright, vivid, high contrast, daylight`
+(для fog-серий ещё `clear sky, sharp details`).
+
+**Denoise-шкала вклада оригинала:** 0.42 — голова фигуры выживает
+(«череп в шлеме», брак); 0.50 — баланс; 0.62–0.68 — сцена всё свободней.
+
+### 1. bg.jpg — деревня в сильном тумане (финалист)
+
+Сид 8801, denoise 0.68 (минимум оригинала). vis 18.1 / mean 13.6.
+
+```
+Dark fantasy digital painting, abandoned mysterious village at night swallowed by extremely dense fog,
+thick heavy mist, only vague crooked silhouettes of wooden houses barely visible through the fog,
+one faint dim lit window glowing through the mist, ravens circling above the rooftops,
+dead gnarled trees, deep charcoal black and dark yellow-olive palette (#181800, #303018, #301818),
+desaturated, muted, faint dim amber glow, no characters, no text, no focal subject,
+extremely dark, dim ambient, very low contrast, subdued,
+oil painting style, 90s dark fantasy video game background art
+```
+
+### 2. bg_alt_cemetery_d62.jpg — кладбище в сильном тумане
+
+Сид 8901, denoise 0.62. vis 18.9 / mean 13.4; у генерации уже есть своя
+пара воронов на (47%, 37%).
+
+```
+Dark fantasy digital painting, abandoned cemetery in a mysterious ruined village at night
+swallowed by extremely dense fog, thick rolling mist,
+leaning gravestones and old crosses barely visible through the heavy fog,
+vague crooked house silhouettes dissolving in the mist, ravens perched on gravestones,
+dead gnarled tree, deep charcoal black and dark yellow-olive palette (#181800, #303018, #301818),
+desaturated, muted, faint dim amber glow, no characters, no text, no focal subject,
+extremely dark, dim ambient, very low contrast, subdued,
+oil painting style, 90s dark fantasy video game background art
+```
+
+### 3. bg_alt_cemetery_8702.jpg — кладбище (первый финалист)
+
+Сид 8702, denoise 0.50. vis 14.2 / yellow 98.2 / sat 0.29 / mean 11.6.
+Вариант с рисованными воронами (см. заметку ниже).
+
+```
+Dark fantasy digital painting, abandoned cemetery in a mysterious ruined village at night,
+leaning gravestones and old weathered crosses, crooked wooden house silhouettes in the fog behind,
+heavy fog rolling low over the graves, ravens perched on gravestones,
+dead gnarled tree, deep charcoal black and dark yellow-olive palette (#181800, #303018, #301818),
+desaturated, muted, faint dim amber glow, no characters, no text, no focal subject,
+extremely dark, dim ambient, low contrast, subdued, oil painting style,
+90s dark fantasy video game background art
+```
+
+**Общий конвейер постобработки** (все три): Color 0.90 (PIL) → градиент
+затемнения к низу (×0.70 от y=55%) → апскейл ×2 нейросетевым DAT x2 через
+A1111 `/sdapi/v1/extra-single-image` (1344×768 → 2688×1536) → JPEG q90.
+Blur убран сознательно: DAT-апскейл сам сохраняет живописную фактуру,
+а размытие делало мелкие детали невидимыми.
+
+**Опыт с рисованными воронами** (для будущих итераций): inpaint по маске
+модель заливает туманом; рисованные полигоны (крылья — Безье, туманный
+ореол за каждой птицей) работают только в светлых полосах тумана — небо
+темнее 20/255, тёмная птица вне светлой зоны не видна (дельта < 5).
+Скрипты сессии: `%TEMP%\draw_ravens_up.py`.
+
 ## Иконки плиток (золотые силуэты)
 
 Сгенерированы там же (1024×1024, CFG 5 / 12 шагов, жёсткий промпт
