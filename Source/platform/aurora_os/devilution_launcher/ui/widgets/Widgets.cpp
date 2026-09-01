@@ -380,13 +380,13 @@ void ToggleSwitch(const char *strId, bool value, const std::function<void(bool)>
 	draw->AddRect(min, max,
 	    Theme::ColorU32(hovered ? ColorRole::GoldBright : ColorRole::BorderGold), rounding, 0, Scale::Px(0.07F));
 
-	// Ручка: на тёмном треке золотая, на золотом — тёмная (как текст
-	// главных кнопок), цвет также перекатывается за положением.
+	// Ручка всегда золотая: цвет не должен кодировать состояние — иначе
+	// «золотая ручка на тёмном треке» читается как включение (на этом
+	// стабильно путались и vision-модели, и тесты на доступность).
 	const float knobD = size.y - Scale::Px(0.4F) - (held ? 0.0F : Scale::Px(0.1F));
 	const float travel = size.x - knobD - Scale::Px(0.4F);
 	const ImVec2 center(min.x + Scale::Px(0.2F) + travel * knobK + knobD * 0.5F, (min.y + max.y) * 0.5F);
-	const ImVec4 knob = lerp(Theme::Color(ColorRole::GoldBright), ImVec4(0.15F, 0.07F, 0.03F, 1.0F), knobK);
-	draw->AddCircleFilled(center, knobD * 0.5F, ImGui::ColorConvertFloat4ToU32(knob), 16);
+	draw->AddCircleFilled(center, knobD * 0.5F, Theme::ColorU32(ColorRole::GoldBright), 16);
 	draw->AddCircle(center, knobD * 0.5F, Theme::ColorU32(ColorRole::BorderGold), 16, Scale::Px(0.05F));
 }
 
