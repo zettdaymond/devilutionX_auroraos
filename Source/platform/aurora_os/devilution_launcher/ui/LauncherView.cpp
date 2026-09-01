@@ -127,9 +127,19 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	// держим с запасом над кластером (высота кнопки + отступ).
 	const float bottomReserve = isHome ? Scale::Px(4.2F) : pad * 0.5F;
 	const ImVec2 windowSize = ImGui::GetWindowSize();
-	const ImVec2 contentPos(0.0F, pad * 0.5F);
-	const ImVec2 contentSize(windowSize.x,
+	ImVec2 contentPos(0.0F, pad * 0.5F);
+	ImVec2 contentSize(windowSize.x,
 	    windowSize.y - pad - bottomReserve - bottomInset);
+	if (!isHome) {
+		// Вторичные экраны (Данные/Настройки/Инфо): в ландшафте столбец
+		// ограничиваем и центрируем — как контентный блок главной, иначе
+		// строки и кнопки растягиваются на всю ширину простынёй. Сужаем
+		// сам child: вся раскладка строк (FileRow, SameLine-выравнивание)
+		// считает ширину от его GetContentRegionAvail.
+		const float capped = std::min(contentSize.x, Scale::Px(kLandscapeContentMaxRem) + pad * 2.0F);
+		contentPos.x = std::max(0.0F, (windowSize.x - capped) * 0.5F);
+		contentSize.x = capped;
+	}
 
 	ImGui::SetCursorPos(contentPos);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, 0));

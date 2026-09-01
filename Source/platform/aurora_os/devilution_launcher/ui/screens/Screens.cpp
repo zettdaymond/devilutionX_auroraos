@@ -29,9 +29,6 @@ namespace {
 constexpr float kFirstRunHeroMaxRem = 17.0F;
 constexpr float kPortraitHeroMaxRem = 14.0F;
 constexpr float kLandscapeHeroRem = 11.0F;
-// В широком окне полка с плитками во всю ширину растягивается в лоскуты —
-// контентный блок ограничен и центрирован; на узких окнах кап не срабатывает.
-constexpr float kLandscapeContentMaxRem = 30.0F;
 constexpr float kTileHeightRem = 4.2F;
 constexpr float kVoiceBannerHeightRem = 2.4F;
 
