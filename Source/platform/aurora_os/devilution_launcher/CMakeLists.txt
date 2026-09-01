@@ -4,6 +4,10 @@ project(devilution_launcher LANGUAGES CXX)
 
 option(LAUNCHER_DESKTOP "Build the standalone desktop launcher executable" OFF)
 option(LAUNCHER_TESTS "Build launcher unit tests" ${LAUNCHER_DESKTOP})
+# Отладка UI по скриншотам через vision-модели: обычная тёмная ручка
+# включённого тумблера путает модели (читают «золотая ручка» как вкл),
+# этот флаг делает ручку золотой в обоих состояниях.
+option(LAUNCHER_VISION_DEBUG_TOGGLES "Постоянная золотая ручка тумблеров для vision-отладки" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -208,4 +212,9 @@ else()
           SDL2::SDL2
   )
 
+endif()
+
+# Обе ветки (desktop exe и aurora object library) собирают ui/widgets.
+if(LAUNCHER_VISION_DEBUG_TOGGLES)
+  target_compile_definitions(devilution_launcher PRIVATE LAUNCHER_VISION_DEBUG_TOGGLES=1)
 endif()
