@@ -71,6 +71,20 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(tomlplusplus)
 
+# SimpleIni уже используется движком (3rdParty/simpleini — тот же
+# pinned-тарбалл). На Aurora цель создаёт корневая сборка, здесь весь
+# блок пропускается; в standalone-десктопе подтягиваем копию сами.
+if(NOT TARGET simpleini)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/../../../../CMake/functions/FetchContent_MakeAvailableExcludeFromAll.cmake)
+  FetchContent_Declare(simpleini
+      URL https://github.com/brofield/simpleini/archive/56499b5af5d2195c6acfc58c4630b70e0c9c4c21.tar.gz
+      URL_HASH MD5=02a561cea03ea11acb65848318ec4a81
+  )
+  FetchContent_MakeAvailableExcludeFromAll(simpleini)
+  add_library(simpleini INTERFACE)
+  target_include_directories(simpleini INTERFACE ${simpleini_SOURCE_DIR})
+endif()
+
 if(LAUNCHER_DESKTOP)
   # CONFIG mode picks the shared import library (SDL2.dll.a). Арты и
   # иконки декодирует вендоренный stb_image, SDL_image не нужен вовсе.
@@ -168,7 +182,7 @@ if(LAUNCHER_DESKTOP)
 
   add_library(launcher_core OBJECT ${LAUNCHER_CORE_SOURCES})
   target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty)
-  target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe tomlplusplus::tomlplusplus)
+  target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe tomlplusplus::tomlplusplus simpleini)
 
   add_executable(devilution_launcher
       ${LAUNCHER_UI_SOURCES}
@@ -199,7 +213,9 @@ else()
   target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty)
   # AuroraPathProvider includes StandartPaths.hpp from the parent directory.
   target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
-  target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe tomlplusplus::tomlplusplus)
+  # Цель simpleini к этому моменту уже создана корневой сборкой
+  # (CMake/Dependencies.cmake -> 3rdParty/simpleini).
+  target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe tomlplusplus::tomlplusplus simpleini)
 
   add_devilutionx_object_library(devilution_launcher ${LAUNCHER_UI_SOURCES})
   target_include_directories(devilution_launcher PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
