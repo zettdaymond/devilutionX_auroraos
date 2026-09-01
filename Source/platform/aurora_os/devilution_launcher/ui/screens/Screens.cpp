@@ -391,8 +391,6 @@ void RenderChecklist(const LauncherState &state, const Dispatcher &dispatch)
 
 void Data(const LauncherState &state, const Dispatcher &dispatch)
 {
-	widgets::ScreenHeader("Данные", [&dispatch] { dispatch(intent::UiNavigate { Screen::Home }); });
-
 	const float width = ImGui::GetContentRegionAvail().x;
 
 	ImGui::PushFont(Theme::Font(FontRole::BodyBold));
@@ -433,10 +431,8 @@ std::string SettingValueText(const SettingSpec &spec, int value)
 	switch (spec.kind) {
 	case SettingKind::PercentVolume:
 		return std::to_string(value) + "%";
-	case SettingKind::Cycle: {
-		const int index = std::clamp(value, 0, static_cast<int>(spec.optionCount) - 1);
-		return std::string(spec.optionNames[static_cast<size_t>(index)]);
-	}
+	case SettingKind::Cycle:
+		return std::string(spec.optionNames[static_cast<size_t>(SettingCycleIndex(spec, value))]);
 	case SettingKind::Slider:
 	case SettingKind::Toggle:
 		break;
@@ -448,10 +444,8 @@ std::string SettingValueText(const SettingSpec &spec, int value)
 float WidestOptionWidth(const SettingSpec &spec)
 {
 	float width = 0.0F;
-	for (const std::string_view option : spec.optionNames) {
-		if (!option.empty()) {
-			width = std::max(width, ImGui::CalcTextSize(option.data()).x);
-		}
+	for (size_t i = 0; i < spec.optionCount; ++i) {
+		width = std::max(width, ImGui::CalcTextSize(spec.optionNames[i].data()).x);
 	}
 	return width;
 }
@@ -504,20 +498,27 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 		// Степпер «‹ значение ›»: компактнее кнопки с названием варианта
 		// и очевидно, что значение переключается. Ячейка значения — по
 		// самому широкому варианту, чтобы степпер не прыгал при смене.
+		// Варианты переключаются по индексу, а в интент уходит
+		// optionValues индекса — у зелий значения 0/1/2/4/8/16.
 		controlWidth = stepper.totalWidth;
+		const int count = static_cast<int>(spec.optionCount);
+		const int currentIndex = SettingCycleIndex(spec, value);
 		ImGui::SameLine(rightEdge - controlWidth);
-		widgets::GhostButton(icons::ChevronLeft, "", ImVec2(stepper.button, stepper.button), [&dispatch, &spec, value] {
-			const int count = static_cast<int>(spec.optionCount);
-			dispatch(intent::SettingChanged { spec.id, (value + count - 1) % count });
-		});
+		widgets::GhostButton(icons::ChevronLeft, "", ImVec2(stepper.button, stepper.button),
+		    [&dispatch, &spec, count, currentIndex] {
+			    const int next = (currentIndex + count - 1) % count;
+			    dispatch(intent::SettingChanged { spec.id, spec.optionValues[static_cast<size_t>(next)] });
+		    });
 		ImGui::SameLine(0, stepper.gap);
 		ImGui::Dummy(ImVec2(stepper.cellWidth, stepper.button));
 		const ImVec2 cellMin = ImGui::GetItemRectMin();
 		const ImVec2 cellMax = ImGui::GetItemRectMax();
 		ImGui::SameLine(0, stepper.gap);
-		widgets::GhostButton(icons::ChevronRight, "", ImVec2(stepper.button, stepper.button), [&dispatch, &spec, value] {
-			dispatch(intent::SettingChanged { spec.id, (value + 1) % static_cast<int>(spec.optionCount) });
-		});
+		widgets::GhostButton(icons::ChevronRight, "", ImVec2(stepper.button, stepper.button),
+		    [&dispatch, &spec, count, currentIndex] {
+			    const int next = (currentIndex + 1) % count;
+			    dispatch(intent::SettingChanged { spec.id, spec.optionValues[static_cast<size_t>(next)] });
+		    });
 
 		const std::string current = SettingValueText(spec, value);
 		ImFont *font = ImGui::GetFont();
@@ -571,8 +572,6 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 
 void Settings(const LauncherState &state, const Dispatcher &dispatch)
 {
-	widgets::ScreenHeader("Настройки", [&dispatch] { dispatch(intent::UiNavigate { Screen::Home }); });
-
 	// Раскладка как на экране данных: строки на всю ширину контента,
 	// без капа и Indent — SameLine-выравнивание FileRow на Indent не
 	// рассчитывает.
@@ -607,7 +606,6 @@ void Settings(const LauncherState &state, const Dispatcher &dispatch)
 
 void About(const LauncherState &, const Dispatcher &dispatch)
 {
-	widgets::ScreenHeader("Инфо", [&dispatch] { dispatch(intent::UiNavigate { Screen::Home }); });
 	Theme::PushFont(FontRole::Heading);
 	widgets::CenteredText("DIABLO", ColorRole::TextHeading);
 	Theme::PopFont();

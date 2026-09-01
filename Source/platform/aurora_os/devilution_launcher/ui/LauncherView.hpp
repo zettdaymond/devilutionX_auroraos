@@ -47,6 +47,12 @@ public:
 private:
 	void RenderBackground() const;
 	void RenderQuickActions(const Dispatcher &dispatch);
+
+	/// Закреплённая шапка вторичного экрана (кнопка «назад» + заголовок
+	/// + разделитель) в собственном окне над прокручиваемым списком.
+	/// Возвращает высоту занятого блока.
+	float RenderScreenHeader(const char *title, const ImVec2 &pos, float width, const Dispatcher &dispatch);
+
 	void RenderScreen(const LauncherState &state, const Dispatcher &dispatch);
 	void RenderDialogs(const LauncherState &state, const Dispatcher &dispatch);
 	void RenderFileBrowser(const LauncherState &state, const Dispatcher &dispatch);
@@ -69,6 +75,11 @@ private:
 	/// подавляются, чтобы провести пальцем по карточке — не значит
 	/// «нажать» на неё.
 	bool m_gestureDrag = false;
+
+	/// Кинетическая прокрутка: скорость (пикселей в секунду) на момент
+	/// отпускания — после жеста список движется по инерции и затухает.
+	float m_flickSpeed = 0.0F;
+	bool m_flickActive = false;
 
 	/// Времена появления текущего экрана/диалога — для fade-анимаций
 	/// (чисто презентационное состояние view-слоя).

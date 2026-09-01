@@ -142,6 +142,19 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 		contentSize.x = capped;
 	}
 
+	// Вторичные экраны: шапка с кнопкой «назад» закреплена над списком и
+	// не прокручивается — «назад» всегда в одном касании, как в
+	// нативных приложениях (корневое окно NoInputs, поэтому шапка —
+	// отдельное прозрачное окно, как кластер кнопок главной).
+	if (!isHome) {
+		const char *title = state.screen == Screen::Data   ? "Данные"
+		    : state.screen == Screen::Settings             ? "Настройки"
+		                                                   : "Инфо";
+		const float headerHeight = RenderScreenHeader(title, contentPos, contentSize.x, guardedDispatch);
+		contentPos.y += headerHeight;
+		contentSize.y = std::max(64.0F, contentSize.y - headerHeight);
+	}
+
 	ImGui::SetCursorPos(contentPos);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, 0));
 	float contentScrollY = 0.0F;
@@ -156,11 +169,26 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 		contentHeight = ImGui::GetWindowHeight();
 		contentScrollY = ImGui::GetScrollY();
 		contentScrollMaxY = ImGui::GetScrollMaxY();
-			// Пока жест активен и палец над контентом — применяем дельту
-			// движения к позиции прокрутки.
-		if (m_gestureDrag
-		    && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
+		const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows
+		    | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+		// Пока жест активен и палец над контентом — применяем дельту
+		// движения и запоминаем скорость для инерции после отпускания.
+		if (m_gestureDrag && hovered) {
 			ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseDelta.y);
+			const float dt = std::max(io.DeltaTime, 1.0e-4F);
+			const float speed = -io.MouseDelta.y / dt;
+			m_flickSpeed = m_flickActive ? (m_flickSpeed * 0.6F + speed * 0.4F) : speed;
+			m_flickActive = true;
+		} else if (m_flickActive && !ImGui::IsMouseDown(0)) {
+			// Кинетическая прокрутка: движение по инерции с экспоненциальным
+			// затуханием; у краёв списка и при новом касании — стоп.
+			ImGui::SetScrollY(ImGui::GetScrollY() + m_flickSpeed * io.DeltaTime);
+			m_flickSpeed *= std::exp(-6.0F * io.DeltaTime);
+			const float y = ImGui::GetScrollY();
+			if (std::abs(m_flickSpeed) < 40.0F || y <= 0.0F || y >= contentScrollMaxY) {
+				m_flickActive = false;
+				m_flickSpeed = 0.0F;
+			}
 		}
 		// Появление экрана: fade + лёгкий подъём снизу.
 		if (state.screen != m_lastScreen) {
@@ -169,6 +197,12 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 			// Индикатор мигает при входе на экран: даёт понять, что ниже
 			// есть контент.
 			m_scrollActiveAt = ImGui::GetTime();
+			m_flickActive = false;
+			m_flickSpeed = 0.0F;
+		}
+		if (ImGui::IsMouseDown(0)) {
+			m_flickActive = false;
+			m_flickSpeed = 0.0F;
 		}
 		const float appearK = EaseOutCubic(ElapsedFraction(m_screenShownAt, ImGui::GetTime(), 0.20F));
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (1.0F - appearK) * Scale::Px(0.6F));
@@ -388,6 +422,32 @@ void LauncherView::RenderScrollIndicator(float scrollY, float scrollMaxY, const 
 	ImDrawList *draw = ImGui::GetWindowDrawList();
 	draw->AddRectFilled(ImVec2(x0, thumbY), ImVec2(x0 + barW, thumbY + thumbH),
 	    ImGui::GetColorU32(ImVec4(0.91F, 0.78F, 0.49F, 0.85F * alpha)), barW * 0.5F);
+}
+
+/// Закреплённая шапка вторичного экрана: собственное прозрачное окно
+/// (корневое окно NoInputs и не принимает нажатия), содержимое —
+/// готовый виджет ScreenHeader с паддингом колонки контента.
+float LauncherView::RenderScreenHeader(const char *title, const ImVec2 &pos, float width,
+    const Dispatcher &dispatch)
+{
+	const ImGuiViewport *viewport = ImGui::GetMainViewport();
+	const float pad = Scale::Px(1.5F);
+	// Кнопка ScreenHeader + воздух до/после разделителя.
+	const float height = Scale::Px(2.3F) + Scale::Px(0.35F) + Scale::Px(0.06F) + Scale::Px(0.5F);
+
+	ImGui::SetNextWindowPos(pos);
+	ImGui::SetNextWindowSize(ImVec2(width, height));
+	ImGui::SetNextWindowViewport(viewport->ID);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, 0));
+	ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 0.0F);
+	ImGui::Begin("##screen-header", nullptr,
+	    ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings
+	        | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar
+	        | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBringToFrontOnFocus);
+	widgets::ScreenHeader(title, [&dispatch] { dispatch(intent::UiNavigate { Screen::Home }); });
+	ImGui::End();
+	ImGui::PopStyleVar(2);
+	return height;
 }
 
 /// Плавающие кнопки разделов в правом нижнем углу главного экрана:

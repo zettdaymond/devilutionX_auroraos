@@ -75,6 +75,26 @@ TEST(CatalogTest, CatalogOrderedByGroups)
 	}
 }
 
+TEST(CatalogTest, CycleOptionsAreWellFormed)
+{
+	for (const SettingSpec &spec : kSettingCatalog) {
+		if (spec.kind != SettingKind::Cycle) {
+			continue;
+		}
+		EXPECT_GE(spec.optionCount, 2) << spec.key.data();
+		EXPECT_LE(spec.optionCount, kMaxSettingOptions) << spec.key.data();
+		for (size_t i = 0; i < spec.optionCount; ++i) {
+			EXPECT_FALSE(spec.optionNames[i].empty()) << spec.key.data() << " option " << i;
+			for (size_t j = i + 1; j < spec.optionCount; ++j) {
+				EXPECT_NE(spec.optionValues[i], spec.optionValues[j])
+				    << spec.key.data() << " duplicate option value";
+			}
+		}
+		// Степпер шире индексов не выходит.
+		EXPECT_EQ(SettingCycleIndex(spec, spec.optionValues[0]), 0) << spec.key.data();
+	}
+}
+
 TEST(CatalogTest, VolumeMapping)
 {
 	EXPECT_EQ(VolumePctToIni(0), -1600);
@@ -186,6 +206,26 @@ TEST_F(EngineOptionsTest, NoTmpFileLeftAfterSave)
 
 	EXPECT_TRUE(std::filesystem::exists(m_iniPath));
 	EXPECT_FALSE(std::filesystem::exists(m_dir / "diablo.ini.tmp"));
+}
+
+TEST_F(EngineOptionsTest, PotionCycleValuesRoundTrip)
+{
+	// Степпер зелий отправляет значения варианта (0/1/2/4/8/16) —
+	// они должны переживать запись в ini как есть.
+	std::array<int, kSettingCount> values = DefaultSettingValues();
+	values[static_cast<size_t>(SettingId::HealPotionPickup)] = 4;
+	values[static_cast<size_t>(SettingId::ManaPotionPickup)] = 16;
+
+	EngineOptionsService service(m_iniPath);
+	service.SaveAll(values);
+
+	const std::string content = ReadRawIni();
+	EXPECT_NE(content.find("Heal Potion Pickup=4"), std::string::npos);
+	EXPECT_NE(content.find("Mana Potion Pickup=16"), std::string::npos);
+
+	const auto loaded = service.Load();
+	EXPECT_EQ(loaded[static_cast<size_t>(SettingId::HealPotionPickup)], 4);
+	EXPECT_EQ(loaded[static_cast<size_t>(SettingId::ManaPotionPickup)], 16);
 }
 
 TEST_F(EngineOptionsTest, OutOfRangeValuesClampedOnSave)
