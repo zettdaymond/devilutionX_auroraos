@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <iterator>
 #include <string>
@@ -172,14 +173,34 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 		const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows
 		    | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
 		// Пока жест активен и палец над контентом — применяем дельту
-		// движения и запоминаем скорость для инерции после отпускания.
+		// движения и копим след позиций для расчёта скорости броска.
 		if (m_gestureDrag && hovered) {
 			ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseDelta.y);
-			const float dt = std::max(io.DeltaTime, 1.0e-4F);
-			const float speed = -io.MouseDelta.y / dt;
-			m_flickSpeed = m_flickActive ? (m_flickSpeed * 0.6F + speed * 0.4F) : speed;
+			if (m_flickTrailLen < static_cast<int>(std::size(m_flickTrail))) {
+				++m_flickTrailLen;
+			}
+			std::memmove(m_flickTrail + 1, m_flickTrail,
+			    static_cast<size_t>(m_flickTrailLen - 1) * sizeof(FlickSample));
+			m_flickTrail[0] = FlickSample { ImGui::GetTime(), io.MousePos.y };
 			m_flickActive = true;
 		} else if (m_flickActive && !ImGui::IsMouseDown(0)) {
+			if (m_flickTrailLen > 0) {
+				// Скорость — по окну ~120 мс: палец тормозит перед
+				// подъёмом, скорость последних кадров занижена.
+				const double now = ImGui::GetTime();
+				int base = m_flickTrailLen - 1;
+				for (int i = 0; i < m_flickTrailLen; ++i) {
+					if (now - m_flickTrail[i].time <= 0.12) {
+						base = i;
+						break;
+					}
+				}
+				const double window = now - m_flickTrail[base].time;
+				m_flickSpeed = window > 1.0e-3
+				    ? -(io.MousePos.y - m_flickTrail[base].y) / static_cast<float>(window)
+				    : 0.0F;
+				m_flickTrailLen = 0;
+			}
 			// Кинетическая прокрутка: движение по инерции с экспоненциальным
 			// затуханием; у краёв списка и при новом касании — стоп.
 			ImGui::SetScrollY(ImGui::GetScrollY() + m_flickSpeed * io.DeltaTime);
@@ -199,10 +220,12 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 			m_scrollActiveAt = ImGui::GetTime();
 			m_flickActive = false;
 			m_flickSpeed = 0.0F;
+			m_flickTrailLen = 0;
 		}
 		if (ImGui::IsMouseDown(0)) {
 			m_flickActive = false;
 			m_flickSpeed = 0.0F;
+			m_flickTrailLen = 0;
 		}
 		const float appearK = EaseOutCubic(ElapsedFraction(m_screenShownAt, ImGui::GetTime(), 0.20F));
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (1.0F - appearK) * Scale::Px(0.6F));
@@ -432,13 +455,16 @@ float LauncherView::RenderScreenHeader(const char *title, const ImVec2 &pos, flo
 {
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
 	const float pad = Scale::Px(1.5F);
+	// Небольшой вертикальный воздух: без него рамка кнопки-стрелки
+	// подрезалась верхним краем окна на устройстве.
+	const float vpad = Scale::Px(0.15F);
 	// Кнопка ScreenHeader + воздух до/после разделителя.
-	const float height = Scale::Px(2.3F) + Scale::Px(0.35F) + Scale::Px(0.06F) + Scale::Px(0.5F);
+	const float height = vpad * 2.0F + Scale::Px(2.3F) + Scale::Px(0.35F) + Scale::Px(0.06F) + Scale::Px(0.5F);
 
 	ImGui::SetNextWindowPos(pos);
 	ImGui::SetNextWindowSize(ImVec2(width, height));
 	ImGui::SetNextWindowViewport(viewport->ID);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, 0));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, vpad));
 	ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 0.0F);
 	ImGui::Begin("##screen-header", nullptr,
 	    ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings
