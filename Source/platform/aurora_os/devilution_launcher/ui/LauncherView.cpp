@@ -384,7 +384,8 @@ void LauncherView::RenderQuickActions(const Dispatcher &dispatch)
 {
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
 	const float buttonHeight = Scale::Px(2.3F);
-	const float buttonWidth = Scale::Px(4.6F);
+	// «Данные» сидел впритык к правому краю кнопки — добавили воздуха по бокам.
+	const float buttonWidth = Scale::Px(5.0F);
 	const float gap = Scale::Px(0.4F);
 	const float sideInset = Scale::Px(0.6F);
 	const float bottomInset = Scale::Px(0.35F) + Scale::Px(0.3F);
