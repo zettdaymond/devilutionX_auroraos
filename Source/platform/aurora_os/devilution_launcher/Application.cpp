@@ -158,7 +158,7 @@ Application::Application(SDL_Window *window, const std::string &companyNamespace
 	// на десктопе — в собственный SDL_GetPrefPath("diasurgical", "devilution").
 	std::filesystem::path engineIni;
 #ifdef AURORA_OS
-	engineIni = std::filesystem::path(AuroraOsStandartPaths::GetWritableDataPath()) / "diablo.ini";
+	engineIni = std::filesystem::path(devilution::AuroraOsStandartPaths::GetWritableDataPath()) / "diablo.ini";
 #else
 	char *enginePref = SDL_GetPrefPath("diasurgical", "devilution");
 	engineIni = (enginePref != nullptr ? std::filesystem::path(enginePref) : baseDir) / "diablo.ini";
