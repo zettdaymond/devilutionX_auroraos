@@ -8,6 +8,7 @@ namespace launcher::ui::icons {
 inline constexpr const char *Home = "\xEF\x80\x95";          // U+F015
 inline constexpr const char *Folder = "\xEF\x81\xBB";        // U+F07B
 inline constexpr const char *Info = "\xEF\x84\xA9";          // U+F129
+inline constexpr const char *Cog = "\xEF\x80\x93";           // U+F013
 inline constexpr const char *ArrowLeft = "\xEF\x81\xA0";     // U+F060
 inline constexpr const char *Download = "\xEF\x80\x99";      // U+F019
 inline constexpr const char *Play = "\xEF\x81\x8B";          // U+F04B
@@ -24,5 +25,7 @@ inline constexpr const char *Exclamation = "\xEF\x84\xAA";   // U+F12A
 inline constexpr const char *Music = "\xEF\x80\x81";         // U+F001
 inline constexpr const char *Book = "\xEF\x80\xAD";          // U+F02D
 inline constexpr const char *Envelope = "\xEF\x83\xA0";      // U+F0E0
+inline constexpr const char *ChevronLeft = "\xEF\x81\x93";   // U+F053
+inline constexpr const char *ChevronRight = "\xEF\x81\x94";  // U+F054
 
 } // namespace launcher::ui::icons

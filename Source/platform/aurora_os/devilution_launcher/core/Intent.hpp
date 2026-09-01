@@ -56,6 +56,16 @@ struct StartDownload {
 };
 struct CancelDownload {};
 
+// -- Настройки движка --
+/// Пользователь поменял одну настройку; value — в единицах каталога
+/// (bool 0/1, проценты для громкостей).
+struct SettingChanged {
+	SettingId setting;
+	int value;
+};
+/// Сбросить все настройки к значениям по умолчанию.
+struct SettingsReset {};
+
 // -- Внутренние события, переданные из потока загрузки --
 struct EvDownloadProgress {
 	int64_t totalBytes;
@@ -82,6 +92,8 @@ using Intent = std::variant<
     intent::LaunchGame,
     intent::StartDownload,
     intent::CancelDownload,
+    intent::SettingChanged,
+    intent::SettingsReset,
     intent::EvDownloadProgress,
     intent::EvDownloadFinished>;
 

@@ -36,17 +36,21 @@ constexpr std::initializer_list<KnownFile> kHellfireRequired {
 Store::Store(IConfigService &configService,
     IGameFilesService &filesService,
     IDownloadService &downloadService,
-    IPathProvider &pathProvider)
+    IPathProvider &pathProvider,
+    IEngineOptionsService &engineOptionsService)
     : m_configService(configService)
     , m_filesService(filesService)
     , m_downloadService(downloadService)
     , m_pathProvider(pathProvider)
+    , m_engineOptionsService(engineOptionsService)
 {
 }
 
 void Store::Init()
 {
 	m_config = m_configService.Load();
+	m_state.settingValues = m_engineOptionsService.Load();
+	m_state.settingsLoaded = true;
 	RescanAndDerive();
 }
 
@@ -240,6 +244,28 @@ void Store::ReduceIntent<intent::CancelDownload>(const intent::CancelDownload &)
 	if (m_state.DownloadInProgress()) {
 		m_downloadService.Cancel();
 	}
+}
+
+template <>
+void Store::ReduceIntent<intent::SettingChanged>(const intent::SettingChanged &i)
+{
+	const size_t index = static_cast<size_t>(i.setting);
+	if (index >= kSettingCount) {
+		return;
+	}
+	m_state.settingValues[index] = i.value;
+	// ini крошечный, а мобильный процесс могут убить в любой момент —
+	// пишем сразу, без накопления.
+	m_engineOptionsService.SaveAll(m_state.settingValues);
+}
+
+template <>
+void Store::ReduceIntent<intent::SettingsReset>(const intent::SettingsReset &)
+{
+	m_state.settingValues = DefaultSettingValues();
+	m_engineOptionsService.SaveAll(m_state.settingValues);
+	m_state.dialog = Dialog::None;
+	m_state.toast = "Настройки сброшены";
 }
 
 template <>

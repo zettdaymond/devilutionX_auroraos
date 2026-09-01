@@ -5,6 +5,7 @@
 
 #include "services/IConfigService.hpp"
 #include "services/IDownloadService.hpp"
+#include "services/IEngineOptionsService.hpp"
 #include "services/IGameFilesService.hpp"
 #include "services/IPathProvider.hpp"
 
@@ -25,7 +26,8 @@ public:
 	Store(IConfigService &configService,
 	      IGameFilesService &filesService,
 	      IDownloadService &downloadService,
-	      IPathProvider &pathProvider);
+	      IPathProvider &pathProvider,
+	      IEngineOptionsService &engineOptionsService);
 
 	/// Читает настройки и делает первичный поиск файлов.
 	void Init();
@@ -55,6 +57,7 @@ private:
 	IGameFilesService &m_filesService;
 	IDownloadService &m_downloadService;
 	IPathProvider &m_pathProvider;
+	IEngineOptionsService &m_engineOptionsService;
 
 	LauncherConfig m_config;
 	LauncherState m_state;

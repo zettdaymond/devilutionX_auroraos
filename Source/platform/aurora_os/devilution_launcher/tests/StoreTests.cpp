@@ -23,7 +23,8 @@ protected:
 		m_downloads = std::make_unique<MockDownloadService>(m_world, behavior);
 		m_paths = std::make_unique<DesktopPathProvider>(
 		    std::filesystem::temp_directory_path() / "devilutionx-launcher-test");
-		m_store = std::make_unique<Store>(*m_config, *m_files, *m_downloads, *m_paths);
+		m_engineOptions = std::make_unique<MockEngineOptionsService>();
+		m_store = std::make_unique<Store>(*m_config, *m_files, *m_downloads, *m_paths, *m_engineOptions);
 		m_store->Init();
 	}
 
@@ -50,6 +51,7 @@ protected:
 	std::unique_ptr<MockGameFilesService> m_files;
 	std::unique_ptr<MockDownloadService> m_downloads;
 	std::unique_ptr<DesktopPathProvider> m_paths;
+	std::unique_ptr<MockEngineOptionsService> m_engineOptions;
 	std::unique_ptr<Store> m_store;
 };
 
@@ -214,6 +216,81 @@ TEST_F(StoreTest, DeleteDownloadedFileRescans)
 
 	EXPECT_FALSE(state().russianVoiceInstalled);
 	EXPECT_TRUE(state().toast.has_value());
+}
+
+// ---- Настройки движка ----
+
+TEST_F(StoreTest, InitLoadsEngineSettings)
+{
+	construct();
+
+	EXPECT_TRUE(state().settingsLoaded);
+	EXPECT_EQ(state().settingValues, DefaultSettingValues());
+}
+
+TEST_F(StoreTest, NavigateToSettingsScreen)
+{
+	construct();
+
+	m_store->Dispatch(intent::UiNavigate { Screen::Settings });
+	pump();
+
+	EXPECT_EQ(state().screen, Screen::Settings);
+}
+
+TEST_F(StoreTest, SettingChangedUpdatesStateAndPersists)
+{
+	construct();
+
+	m_store->Dispatch(intent::SettingChanged { SettingId::RunInTown, 1 });
+	pump();
+
+	EXPECT_EQ(state().settingValues[static_cast<size_t>(SettingId::RunInTown)], 1);
+	ASSERT_EQ(m_engineOptions->Saves().size(), 1U);
+	EXPECT_EQ(m_engineOptions->Saves()[0][static_cast<size_t>(SettingId::RunInTown)], 1);
+}
+
+TEST_F(StoreTest, VolumeSettingStoredAsPercent)
+{
+	construct();
+
+	m_store->Dispatch(intent::SettingChanged { SettingId::SoundVolume, 30 });
+	pump();
+
+	EXPECT_EQ(state().settingValues[static_cast<size_t>(SettingId::SoundVolume)], 30);
+	EXPECT_EQ(m_engineOptions->Saves().size(), 1U);
+}
+
+TEST_F(StoreTest, SettingsResetRestoresDefaults)
+{
+	construct();
+	m_store->Dispatch(intent::SettingChanged { SettingId::RunInTown, 1 });
+	m_store->Dispatch(intent::SettingChanged { SettingId::GammaCorrection, 90 });
+	pump();
+	ASSERT_EQ(m_engineOptions->Saves().size(), 2U);
+
+	m_store->Dispatch(intent::SettingsReset {});
+	pump();
+
+	EXPECT_EQ(state().settingValues, DefaultSettingValues());
+	EXPECT_EQ(m_engineOptions->Saves().size(), 3U);
+	EXPECT_EQ(m_engineOptions->Saves()[2], DefaultSettingValues());
+	ASSERT_TRUE(state().toast.has_value());
+	EXPECT_EQ(state().dialog, Dialog::None);
+}
+
+TEST_F(StoreTest, ResetDialogFlow)
+{
+	construct();
+
+	m_store->Dispatch(intent::UiOpenDialog { Dialog::ConfirmResetSettings });
+	pump();
+	EXPECT_EQ(state().dialog, Dialog::ConfirmResetSettings);
+
+	m_store->Dispatch(intent::UiCloseDialog {});
+	pump();
+	EXPECT_EQ(state().dialog, Dialog::None);
+	EXPECT_EQ(m_engineOptions->Saves().size(), 0U);
 }
 
 } // namespace

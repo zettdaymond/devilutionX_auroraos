@@ -51,6 +51,8 @@ Args ParseArgs(int argc, char **argv)
 				args.screen = launcher::Screen::Home;
 			} else if (value == "data") {
 				args.screen = launcher::Screen::Data;
+			} else if (value == "settings") {
+				args.screen = launcher::Screen::Settings;
 			} else if (value == "about") {
 				args.screen = launcher::Screen::About;
 			}
@@ -64,6 +66,8 @@ Args ParseArgs(int argc, char **argv)
 				args.dialog = launcher::Dialog::ConfirmDownloadRu;
 			} else if (value == "hellfire-missing") {
 				args.dialog = launcher::Dialog::HellfireMissingFiles;
+			} else if (value == "confirm-reset-settings") {
+				args.dialog = launcher::Dialog::ConfirmResetSettings;
 			} else if (value == "error") {
 				args.dialog = launcher::Dialog::Error;
 			}
@@ -74,7 +78,7 @@ Args ParseArgs(int argc, char **argv)
 				args.windowHeight = std::atoi(x + 1);
 			}
 		} else if (arg == "--help" || arg == "-h") {
-			spdlog::info("Usage: devilution_launcher [--mock-scenario=<name>] [--screen=home|data|about] [--window=<WxH>]");
+			spdlog::info("Usage: devilution_launcher [--mock-scenario=<name>] [--screen=home|data|settings|about] [--dialog=confirm-reset-settings] [--window=<WxH>]");
 			spdlog::info("Scenarios:");
 			for (const auto &name : launcher::MockScenario::Names()) {
 				spdlog::info("  {}", name);

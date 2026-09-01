@@ -107,6 +107,31 @@ void Download(const LauncherState &state, const Dispatcher &dispatch, KnownFile 
 	EndModal();
 }
 
+void ResetSettings(const LauncherState &, const Dispatcher &dispatch)
+{
+	const char *title = "Сбросить настройки?";
+
+	if (!BeginModal(title, 24.0F)) {
+		return;
+	}
+	ModalTitle(title);
+	ImGui::TextWrapped("%s", "Все параметры вернутся к значениям по умолчанию.");
+
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.5F)));
+	const ImVec2 buttonSize = PairedButtonSize(9.0F, 2.2F);
+	if (ImGui::Button("Сбросить", buttonSize)) {
+		ImGui::CloseCurrentPopup();
+		dispatch(intent::SettingsReset {});
+	}
+	ImGui::SameLine();
+	widgets::IconButton(icons::Times, "Отмена", false, buttonSize, [&dispatch] {
+		ImGui::CloseCurrentPopup();
+		dispatch(intent::UiCloseDialog {});
+	});
+
+	EndModal();
+}
+
 } // namespace confirm
 
 namespace overlay {
@@ -372,6 +397,9 @@ void OpenFor(Dialog dialog)
 		break;
 	case Dialog::HellfireMissingFiles:
 		ImGui::OpenPopup("Не хватает файлов");
+		break;
+	case Dialog::ConfirmResetSettings:
+		ImGui::OpenPopup("Сбросить настройки?");
 		break;
 	case Dialog::Error:
 		ImGui::OpenPopup("Ошибка");

@@ -1,6 +1,7 @@
 #include "MockScenarios.hpp"
 
 #include "../DesktopPathProvider.hpp"
+#include "../EngineOptionsService.hpp"
 #include "MockDownloadService.hpp"
 #include "MockServices.hpp"
 
@@ -75,7 +76,11 @@ ServiceBundle MockScenario::MakeBundle() const
 	bundle.config = std::make_unique<MockConfigService>();
 	bundle.files = std::make_unique<MockGameFilesService>(m_world);
 	bundle.downloads = std::make_unique<MockDownloadService>(m_world, m_behavior);
-	bundle.paths = std::make_unique<DesktopPathProvider>(std::filesystem::temp_directory_path() / "devilutionx-mock");
+	const std::filesystem::path mockDir = std::filesystem::temp_directory_path() / "devilutionx-mock";
+	bundle.paths = std::make_unique<DesktopPathProvider>(mockDir);
+	// Настройки движка — настоящий сервис на временном diablo.ini:
+	// сценарии тренируют и реальную работу с ini-файлом.
+	bundle.engineOptions = std::make_unique<EngineOptionsService>(mockDir / "diablo.ini");
 	return bundle;
 }
 

@@ -23,6 +23,10 @@
 
 #include <cmrc/cmrc.hpp>
 
+#ifdef AURORA_OS
+#   include "../StandartPaths.hpp"
+#endif
+
 #include <chrono>
 #include <filesystem>
 #include <iterator>
@@ -144,9 +148,24 @@ Application::Application(SDL_Window *window, const std::string &companyNamespace
     , m_companyNamespace(companyNamespace)
     , m_appName(appName)
 {
-	const char *prefPath = SDL_GetPrefPath(m_companyNamespace.c_str(), m_appName.c_str());
-	m_services = launcher::MakeRealServices(prefPath != nullptr ? std::filesystem::path(prefPath)
-	                                                            : std::filesystem::temp_directory_path());
+	char *prefPath = SDL_GetPrefPath(m_companyNamespace.c_str(), m_appName.c_str());
+	const std::filesystem::path baseDir = prefPath != nullptr ? std::filesystem::path(prefPath)
+	                                                          : std::filesystem::temp_directory_path();
+	SDL_free(prefPath);
+
+	// diablo.ini живёт в конфиг-каталоге движка, а он не совпадает с
+	// базовой папкой лаунчера: на Aurora движок ходит через Qt StandartPaths,
+	// на десктопе — в собственный SDL_GetPrefPath("diasurgical", "devilution").
+	std::filesystem::path engineIni;
+#ifdef AURORA_OS
+	engineIni = std::filesystem::path(AuroraOsStandartPaths::GetWritableDataPath()) / "diablo.ini";
+#else
+	char *enginePref = SDL_GetPrefPath("diasurgical", "devilution");
+	engineIni = (enginePref != nullptr ? std::filesystem::path(enginePref) : baseDir) / "diablo.ini";
+	SDL_free(enginePref);
+#endif
+
+	m_services = launcher::MakeRealServices(baseDir, std::move(engineIni));
 }
 
 Application::Application(SDL_Window *window, launcher::ServiceBundle services)
@@ -258,7 +277,8 @@ AppResult Application::Run()
 	AttachFileLog();
 
 	m_store = std::make_unique<launcher::Store>(
-	    *m_services.config, *m_services.files, *m_services.downloads, *m_services.paths);
+	    *m_services.config, *m_services.files, *m_services.downloads, *m_services.paths,
+	    *m_services.engineOptions);
 
 	// Setup() создаёт контекст ImGui и грузит шрифты, поэтому вид (и его
 	// файловый браузер, которому нужен шрифтовый атлас) создаётся после него.

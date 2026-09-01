@@ -14,6 +14,7 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(launcher_tests
     EngineLaunchTests.cpp
+    EngineOptionsTests.cpp
     GameFilesTests.cpp
     StoreTests.cpp
 )

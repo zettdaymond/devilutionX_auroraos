@@ -1,11 +1,13 @@
 #pragma once
 
 #include "services/IConfigService.hpp"
+#include "services/IEngineOptionsService.hpp"
 #include "services/IGameFilesService.hpp"
 
 #include "MockWorld.hpp"
 
 #include <memory>
+#include <vector>
 
 namespace launcher {
 
@@ -20,6 +22,24 @@ public:
 
 private:
 	LauncherConfig m_stored;
+};
+
+/// Настройки движка в памяти; помнит все вызовы SaveAll, чтобы тест
+/// проверял и значения, и количество записей.
+class MockEngineOptionsService final : public IEngineOptionsService {
+public:
+	[[nodiscard]] std::array<int, kSettingCount> Load() override { return m_values; }
+	void SaveAll(const std::array<int, kSettingCount> &values) override
+	{
+		m_values = values;
+		m_saves.push_back(values);
+	}
+
+	[[nodiscard]] const std::vector<std::array<int, kSettingCount>> &Saves() const { return m_saves; }
+
+private:
+	std::array<int, kSettingCount> m_values = DefaultSettingValues();
+	std::vector<std::array<int, kSettingCount>> m_saves;
 };
 
 /// Файловая «система» поверх MockWorld: любая просканированная папка

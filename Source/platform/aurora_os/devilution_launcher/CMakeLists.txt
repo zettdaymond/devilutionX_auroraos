@@ -127,6 +127,7 @@ set(LAUNCHER_CORE_SOURCES
     core/Store.cpp
     services/ConfigService.cpp
     services/DesktopPathProvider.cpp
+    services/EngineOptionsService.cpp
     services/GameFilesService.cpp
     services/ServiceFactory.cpp
     services/ZoeDownloadService.cpp
@@ -162,7 +163,7 @@ endif()
 if(LAUNCHER_DESKTOP)
 
   add_library(launcher_core OBJECT ${LAUNCHER_CORE_SOURCES})
-  target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+  target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty)
   target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe tomlplusplus::tomlplusplus)
 
   add_executable(devilution_launcher
@@ -191,7 +192,7 @@ else()
 
   # Aurora OS: object libraries linked into the game binary.
   add_devilutionx_object_library(launcher_core ${LAUNCHER_CORE_SOURCES} services/AuroraPathProvider.cpp)
-  target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+  target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty)
   # AuroraPathProvider includes StandartPaths.hpp from the parent directory.
   target_include_directories(launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
   target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe tomlplusplus::tomlplusplus)

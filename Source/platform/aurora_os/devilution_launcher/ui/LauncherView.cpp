@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <filesystem>
 #include <iterator>
 #include <string>
@@ -122,7 +123,9 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	// оверлей-индикатор у края, контент держит симметричные поля. На
 	// главном экране снизу резерв под плавающие кнопки разделов.
 	const bool isHome = (state.screen == Screen::Home);
-	const float bottomReserve = isHome ? Scale::Px(3.4F) : pad * 0.5F;
+	// Квадратные кнопки разделов стали выше прежних широких — резерв
+	// держим с запасом над кластером (высота кнопки + отступ).
+	const float bottomReserve = isHome ? Scale::Px(4.2F) : pad * 0.5F;
 	const ImVec2 windowSize = ImGui::GetWindowSize();
 	const ImVec2 contentPos(0.0F, pad * 0.5F);
 	const ImVec2 contentSize(windowSize.x,
@@ -377,19 +380,18 @@ void LauncherView::RenderScrollIndicator(float scrollY, float scrollMaxY, const 
 }
 
 /// Плавающие кнопки разделов в правом нижнем углу главного экрана:
-/// «Данные» и «О порте» — второстепенные действия и не заслуживают
-/// вкладок; кнопки висят поверх контента, всегда в одном жесте от
-/// любой прокрутки.
+/// «Данные», «Настройки», «Инфо» — второстепенные действия и не
+/// заслуживают вкладок; кнопки висят поверх контента, всегда в одном
+/// жесте от любой прокрутки. Квадратные с иконкой и короткой подписью:
+/// три широкие в ряд уже не влезают в телефон.
 void LauncherView::RenderQuickActions(const Dispatcher &dispatch)
 {
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
-	const float buttonHeight = Scale::Px(2.3F);
-	// «Данные» сидел впритык к правому краю кнопки — добавили воздуха по бокам.
-	const float buttonWidth = Scale::Px(5.0F);
+	const float buttonSize = Scale::Px(3.7F);
 	const float gap = Scale::Px(0.4F);
 	const float sideInset = Scale::Px(0.6F);
 	const float bottomInset = Scale::Px(0.35F) + Scale::Px(0.3F);
-	const ImVec2 clusterSize(buttonWidth * 2.0F + gap, buttonHeight);
+	const ImVec2 clusterSize(buttonSize * 3.0F + gap * 2.0F, buttonSize);
 	const ImVec2 pos(viewport->WorkPos.x + viewport->WorkSize.x - clusterSize.x - sideInset,
 	    viewport->WorkPos.y + viewport->WorkSize.y - clusterSize.y - bottomInset);
 
@@ -410,17 +412,40 @@ void LauncherView::RenderQuickActions(const Dispatcher &dispatch)
 	};
 	const QuickItem items[] {
 		{ Screen::Data, icons::Folder, "Данные" },
+		{ Screen::Settings, icons::Cog, "Настройки" },
 		{ Screen::About, icons::Info, "Инфо" },
 	};
+	int index = 0;
 	for (const QuickItem &item : items) {
 		ImGui::PushStyleColor(ImGuiCol_Button, Theme::Color(ColorRole::Panel));
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Theme::Color(ColorRole::PanelHover));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, Theme::Color(ColorRole::RedPressed));
 		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextBody));
-		const std::string label = std::string(item.icon) + " " + item.label;
-		if (ImGui::Button(label.c_str(), ImVec2(buttonWidth, buttonHeight))) {
+		char buttonId[32];
+		std::snprintf(buttonId, sizeof(buttonId), "##quick-%d", index++);
+		if (ImGui::Button(buttonId, ImVec2(buttonSize, buttonSize))) {
 			dispatch(intent::UiNavigate { item.screen });
 		}
+
+		// Иконка сверху по центру, под ней короткая подпись — у кнопки
+		// двухстрочное содержимое, обычный label ImGui не переносится.
+		ImDrawList *draw = ImGui::GetWindowDrawList();
+		const ImVec2 min = ImGui::GetItemRectMin();
+		const ImVec2 max = ImGui::GetItemRectMax();
+		ImFont *font = Theme::Font(FontRole::Body);
+		const float iconSize = Scale::Px(1.35F);
+		const ImVec2 iconSize2 = font != nullptr ? font->CalcTextSizeA(iconSize, FLT_MAX, 0.0F, item.icon) : ImVec2(0, 0);
+		const float labelSize = Scale::Px(0.78F);
+		const std::string label = widgets::FitTextEllipsis(font, labelSize, item.label, buttonSize - Scale::Px(0.6F));
+		const ImVec2 labelSize2 = font != nullptr ? font->CalcTextSizeA(labelSize, FLT_MAX, 0.0F, label.c_str()) : ImVec2(0, 0);
+		const float blockH = iconSize2.y + Scale::Px(0.35F) + labelSize2.y;
+		const float topY = min.y + (buttonSize - blockH) * 0.5F;
+		draw->AddText(font, iconSize, ImVec2(min.x + (buttonSize - iconSize2.x) * 0.5F, topY),
+		    Theme::ColorU32(ColorRole::GoldBright), item.icon);
+		draw->AddText(font, labelSize,
+		    ImVec2(min.x + (buttonSize - labelSize2.x) * 0.5F, topY + iconSize2.y + Scale::Px(0.35F)),
+		    Theme::ColorU32(ColorRole::TextBody), label.c_str());
+
 		ImGui::SameLine(0, gap);
 		ImGui::PopStyleColor(4);
 	}
@@ -448,6 +473,9 @@ void LauncherView::RenderScreen(const LauncherState &state, const Dispatcher &di
 		break;
 	case Screen::Data:
 		screens::Data(state, dispatch);
+		break;
+	case Screen::Settings:
+		screens::Settings(state, dispatch);
 		break;
 	case Screen::About:
 		screens::About(state, dispatch);
@@ -483,6 +511,9 @@ void LauncherView::RenderDialogs(const LauncherState &state, const Dispatcher &d
 		break;
 	case Dialog::HellfireMissingFiles:
 		dialogs::MissingFiles(state, dispatch);
+		break;
+	case Dialog::ConfirmResetSettings:
+		dialogs::confirm::ResetSettings(state, dispatch);
 		break;
 	case Dialog::Error:
 		dialogs::Error(state, dispatch);

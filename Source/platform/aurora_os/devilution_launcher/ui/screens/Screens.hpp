@@ -32,6 +32,11 @@ void Home(const LauncherState &state, const Dispatcher &dispatch, const ArtSet &
 /// скачанного, свободное место.
 void Data(const LauncherState &state, const Dispatcher &dispatch);
 
+/// Настройки игры (движковые опции diablo.ini) по группам: тумблеры,
+/// слайдеры громкости/яркости и перебор вариантов. Применяются при
+/// следующем запуске игры.
+void Settings(const LauncherState &state, const Dispatcher &dispatch);
+
 /// Экран «О порте».
 void About(const LauncherState &state, const Dispatcher &dispatch);
 

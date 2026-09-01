@@ -36,19 +36,21 @@ services/                                    — IConfigService, IGameFilesServi
 
 | Путь | Содержимое |
 |---|---|
-| `core/` | `LauncherState`, `Intent` (std::variant), `Store`, `AppResult`, каталог MPQ (`GameFiles`) |
-| `services/` | интерфейсы + портабельные реализации (TOML-конфиг, сканер ФС, обёртка zoe) + `ServiceFactory` |
+| `core/` | `LauncherState`, `Intent` (std::variant), `Store`, `AppResult`, каталог MPQ (`GameFiles`), каталог движковых настроек (`EngineOptions`) |
+| `services/` | интерфейсы + портабельные реализации (TOML-конфиг, сканер ФС, обёртка zoe, редактор diablo.ini) + `ServiceFactory` |
 | `services/mocks/` | `MockWorld` (фейковая ФС) + мок-сервисы + сценарии `MockScenario` |
 | `ui/` | `Theme` (шрифты/палитра/стиль), `Scale` (rem-масштабирование), `LauncherView` (роутер) |
-| `ui/screens/` | Home (карточки игр / hero), Data (чек-лист файлов), About |
-| `ui/dialogs/` | подтверждение загрузки, оверлей прогресса (скорость/ETA/отмена), диалог недостающих файлов Hellfire, ошибки, тосты |
-| `tests/` | GTest: логика Store на моках + реальный GameFilesService |
+| `ui/screens/` | Home (карточки игр / hero), Data (чек-лист файлов), Settings (настройки игры), About |
+| `ui/dialogs/` | подтверждение загрузки, оверлей прогресса (скорость/ETA/отмена), диалог недостающих файлов Hellfire, подтверждение сброса настроек, ошибки, тосты |
+| `tests/` | GTest: логика Store на моках + реальный GameFilesService + реальный EngineOptionsService |
 
 ### Сервисы и платформы
 
 - **Портабельные** (десктоп и Aurora): `ConfigService` (toml++, атомарная запись),
   `GameFilesService` (std::filesystem, регистронезависимый поиск MPQ),
   `ZoeDownloadService` (zoe, троттлинг прогресса ~4 Гц, отмена),
+  `EngineOptionsService` (diablo.ini движка поверх вендоренного SimpleIni —
+  той же библиотеки, что использует движок),
   `DesktopPathProvider`.
 - **Aurora OS**: `AuroraPathProvider` — обёртка над `StandartPaths` (Qt за
   пределами лаунчера не используется). Скачанные файлы кладутся в
@@ -81,7 +83,9 @@ ctest --test-dir build-desktop            # unit-тесты
 Десктоп-билд поддерживает флаги:
 
 ```
-devilution_launcher [--mock-scenario=<имя>] [--screen=home|data|about] [--window=<WxH>]
+devilution_launcher [--mock-scenario=<имя>] [--screen=home|data|settings|about]
+                    [--dialog=confirm-demo|confirm-ru|hellfire-missing|confirm-reset-settings|error]
+                    [--open-browser] [--window=<WxH>]
 ```
 
 Сценарии (`--mock-scenario=`) позволяют пройти пользовательские потоки
@@ -123,7 +127,25 @@ devilution_launcher [--mock-scenario=<имя>] [--screen=home|data|about] [--win
    рескан и тост.
 5. **Данные**: чек-лист найденных файлов с размерами и расположением,
    смена папки, удаление скачанного, свободное место.
-6. **About**: версия порта, ссылки, лицензии.
+6. **Настройки**: движковые опции Diablo/Hellfire (геймплей, графика,
+   звук) — тумблеры, слайдеры громкости/яркости, перебор вариантов,
+   сброс к значениям по умолчанию.
+7. **About**: версия порта, ссылки, лицензии.
+
+### Как применяются настройки игры
+
+Экран «Настройки» пишет значения в `diablo.ini` движка (SimpleIni, тот же
+формат, что использует сам движок: секции `[Game]/[Graphics]/[Audio]`,
+булевы как `1/0`; чужие ключи и секции сохраняются нетронутыми).
+Лаунчер работает до `LoadOptions()` движка, поэтому изменения
+подхватываются при следующем запуске игры без перезапуска лаунчера.
+Путь к файлу зависит от платформы: Aurora —
+`~/.local/share/org.diasurgical.devilutionx/diablo.ini` (Qt StandartPaths),
+десктоп — `SDL_GetPrefPath("diasurgical", "devilution")`. Заметка:
+громкости и гамма в собственном меню настроек движка скрыты (`Invisible`),
+так что лаунчер — единственное место, где их поменять на устройстве.
+Громкости хранятся в логарифмической шкале движка (−1600..0), на экране —
+проценты; маппинг — в `core/EngineOptions.hpp` и покрыт тестами.
 
 Решение лаунчера возвращается движку как `AppResult`
 (`ExitAction::LaunchDiablo | LaunchHellfire | LaunchDemo` + путь к данным);

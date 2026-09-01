@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AppResult.hpp"
+#include "EngineOptions.hpp"
 #include "GameFiles.hpp"
 
 #include <array>
@@ -16,6 +17,7 @@ namespace launcher {
 enum class Screen : uint8_t {
 	Home,
 	Data,
+	Settings,
 	About,
 };
 
@@ -26,6 +28,7 @@ enum class Dialog : uint8_t {
 	ConfirmDownloadRu,
 	DownloadProgress,
 	HellfireMissingFiles,
+	ConfirmResetSettings,
 	Error,
 };
 
@@ -68,6 +71,11 @@ struct LauncherState {
 
 // Текущая загрузка
 	std::optional<DownloadState> download;
+
+// Настройки движка (diablo.ini); значения — в единицах каталога
+// (bool 0/1, проценты для громкостей), индекс — SettingId.
+	std::array<int, kSettingCount> settingValues = DefaultSettingValues();
+	bool settingsLoaded = false;
 
 // Данные для диалога
 	std::vector<KnownFile> hellfireMissing; // for Dialog::HellfireMissingFiles

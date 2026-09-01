@@ -13,6 +13,9 @@ namespace confirm {
 /// ConfirmDownloadDemo / ConfirmDownloadRu.
 void Download(const LauncherState &state, const Dispatcher &dispatch, KnownFile file);
 
+/// ConfirmResetSettings — сброс настроек к значениям по умолчанию.
+void ResetSettings(const LauncherState &state, const Dispatcher &dispatch);
+
 } // namespace confirm
 
 namespace overlay {

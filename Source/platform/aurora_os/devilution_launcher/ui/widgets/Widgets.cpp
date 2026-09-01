@@ -31,6 +31,18 @@ float FitFontSize(ImFont *font, float startSize, const char *text, float maxWidt
 	return std::max(size, minSize);
 }
 
+void CornerAccents(ImDrawList *draw, const ImVec2 &min, const ImVec2 &max, float rounding)
+{
+	const float t = Scale::Px(0.55F);
+	const ImVec2 tl = min + ImVec2(rounding * 0.5F, rounding * 0.5F);
+	const ImVec2 br = max - ImVec2(rounding * 0.5F, rounding * 0.5F);
+	const ImU32 gold = Theme::ColorU32(ColorRole::BorderGold);
+	draw->AddTriangleFilled(tl, tl + ImVec2(t, 0), tl + ImVec2(0, t), gold);
+	draw->AddTriangleFilled(br, br - ImVec2(t, 0), br - ImVec2(0, t), gold);
+}
+
+} // namespace
+
 /// Обрезает текст с «…», чтобы он влезал в ширину.
 /// Удаляет целые кодовые точки UTF-8 — кириллица не режется пополам.
 std::string FitTextEllipsis(ImFont *font, float size, const char *text, float maxWidth)
@@ -50,18 +62,6 @@ std::string FitTextEllipsis(ImFont *font, float size, const char *text, float ma
 	}
 	return result + "…";
 }
-
-void CornerAccents(ImDrawList *draw, const ImVec2 &min, const ImVec2 &max, float rounding)
-{
-	const float t = Scale::Px(0.55F);
-	const ImVec2 tl = min + ImVec2(rounding * 0.5F, rounding * 0.5F);
-	const ImVec2 br = max - ImVec2(rounding * 0.5F, rounding * 0.5F);
-	const ImU32 gold = Theme::ColorU32(ColorRole::BorderGold);
-	draw->AddTriangleFilled(tl, tl + ImVec2(t, 0), tl + ImVec2(0, t), gold);
-	draw->AddTriangleFilled(br, br - ImVec2(t, 0), br - ImVec2(0, t), gold);
-}
-
-} // namespace
 
 void HeroPanel(const char *eyebrow, const char *title, const char *status, const BackgroundArt &art,
     const ImVec2 &uv0, const ImVec2 &uv1, const ImVec4 &tint, const ImVec2 &size,
@@ -340,6 +340,103 @@ void CenteredText(const char *text, ColorRole role)
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(role));
 	ImGui::TextUnformatted(text);
 	ImGui::PopStyleColor();
+}
+
+void ToggleSwitch(const char *strId, bool value, const std::function<void(bool)> &onChange)
+{
+	const ImVec2 size(Scale::Px(2.4F), Scale::Px(1.35F));
+	if (ImGui::InvisibleButton(strId, size, ImGuiButtonFlags_None)) {
+		onChange(!value);
+	}
+
+	const ImVec2 min = ImGui::GetItemRectMin();
+	const ImVec2 max = ImGui::GetItemRectMax();
+	ImDrawList *draw = ImGui::GetWindowDrawList();
+	const bool hovered = ImGui::IsItemHovered();
+	const bool held = ImGui::IsItemActive();
+	const float rounding = size.y * 0.5F;
+
+	// Положение ручки анимируется экспоненциальным приближением к цели —
+	// плавно при любой частоте кадров и без учёта времени включения.
+	const float target = value ? 1.0F : 0.0F;
+	ImGuiStorage *storage = ImGui::GetStateStorage();
+	const ImGuiID knobId = ImGui::GetID(strId);
+	float knobK = storage->GetFloat(knobId, target);
+	knobK += (target - knobK) * std::min(1.0F, ImGui::GetIO().DeltaTime * 16.0F);
+	if (std::abs(target - knobK) < 0.003F) {
+		knobK = target;
+	}
+	storage->SetFloat(knobId, knobK);
+
+	// Тень и трек: выключен — тёмная панель, включён — тёплое золото;
+	// цвет плавно дотягивается за ручкой.
+	auto lerp = [](const ImVec4 &a, const ImVec4 &b, float k) {
+		return ImVec4(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k, a.w + (b.w - a.w) * k);
+	};
+	const ImVec4 fill = lerp(Theme::Color(ColorRole::Panel), Theme::Color(ColorRole::GoldDim), knobK);
+	draw->AddRectFilled(min + ImVec2(0, Scale::Px(0.12F)), max + ImVec2(0, Scale::Px(0.12F)),
+	    IM_COL32(0, 0, 0, 110), rounding);
+	draw->AddRectFilled(min, max, ImGui::ColorConvertFloat4ToU32(fill), rounding);
+	draw->AddRect(min, max,
+	    Theme::ColorU32(hovered ? ColorRole::GoldBright : ColorRole::BorderGold), rounding, 0, Scale::Px(0.07F));
+
+	// Ручка: на тёмном треке золотая, на золотом — тёмная (как текст
+	// главных кнопок), цвет также перекатывается за положением.
+	const float knobD = size.y - Scale::Px(0.4F) - (held ? 0.0F : Scale::Px(0.1F));
+	const float travel = size.x - knobD - Scale::Px(0.4F);
+	const ImVec2 center(min.x + Scale::Px(0.2F) + travel * knobK + knobD * 0.5F, (min.y + max.y) * 0.5F);
+	const ImVec4 knob = lerp(Theme::Color(ColorRole::GoldBright), ImVec4(0.15F, 0.07F, 0.03F, 1.0F), knobK);
+	draw->AddCircleFilled(center, knobD * 0.5F, ImGui::ColorConvertFloat4ToU32(knob), 16);
+	draw->AddCircle(center, knobD * 0.5F, Theme::ColorU32(ColorRole::BorderGold), 16, Scale::Px(0.05F));
+}
+
+void OptionSlider(const char *strId, int value, int minValue, int maxValue,
+    const std::function<void(int)> &onChange)
+{
+	const float height = Scale::Px(2.1F);
+	const ImVec2 size(ImGui::GetContentRegionAvail().x, height);
+	ImGui::InvisibleButton(strId, size, ImGuiButtonFlags_None);
+
+	const ImVec2 min = ImGui::GetItemRectMin();
+	const ImVec2 max = ImGui::GetItemRectMax();
+	const bool hovered = ImGui::IsItemHovered();
+	const bool active = ImGui::IsItemActive();
+
+	// Значение задаётся положением указателя — и нажатием, и перетаскиванием.
+	if (active && maxValue > minValue) {
+		const float t = std::clamp((ImGui::GetIO().MousePos.x - min.x) / (max.x - min.x), 0.0F, 1.0F);
+		const int next = minValue + static_cast<int>(std::lround(t * static_cast<float>(maxValue - minValue)));
+		if (next != value) {
+			onChange(next);
+		}
+	}
+
+	ImDrawList *draw = ImGui::GetWindowDrawList();
+	const float trackH = Scale::Px(0.42F);
+	const float cy = (min.y + max.y) * 0.5F;
+	const float fraction = maxValue > minValue
+	    ? static_cast<float>(value - minValue) / static_cast<float>(maxValue - minValue)
+	    : 0.0F;
+
+	// Тонкий трек и золотая заливка пройденной части.
+	const ImVec2 trackMin(min.x, cy - trackH * 0.5F);
+	const ImVec2 trackMax(max.x, cy + trackH * 0.5F);
+	draw->AddRectFilled(trackMin, trackMax, Theme::ColorU32(ColorRole::Panel), trackH * 0.5F);
+	if (fraction > 0.0F) {
+		draw->AddRectFilledMultiColor(trackMin, ImVec2(trackMin.x + (trackMax.x - trackMin.x) * fraction, trackMax.y),
+		    Theme::ColorU32(ColorRole::Red), Theme::ColorU32(ColorRole::BorderGold),
+		    Theme::ColorU32(ColorRole::BorderGold), Theme::ColorU32(ColorRole::Red));
+	}
+	draw->AddRect(trackMin, trackMax,
+	    Theme::ColorU32(hovered || active ? ColorRole::GoldBright : ColorRole::BorderGold), trackH * 0.5F, 0,
+	    Scale::Px(0.05F));
+
+	// Ручка-круг, при захвате чуть крупнее.
+	const float knobD = Scale::Px(active ? 1.25F : 1.1F);
+	const ImVec2 knobCenter(min.x + (max.x - min.x) * fraction, cy);
+	draw->AddCircleFilled(knobCenter, knobD * 0.5F + Scale::Px(0.06F), IM_COL32(0, 0, 0, 90), 16);
+	draw->AddCircleFilled(knobCenter, knobD * 0.5F, Theme::ColorU32(ColorRole::GoldBright), 16);
+	draw->AddCircle(knobCenter, knobD * 0.5F, Theme::ColorU32(ColorRole::BorderGold), 16, Scale::Px(0.05F));
 }
 
 /// Разбивает путь на строки по разделителям «/» и «\»: перенос никогда

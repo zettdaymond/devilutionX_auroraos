@@ -8,10 +8,15 @@
 #include <imgui.h>
 
 #include <functional>
+#include <string>
 
 namespace launcher::ui::widgets {
 
 using Dispatcher = std::function<void(Intent)>;
+
+/// Обрезает текст с «…» под заданную ширину (кегль и шрифт передаются
+/// явно — мерить нужно теми же, которыми рисуем).
+[[nodiscard]] std::string FitTextEllipsis(ImFont *font, float size, const char *text, float maxWidth);
 
 /// Арт, разделяемый с view-слоем (текстура лаунчера и её размер).
 struct BackgroundArt {
@@ -65,6 +70,16 @@ void IconButton(const char *icon, const char *label, bool accent, const ImVec2 &
 
 /// Текст цветом роли, по центру текущей ширины контента.
 void CenteredText(const char *text, ColorRole role = ColorRole::TextBody);
+
+/// Тумблер настройки: трек с анимированной ручкой, включённое
+/// состояние — тёплое золото. Тап по всей площади переключает.
+void ToggleSwitch(const char *strId, bool value, const std::function<void(bool)> &onChange);
+
+/// Слайдер настройки на всю ширину строки: тонкий трек, золотая
+/// заливка и ручка. Нажатие и перетаскивание задают значение
+/// положением пальца.
+void OptionSlider(const char *strId, int value, int minValue, int maxValue,
+    const std::function<void(int)> &onChange);
 
 /// Строка файла в чек-листе. Первая строка: маркер, имя, справа размер
 /// (или «можно скачать»/«не найден») и действие — корзинка для
