@@ -335,6 +335,7 @@ AppResult Application::Run()
 	// поверх последнего кадра) и только затем отдаёт управление движку.
 	while (m_running
 	    && (!m_store->State().pendingLaunch.has_value() || !m_view->LaunchIrisDone())) {
+		const auto frameStart = std::chrono::steady_clock::now();
 		// В фоне (свёрнуто/скрыто) цикл продолжает обслуживать события и
 		// загрузки, но не рендерит. Вместо слепого сна ждём событие в ОС:
 		// разворачивание обрабатывается мгновенно, а таймаут 250 мс равен
@@ -378,6 +379,18 @@ AppResult Application::Run()
 		SDL_RenderClear(m_renderer);
 		ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_renderer);
 		SDL_RenderPresent(m_renderer);
+
+		// Кадровый темп ~60 fps: без паузы цикл крутится вхолостую на
+		// 100% CPU — на устройстве governor сбрасывает частоту от нагрева,
+		// и кадры начинают опаздывать мимо развёртки (наблюдали 45 fps
+		// при простое). Сон отдаляет следующий кадр не раньше 16 мс;
+		// vsync в SDL_Renderer при этом остаётся включённым.
+		const auto deadline = frameStart + std::chrono::milliseconds(16);
+		if (const auto remaining = deadline - std::chrono::steady_clock::now();
+		    remaining.count() > 0) {
+			SDL_Delay(static_cast<Uint32>(
+			    std::chrono::duration_cast<std::chrono::milliseconds>(remaining).count()));
+		}
 	}
 
 	AppResult result;
