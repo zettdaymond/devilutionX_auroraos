@@ -296,6 +296,9 @@ AppResult Application::Run()
 		SDL_PushEvent(&wake);
 	});
 #ifdef AURORA_OS
+	// ВРЕМЕННАЯ телеметрия «aurora-probe»: вдруг патченная SDL Авроры
+	// шлёт системные события в начале жеста сворачивания.
+	SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
 	StartDisplayWatch();
 #endif
 
@@ -344,6 +347,34 @@ AppResult Application::Run()
 	auto processEvent = [this](const SDL_Event &event) {
 		ImGui_ImplSDL2_ProcessEvent(&event);
 
+#ifdef AURORA_OS
+		// ВРЕМЕННАЯ телеметрия «aurora-probe»: редкие типы событий SDL —
+		// ищем хоть один сигнал, приходящий в НАЧАЛЕ жеста сворачивания.
+		switch (event.type) {
+		case SDL_FINGERDOWN:
+			spdlog::info("aurora-probe: FINGERDOWN");
+			break;
+		case SDL_FINGERUP:
+			spdlog::info("aurora-probe: FINGERUP");
+			break;
+		case SDL_MOUSEBUTTONDOWN:
+		case SDL_MOUSEBUTTONUP:
+		case SDL_KEYDOWN:
+		case SDL_TEXTEDITING:
+		case SDL_TEXTINPUT:
+			break;
+		default:
+			if (event.type == SDL_WINDOWEVENT || event.type == SDL_QUIT
+			    || event.type == SDL_MOUSEMOTION || event.type == SDL_FINGERMOTION
+			    || event.type == SDL_MOUSEWHEEL || event.type >= SDL_USEREVENT) {
+				break;
+			}
+			spdlog::info("aurora-probe: event type={} (display={})",
+			    event.type, event.type == SDL_DISPLAYEVENT ? static_cast<int>(event.display.event) : -1);
+			break;
+		}
+#endif
+
 		if (event.type == m_wakeEventType) {
 			// Фоновый поток положил интент в Store — в свёрнутом состоянии
 			// это значит, что обложку (прогресс в плитке) надо перерисовать.
@@ -364,12 +395,16 @@ AppResult Application::Run()
 				m_tkLocked = event.user.data1 != nullptr;
 				break;
 			case 2:
-				// Верхнее окно композитора: сигнал приходит раньше SDL-фокуса
-				// и покрывает случай «жест ещё держат, а приложение уже в плитке».
+				// Верхнее окно композитора — авторитетный источник: реагируем
+				// мгновенно, без дебаунса (он нужен только SDL-фокусу).
 				if (event.user.data1 != nullptr) {
+					m_topmostLost = false;
 					m_focusLostAt.reset();
-				} else if (!m_focusLostAt.has_value()) {
-					m_focusLostAt = std::chrono::steady_clock::now();
+				} else {
+					m_topmostLost = true;
+					if (!m_focusLostAt.has_value()) {
+						m_focusLostAt = std::chrono::steady_clock::now();
+					}
 				}
 				break;
 			default:
@@ -670,6 +705,7 @@ void Application::OnEvent(const SDL_WindowEvent &event)
 	} else if (event.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
 		spdlog::info("aurora-probe: SDL FOCUS_GAINED");
 		m_focusLostAt.reset();
+		m_topmostLost = false;
 	}
 #endif
 
@@ -691,10 +727,11 @@ bool Application::IsTiled() const
 		return true;
 	}
 	// Аврора не шлёт MINIMIZED/HIDDEN при сворачивании в плитку, поэтому
-	// «в плитке» = потеря переднего плана (композитор или SDL-фокус) чуть
-	// дольше мгновенной потери — мигание обложкой от шторок отсекаем.
-	return m_focusLostAt.has_value()
-	    && std::chrono::steady_clock::now() - *m_focusLostAt >= std::chrono::milliseconds(100);
+	// «в плитке» = потеря переднего плана: композитор сказал — мгновенно,
+	// SDL-фокус (фолбэк при мёртой шине) — с дебаунсом от мигания шторками.
+	return m_topmostLost
+	    || (m_focusLostAt.has_value()
+	        && std::chrono::steady_clock::now() - *m_focusLostAt >= std::chrono::milliseconds(100));
 #else
 	return (SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
 #endif

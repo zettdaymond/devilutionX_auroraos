@@ -140,11 +140,11 @@ private:
 
 #ifdef AURORA_OS
 	/// Аврора не шлёт MINIMIZED/HIDDEN при сворачивании в плитку — только
-	/// FOCUS_LOST. «В плитке» = устойчивая (>=100 мс) потеря переднего
-	/// плана; источники два, питают один таймер: SDL-фокус (фолбэк) и
-	/// сигнал композитора privateTopmostWindowProcessIdChanged (правда от
-	/// Lipstick — приходит и в начале жеста сворачивания).
+	/// FOCUS_LOST. «В плитке» = потеря переднего плана: сигнал композитора
+	/// privateTopmostWindowProcessIdChanged действует мгновенно (он
+	/// авторитетен), а SDL-фокус — фолбэк с дебаунсом 100 мс.
 	std::optional<std::chrono::steady_clock::time_point> m_focusLostAt;
+	bool m_topmostLost = false;
 
 	/// Наблюдатель состояния: поток слушает D-Bus (демон mce — дисплей и
 	/// блокировка; композитор Lipstick — верхнее окно) и переправляет
