@@ -1,0 +1,10 @@
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: xkbcommon
+Description: X.Org xkbcommon library (prebuilt from Aurora conan artifactory)
+Version: 1.5.0
+Libs: -L${libdir} -lxkbcommon
+Cflags: -I${includedir}

@@ -60,6 +60,26 @@ set(DEVILUTIONX_ASSETS_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/share/${PROJECT_NAM
 list(APPEND DEVILUTIONX_PLATFORM_SUBDIRECTORIES platform/aurora_os)
 list(APPEND DEVILUTIONX_PLATFORM_LINK_LIBRARIES libdevilutionx_aurora_os)
 
+# Прекомпилированный xkbcommon (conan-артефакторий Авроры, 1.5.0) — для
+# локальной сборки вне эмулятора, где пакета нет в системном sysroot.
+# Каталог подкладывается в PKG_CONFIG_PATH ДО add_subdirectory корня,
+# чтобы его увидели все pkg_search_module'ы ниже по дереву (вендоренная
+# SDL2 требует xkbcommon для wayland-бэкенда). Префиксы в .pc переносимые
+# (${pcfiledir}), от пути checkout не зависят.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "armv7")
+    set(DEVILUTIONX_XKB_ARCH "armv7hl")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|armv8")
+    set(DEVILUTIONX_XKB_ARCH "aarch64")
+else()
+    set(DEVILUTIONX_XKB_ARCH "x86_64")
+endif()
+set(DEVILUTIONX_XKB_PKGCONFIG
+    "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/xkbcommon/${DEVILUTIONX_XKB_ARCH}/lib/pkgconfig")
+if(EXISTS "${DEVILUTIONX_XKB_PKGCONFIG}/xkbcommon.pc")
+    set(ENV{PKG_CONFIG_PATH} "${DEVILUTIONX_XKB_PKGCONFIG}:$ENV{PKG_CONFIG_PATH}")
+    message(STATUS "xkbcommon: prebuilt ${DEVILUTIONX_XKB_ARCH} добавлен в PKG_CONFIG_PATH")
+endif()
+
 add_definitions(-DAURORA_OS)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/.. devilutionX)
 
