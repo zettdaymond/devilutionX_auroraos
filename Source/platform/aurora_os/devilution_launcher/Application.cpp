@@ -413,6 +413,23 @@ AppResult Application::Run()
 					}
 				}
 				break;
+			case 3:
+				// coverstatus от Lipstick — начало жеста сворачивания, до
+				// потери фокуса. Сигнал не адресован конкретному окну:
+				// 1/2 принимаем как «нас сворачивают» (жест бывает только
+				// на переднем плане), ноль — как возврат; чужие нули
+				// игнорируем, если мы не входили через coverstatus.
+				if (event.user.data1 != nullptr) {
+					if (!m_focusLostAt.has_value()) {
+						m_focusLostAt = std::chrono::steady_clock::now();
+					}
+					m_coverActive = true;
+				} else if (m_coverActive) {
+					m_coverActive = false;
+					m_focusLostAt.reset();
+					m_topmostLost = false;
+				}
+				break;
 			default:
 				break;
 			}
@@ -616,11 +633,19 @@ void Application::DisplayWatchLoop()
 		return;
 	}
 
-	// Дисплей + блокировка от mce, верхнее окно от Lipstick.
+	// Дисплей + блокировка от mce, верхнее окно и состояние обложки —
+	// от Lipstick.
 	dbus_bus_add_match(bus, "type='signal',sender='com.nokia.mce',interface='com.nokia.mce.signal'", &error);
 	const bool mceOk = !dbus_error_is_set(&error);
 	if (!mceOk) {
 		spdlog::warn("aurora-watch: подписка на mce не удалась ({})", error.message);
+		dbus_error_free(&error);
+	}
+	// coverstatus стреляет в НАЧАЛЕ жеста сворачивания (до потери фокуса),
+	// но без идентификатора окна: атрибуируем «жест наш», пока мы в фокусе.
+	dbus_bus_add_match(bus, "type='signal',interface='com.jolla.lipstick',member='coverstatus'", &error);
+	if (dbus_error_is_set(&error)) {
+		spdlog::warn("aurora-watch: подписка на coverstatus не удалась ({})", error.message);
 		dbus_error_free(&error);
 	}
 	dbus_bus_add_match(bus,
@@ -701,6 +726,12 @@ void Application::DisplayWatchLoop()
 				int32_t pid = 0;
 				if (dbus_message_get_args(message, &parse, DBUS_TYPE_INT32, &pid, DBUS_TYPE_INVALID)) {
 					PushStateEvent(2, pid == ourPid);
+				}
+			} else if (dbus_message_is_signal(message, "com.jolla.lipstick", "coverstatus")) {
+				int32_t status = 0;
+				if (dbus_message_get_args(message, &parse, DBUS_TYPE_INT32, &status, DBUS_TYPE_INVALID)) {
+					spdlog::info("aurora-probe: coverstatus = {}", status);
+					PushStateEvent(3, status != 0);
 				}
 			}
 			dbus_error_free(&parse);
