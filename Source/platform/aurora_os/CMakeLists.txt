@@ -48,6 +48,7 @@ target_link_libraries(libdevilutionx_aurora_os
         ${AUDIORESOURCE_LIBRARIES}
         ${GLIB_LIBRARIES}
         ${WAYLAND_LIBRARIES}
+        ${DBUS_LIBRARIES}
 )
 
 add_subdirectory(devilution_launcher)
