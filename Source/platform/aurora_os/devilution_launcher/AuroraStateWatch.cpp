@@ -23,7 +23,6 @@ const char *NameOf(StateEvent event)
 	case StateEvent::DisplayOn: return "display";
 	case StateEvent::TkLocked: return "tklock";
 	case StateEvent::TopmostOurs: return "topmost";
-	case StateEvent::CoverActive: return "cover";
 	}
 	return "?";
 }
@@ -84,31 +83,8 @@ void StateWatch::Run()
 		dbus_error_free(&error);
 	}
 
-	// Сессионная шина: coverstatus жеста сворачивания. Значения: 1 и 2
-	// приходят парой в начале жеста (прогресса драга композитор не
-	// вещает), 3 и 0 — парой при возврате из плитки.
-	DBusConnection *session = nullptr;
-	if (mceOk || compositorOk) {
-		session = dbus_bus_get(DBUS_BUS_SESSION, &error);
-		if (session == nullptr) {
-			spdlog::warn("aurora: сессионная шина недоступна ({}), жести не увидим",
-			    error.message != nullptr ? error.message : "?");
-			dbus_error_free(&error);
-		} else {
-			dbus_bus_add_match(session, "type='signal',interface='com.jolla.lipstick',member='coverstatus'", &error);
-			if (dbus_error_is_set(&error)) {
-				spdlog::warn("aurora: подписка на coverstatus не удалась ({})", error.message);
-				dbus_error_free(&error);
-				dbus_connection_unref(session);
-				session = nullptr;
-			}
-		}
-	}
 	if (!mceOk && !compositorOk) {
 		dbus_connection_unref(system);
-		if (session != nullptr) {
-			dbus_connection_unref(session);
-		}
 		return;
 	}
 
@@ -170,48 +146,23 @@ void StateWatch::Run()
 				if (dbus_message_get_args(message, &parse, DBUS_TYPE_INT32, &pid, DBUS_TYPE_INVALID)) {
 					Push(StateEvent::TopmostOurs, pid == ourPid);
 				}
-			} else if (dbus_message_is_signal(message, "com.jolla.lipstick", "coverstatus")) {
-				int32_t cover = 0;
-				if (dbus_message_get_args(message, &parse, DBUS_TYPE_INT32, &cover, DBUS_TYPE_INVALID)) {
-					// 1 всегда мгновенно сменяется парой 2 — не пушим,
-					// в булевой форме он неотличим от возврата. 2 — жест
-					// дошёл до плитки; 3 и 0 идут парой при возврате —
-					// достаточно первого.
-					if (cover == 2) {
-						Push(StateEvent::CoverActive, true);
-					} else if (cover == 3) {
-						Push(StateEvent::CoverActive, false);
-					}
-				}
 			}
 			dbus_error_free(&parse);
 			dbus_message_unref(message);
 		}
 	};
 
-	// Блокирующее чтение с таймаутом по каждой из шин по очереди:
-	// просыпаемся ~7 раз в секунду только чтобы проверить флаг
-	// завершения — дешевле интеграции шин в цикл событий.
+	// Блокирующее чтение с таймаутом: просыпаемся четыре раза в секунду
+	// только чтобы проверить флаг завершения — дешевле интеграции шины
+	// в цикл событий.
 	while (!m_stop.load()) {
-		if (!dbus_connection_read_write(system, 70)) {
+		if (!dbus_connection_read_write(system, 250)) {
 			spdlog::warn("aurora: системная шина потеряна");
 			break;
 		}
 		drain(system);
-		if (session != nullptr) {
-			if (!dbus_connection_read_write(session, 70)) {
-				spdlog::warn("aurora: сессионная шина потеряна");
-				dbus_connection_unref(session);
-				session = nullptr;
-				continue;
-			}
-			drain(session);
-		}
 	}
 	dbus_connection_unref(system);
-	if (session != nullptr) {
-		dbus_connection_unref(session);
-	}
 }
 
 } // namespace launcher::aurora

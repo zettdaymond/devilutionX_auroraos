@@ -511,21 +511,6 @@ void Application::ApplyAuroraState(launcher::aurora::StateEvent what, bool value
 			}
 		}
 		break;
-	case launcher::aurora::StateEvent::CoverActive:
-		// coverstatus: значение 2 — начало жеста сворачивания, 3/0 —
-		// возврат из плитки. Сигнал не адресован окну: началo считаем
-		// своим только с переднего плана (жест бывает только на нём);
-		// чужой жест в фоне обнуляет метку — наша точно устарела. Вход
-		// по жесту не делаем (обложка включается по TopmostOurs в момент
-		// отпускания пальца), а вот выход — мгновенный.
-		if (value) {
-			m_coverGestureOurs = !m_focusLostAt.has_value();
-		} else if (m_coverGestureOurs) {
-			m_coverGestureOurs = false;
-			m_focusLostAt.reset();
-			m_topmostLost = false;
-		}
-		break;
 	}
 
 	// Пробуждение: пару секунд считаем себя передним планом и рендерим
