@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <array>
 #include <cfloat>
-#include <cstdlib>
 #include <cstring>
 #include <string>
 
@@ -573,14 +572,21 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 
 void Settings(const LauncherState &state, const Dispatcher &dispatch)
 {
-	// TODO(кинетика): временная ручка диагностики стоимости списка
-	// (LAUNCHER_SETTINGS_ROWS=12) — убрать после локализации.
-	static const int rowsLimit = [] {
-		const char *env = std::getenv("LAUNCHER_SETTINGS_ROWS");
-		return env != nullptr ? std::atoi(env) : 0;
-	}();
-	static int rowsDrawn = 0;
-	rowsDrawn = 0;
+	// Виртуализация: полный список в 41 строку стоил ~6 мс/кадр на
+	// устройстве — кадр перестал попадать в развёртку (45 fps вместо 60).
+	// Высота строки переносима (описания переносятся по ширине), поэтому
+	// рендерим только строки у окна, а высоту остальных берём из кэша
+	// прошлого кадра и просто резервируем место. Смена ширины сбрасывает
+	// кэш; запас в 4rem покрывает скачок прокрутки за кадр.
+	static float rowHeights[kSettingCount] = {};
+	static float cachedWidth = -1.0F;
+	const float listWidth = ImGui::GetContentRegionAvail().x;
+	if (listWidth != cachedWidth) {
+		cachedWidth = listWidth;
+		std::fill(rowHeights, rowHeights + kSettingCount, 0.0F);
+	}
+	const float viewTop = ImGui::GetScrollY() - Scale::Px(4.0F);
+	const float viewBottom = ImGui::GetScrollY() + ImGui::GetWindowHeight() + Scale::Px(4.0F);
 
 	// Раскладка как на экране данных: строки на всю ширину контента,
 	// без капа и Indent — SameLine-выравнивание FileRow на Indent не
@@ -603,11 +609,15 @@ void Settings(const LauncherState &state, const Dispatcher &dispatch)
 			if (spec.group != group.group) {
 				continue;
 			}
-			++rowsDrawn;
-			if (rowsLimit > 0 && rowsDrawn > rowsLimit) {
+			const size_t index = static_cast<size_t>(spec.id);
+			const float rowTop = ImGui::GetCursorPosY();
+			if (rowHeights[index] > 0.0F
+			    && (rowTop + rowHeights[index] < viewTop || rowTop > viewBottom)) {
+				ImGui::SetCursorPosY(rowTop + rowHeights[index]);
 				continue;
 			}
-			RenderSettingRow(spec, state.settingValues[static_cast<size_t>(spec.id)], dispatch);
+			RenderSettingRow(spec, state.settingValues[index], dispatch);
+			rowHeights[index] = ImGui::GetCursorPosY() - rowTop;
 		}
 	}
 
