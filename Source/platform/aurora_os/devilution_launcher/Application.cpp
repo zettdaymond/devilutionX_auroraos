@@ -410,12 +410,21 @@ AppResult Application::Run()
 			default:
 				break;
 			}
-			// Пробуждение при потерянном переднем плане: даём фокусу сотню
-			// миллисекунд вернуться, иначе обложка мигнёт на разблокировке
-			// раньше FOCUS_GAINED/topmost-сигнала.
+			// Пробуждение: пару секунд считаем себя передним планом и
+			// рендерим интерфейс — между «экран разблокирован» и «окно
+			// поднято» идёт анимация локскрина, и обложка в этом зазоре
+			// мелькает. Перед сном были плиткой — грейс не нужен: после
+			// разблокировки сразу остаёмся обложкой.
 			const bool awake = m_displayOn && !m_tkLocked;
-			if (wasAwake != awake && awake && m_focusLostAt.has_value()) {
-				m_focusLostAt = std::chrono::steady_clock::now();
+			if (wasAwake != awake) {
+				if (awake) {
+					if (!m_skipWakeGrace) {
+						m_wakeGraceUntil =
+						    std::chrono::steady_clock::now() + std::chrono::milliseconds(1500);
+					}
+				} else {
+					m_skipWakeGrace = m_wasHidden;
+				}
 			}
 		}
 #endif
@@ -722,6 +731,13 @@ bool Application::IsTiled() const
 	// на экран блокировки обложке показываться незачем.
 	if (!m_displayOn || m_tkLocked) {
 		return true;
+	}
+	// Грейс после пробуждения: рендерим интерфейс как передний план.
+	if (m_wakeGraceUntil.has_value()) {
+		if (std::chrono::steady_clock::now() < *m_wakeGraceUntil) {
+			return false;
+		}
+		m_wakeGraceUntil.reset();
 	}
 	if ((SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0) {
 		return true;
