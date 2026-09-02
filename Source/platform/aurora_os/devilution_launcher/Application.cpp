@@ -414,11 +414,12 @@ AppResult Application::Run()
 				}
 				break;
 			case 3:
-				// coverstatus от Lipstick — начало жеста сворачивания, до
-				// потери фокуса. Сигнал не адресован конкретному окну:
-				// 1/2 принимаем как «нас сворачивают» (жест бывает только
-				// на переднем плане), ноль — как возврат; чужие нули
-				// игнорируем, если мы не входили через coverstatus.
+				// coverstatus = 2 от Lipstick: драг сворачивания прошёл
+				// порог и окно сжалось в плитку — показываем обложку, не
+				// дожидаясь потери фокуса (она придёт только с отпусканием
+				// пальца). 1 — жест только начался, окно ещё полноэкранное;
+				// 0/3 — обычный режим/возврат. Сигнал не адресован окну:
+				// атрибуция через «жест бывает только на переднем плане».
 				if (event.user.data1 != nullptr) {
 					if (!m_focusLostAt.has_value()) {
 						m_focusLostAt = std::chrono::steady_clock::now();
@@ -633,19 +634,14 @@ void Application::DisplayWatchLoop()
 		return;
 	}
 
-	// Дисплей + блокировка от mce, верхнее окно и состояние обложки —
-	// от Lipstick.
+	// Дисплей + блокировка от mce, верхнее окно от композитора — системная
+	// шина. А вот coverstatus (начало жеста сворачивания, до потери
+	// фокуса) композитор вещает под именем com.jolla.lipstick на
+	// СЕССИОННОЙ шине — на системной этого имени нет вовсе.
 	dbus_bus_add_match(bus, "type='signal',sender='com.nokia.mce',interface='com.nokia.mce.signal'", &error);
 	const bool mceOk = !dbus_error_is_set(&error);
 	if (!mceOk) {
 		spdlog::warn("aurora-watch: подписка на mce не удалась ({})", error.message);
-		dbus_error_free(&error);
-	}
-	// coverstatus стреляет в НАЧАЛЕ жеста сворачивания (до потери фокуса),
-	// но без идентификатора окна: атрибуируем «жест наш», пока мы в фокусе.
-	dbus_bus_add_match(bus, "type='signal',interface='com.jolla.lipstick',member='coverstatus'", &error);
-	if (dbus_error_is_set(&error)) {
-		spdlog::warn("aurora-watch: подписка на coverstatus не удалась ({})", error.message);
 		dbus_error_free(&error);
 	}
 	dbus_bus_add_match(bus,
@@ -659,6 +655,23 @@ void Application::DisplayWatchLoop()
 	if (!mceOk && !compositorOk) {
 		dbus_connection_unref(bus);
 		return;
+	}
+
+	// Сигнал без идентификатора окна: атрибуируем «жест наш», пока мы
+	// в фокусе (жест бывает только на переднем плане).
+	DBusConnection *session = dbus_bus_get(DBUS_BUS_SESSION, &error);
+	if (session == nullptr) {
+		spdlog::warn("aurora-watch: сессионная шина недоступна ({}), жесты не увидим",
+		    error.message != nullptr ? error.message : "?");
+		dbus_error_free(&error);
+	} else {
+		dbus_bus_add_match(session, "type='signal',interface='com.jolla.lipstick',member='coverstatus'", &error);
+		if (dbus_error_is_set(&error)) {
+			spdlog::warn("aurora-watch: подписка на coverstatus не удалась ({})", error.message);
+			dbus_error_free(&error);
+			dbus_connection_unref(session);
+			session = nullptr;
+		}
 	}
 
 	// Начальные состояния — синхронными запросами, чтобы не ждать первых
@@ -699,15 +712,11 @@ void Application::DisplayWatchLoop()
 	}
 	const int32_t ourPid = static_cast<int32_t>(::getpid());
 
-	// Блокирующее чтение с таймаутом: просыпаемся четыре раза в секунду
-	// только чтобы проверить флаг завершения — дешевле интеграции шины
-	// в цикл событий.
-	while (!m_displayWatchStop.load()) {
-		if (!dbus_connection_read_write(bus, 250)) {
-			spdlog::warn("aurora-watch: соединение с шиной потеряно");
-			break;
-		}
-		while (DBusMessage *message = dbus_connection_pop_message(bus)) {
+	// Диспетчеризация одного сообщения: интерфейс определяет источник,
+	// шина значения не имеет (coverstatus ходит по сессии, остальное —
+	// по системной).
+	const auto drainBus = [this, ourPid](DBusConnection *connection) {
+		while (DBusMessage *message = dbus_connection_pop_message(connection)) {
 			DBusError parse;
 			dbus_error_init(&parse);
 			const char *status = nullptr;
@@ -728,17 +737,44 @@ void Application::DisplayWatchLoop()
 					PushStateEvent(2, pid == ourPid);
 				}
 			} else if (dbus_message_is_signal(message, "com.jolla.lipstick", "coverstatus")) {
-				int32_t status = 0;
-				if (dbus_message_get_args(message, &parse, DBUS_TYPE_INT32, &status, DBUS_TYPE_INVALID)) {
-					spdlog::info("aurora-probe: coverstatus = {}", status);
-					PushStateEvent(3, status != 0);
+				int32_t cover = 0;
+				if (dbus_message_get_args(message, &parse, DBUS_TYPE_INT32, &cover, DBUS_TYPE_INVALID)) {
+					spdlog::info("aurora-probe: coverstatus = {}", cover);
+					// 1 — жест начался, окно ещё полноэкранное; 2 — драг
+					// дошёл до порога и окно сжалось в плитку (порог — на
+					// совести композитора, у нас данных о пальце нет);
+					// 3 — возврат из плитки; 0 — обычный режим.
+					PushStateEvent(3, cover == 2);
 				}
 			}
 			dbus_error_free(&parse);
 			dbus_message_unref(message);
 		}
+	};
+
+	// Блокирующее чтение с таймаутом по каждой из шин по очереди:
+	// просыпаемся ~7 раз в секунду только чтобы проверить флаг
+	// завершения — дешевле интеграции шин в цикл событий.
+	while (!m_displayWatchStop.load()) {
+		if (!dbus_connection_read_write(bus, 70)) {
+			spdlog::warn("aurora-watch: системная шина потеряна");
+			break;
+		}
+		drainBus(bus);
+		if (session != nullptr) {
+			if (!dbus_connection_read_write(session, 70)) {
+				spdlog::warn("aurora-watch: сессионная шина потеряна");
+				dbus_connection_unref(session);
+				session = nullptr;
+				continue;
+			}
+			drainBus(session);
+		}
 	}
 	dbus_connection_unref(bus);
+	if (session != nullptr) {
+		dbus_connection_unref(session);
+	}
 }
 
 // ---------------------------------------------------------------------------
