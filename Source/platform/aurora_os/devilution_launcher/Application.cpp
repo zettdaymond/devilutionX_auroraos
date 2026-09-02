@@ -512,12 +512,16 @@ void Application::ApplyAuroraState(launcher::aurora::StateEvent what, bool value
 		}
 		break;
 	case launcher::aurora::StateEvent::CoverActive:
-		// coverstatus: 1 и 2 прилетают парой в начале жеста, 3 и 0 —
-		// парой при возврате из плитки. Вход не делаем (обложка
-		// включается по TopmostOurs, в момент отпускания пальца), а вот
-		// выход мгновенный, не ждём FOCUS_GAINED. «1» до «2» безвредна:
-		// фокус ещё не потерян, сбрасывать нечего.
-		if (!value) {
+		// coverstatus: значение 2 — начало жеста сворачивания, 3/0 —
+		// возврат из плитки. Сигнал не адресован окну: началo считаем
+		// своим только с переднего плана (жест бывает только на нём);
+		// чужой жест в фоне обнуляет метку — наша точно устарела. Вход
+		// по жесту не делаем (обложка включается по TopmostOurs в момент
+		// отпускания пальца), а вот выход — мгновенный.
+		if (value) {
+			m_coverGestureOurs = !m_focusLostAt.has_value();
+		} else if (m_coverGestureOurs) {
+			m_coverGestureOurs = false;
 			m_focusLostAt.reset();
 			m_topmostLost = false;
 		}
@@ -550,6 +554,13 @@ bool Application::CoverFadeFrame(float &alpha)
 		return false;
 	}
 	if (m_coverFadeStartedAt < 0.0) {
+		// Фейд живёт только на переходе «видимое → плитка»: m_wasHidden
+		// ещё false. Будить его повторно нельзя — иначе каждое
+		// пробуждение в плитке (прогресс загрузки, чужие окна) снова
+		// рисовало бы интерфейс под обложкой.
+		if (m_wasHidden) {
+			return false;
+		}
 		m_coverFadeStartedAt = ImGui::GetTime();
 	}
 	// Кросс-фейд на входе в плитку: первые kCoverFade секунд кадр —

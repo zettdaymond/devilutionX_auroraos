@@ -173,7 +173,15 @@ void StateWatch::Run()
 			} else if (dbus_message_is_signal(message, "com.jolla.lipstick", "coverstatus")) {
 				int32_t cover = 0;
 				if (dbus_message_get_args(message, &parse, DBUS_TYPE_INT32, &cover, DBUS_TYPE_INVALID)) {
-					Push(StateEvent::CoverActive, cover == 2);
+					// 1 всегда мгновенно сменяется парой 2 — не пушим,
+					// в булевой форме он неотличим от возврата. 2 — жест
+					// дошёл до плитки; 3 и 0 идут парой при возврате —
+					// достаточно первого.
+					if (cover == 2) {
+						Push(StateEvent::CoverActive, true);
+					} else if (cover == 3) {
+						Push(StateEvent::CoverActive, false);
+					}
 				}
 			}
 			dbus_error_free(&parse);
