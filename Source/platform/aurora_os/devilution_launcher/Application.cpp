@@ -141,6 +141,28 @@ SDL_Texture *LoadAssetTexture(SDL_Renderer *renderer, const char *path, ImVec2 &
 	}
 }
 
+/// Читаемое имя события окна для журнала (временная телеметрия «обложка»:
+/// на Авроре важно, какую последовательность шлёт композитор при
+/// сворачивании в плитку; прочие события — числом).
+const char *WindowEventName(Uint8 event)
+{
+	switch (event) {
+	case SDL_WINDOWEVENT_SHOWN: return "SHOWN";
+	case SDL_WINDOWEVENT_HIDDEN: return "HIDDEN";
+	case SDL_WINDOWEVENT_EXPOSED: return "EXPOSED";
+	case SDL_WINDOWEVENT_MOVED: return "MOVED";
+	case SDL_WINDOWEVENT_RESIZED: return "RESIZED";
+	case SDL_WINDOWEVENT_SIZE_CHANGED: return "SIZE_CHANGED";
+	case SDL_WINDOWEVENT_MINIMIZED: return "MINIMIZED";
+	case SDL_WINDOWEVENT_MAXIMIZED: return "MAXIMIZED";
+	case SDL_WINDOWEVENT_RESTORED: return "RESTORED";
+	case SDL_WINDOWEVENT_FOCUS_GAINED: return "FOCUS_GAINED";
+	case SDL_WINDOWEVENT_FOCUS_LOST: return "FOCUS_LOST";
+	case SDL_WINDOWEVENT_CLOSE: return "CLOSE";
+	default: return "OTHER";
+	}
+}
+
 } // namespace
 
 Application::Application(SDL_Window *window, const std::string &companyNamespace, const std::string &appName)
@@ -280,6 +302,15 @@ AppResult Application::Run()
 	    *m_services.config, *m_services.files, *m_services.downloads, *m_services.paths,
 	    *m_services.engineOptions);
 
+	// Свёрнутый цикл спит в блокирующем SDL_WaitEvent: фоновые потоки
+	// (прогресс/финиш загрузок zoe) будят его пользовательским событием.
+	m_wakeEventType = SDL_RegisterEvents(1);
+	m_store->SetWakeCallback([this]() {
+		SDL_Event wake {};
+		wake.type = m_wakeEventType;
+		SDL_PushEvent(&wake);
+	});
+
 	// Setup() создаёт контекст ImGui и грузит шрифты, поэтому вид (и его
 	// файловый браузер, которому нужен шрифтовый атлас) создаётся после него.
 	if (m_renderer == nullptr && !Setup()) {
@@ -314,6 +345,9 @@ AppResult Application::Run()
 	if (m_initialDialog.has_value()) {
 		m_store->Dispatch(launcher::intent::UiOpenDialog { *m_initialDialog });
 	}
+	if (m_initialDownload) {
+		m_store->Dispatch(launcher::intent::StartDownload { launcher::KnownFile::Spawn });
+	}
 
 	auto dispatch = [this](launcher::Intent intent) {
 		m_store->Dispatch(std::move(intent));
@@ -322,6 +356,11 @@ AppResult Application::Run()
 	auto processEvent = [this](const SDL_Event &event) {
 		ImGui_ImplSDL2_ProcessEvent(&event);
 
+		if (event.type == m_wakeEventType) {
+			// Фоновый поток положил интент в Store — в свёрнутом состоянии
+			// это значит, что обложку (прогресс в плитке) надо перерисовать.
+			m_coverDirty = true;
+		}
 		if (event.type == SDL_QUIT) {
 			Stop();
 		}
@@ -336,12 +375,11 @@ AppResult Application::Run()
 	while (m_running
 	    && (!m_store->State().pendingLaunch.has_value() || !m_view->LaunchIrisDone())) {
 		const auto frameStart = std::chrono::steady_clock::now();
-		// В фоне (свёрнуто/скрыто) цикл продолжает обслуживать события и
-		// загрузки, но не рендерит. Вместо слепого сна ждём событие в ОС:
-		// разворачивание обрабатывается мгновенно, а таймаут 250 мс равен
-		// периоду троттлинга прогресса загрузок — просыпаемся ровно в такт
-		// прибытию интентов из фоновой очереди (они приходят не как
-		// SDL-события, поэтому бесконечное ожидание недопустимо).
+		// В фоне (свёрнуто в плитку/скрыто) интерфейс не рендерится: рисуем
+		// один кадр «обложки» для плитки композитора и спим в блокирующем
+		// SDL_WaitEvent — никакого опроса по таймеру. Будят только события
+		// окна (разворачивание) и wake-пинки фоновых интентов (прогресс
+		// загрузок), по которым обложка перерисовывается с новым процентом.
 		const Uint32 windowFlags = SDL_GetWindowFlags(m_window);
 		const bool hidden = (windowFlags & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
 
@@ -351,10 +389,17 @@ AppResult Application::Run()
 			if (m_store->State().pendingLaunch.has_value()) {
 				break;
 			}
-			SDL_Event wake {};
-			if (SDL_WaitEventTimeout(&wake, 250) == 1) {
-				processEvent(wake);
+			if (!m_wasHidden || m_coverDirty) {
+				RenderCoverFrame();
+				m_coverDirty = false;
 			}
+			m_wasHidden = true;
+			SDL_Event wait {};
+			if (SDL_WaitEvent(&wait) == 1) {
+				processEvent(wait);
+			}
+		} else {
+			m_wasHidden = false;
 		}
 
 		SDL_Event event {};
@@ -363,7 +408,9 @@ AppResult Application::Run()
 		}
 
 		m_store->Poll();
-		if (hidden) {
+
+		// Обработанные события могли развернуть окно — видим ли мы ещё?
+		if ((SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0) {
 			continue;
 		}
 
@@ -371,7 +418,11 @@ AppResult Application::Run()
 		ImGui_ImplSDL2_NewFrame();
 		ImGui::NewFrame();
 
-		m_view->Render(m_store->State(), dispatch);
+		if (m_coverPreview) {
+			m_view->RenderCover(m_store->State());
+		} else {
+			m_view->Render(m_store->State(), dispatch);
+		}
 
 		ImGui::Render();
 
@@ -407,8 +458,36 @@ void Application::Stop()
 	m_running = false;
 }
 
+void Application::RenderCoverFrame()
+{
+	ImGui_ImplSDLRenderer2_NewFrame();
+	ImGui_ImplSDL2_NewFrame();
+	ImGui::NewFrame();
+
+	m_view->RenderCover(m_store->State());
+
+	ImGui::Render();
+
+	SDL_SetRenderDrawColor(m_renderer, 10, 7, 5, 255);
+	SDL_RenderClear(m_renderer);
+	ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+	// Телеметрия (временная, «обложка»): present в скрытом окне может
+	// блокироваться на frame-callback Wayland — на устройстве сверим
+	// длительность с кадром видимого режима.
+	const auto presentStart = std::chrono::steady_clock::now();
+	SDL_RenderPresent(m_renderer);
+	const auto presentMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+	    std::chrono::steady_clock::now() - presentStart);
+	spdlog::info("cover: present за {} мс", presentMs.count());
+}
+
 void Application::OnEvent(const SDL_WindowEvent &event)
 {
+	// Временная телеметрия «обложка»: последовательность событий окна при
+	// сворачивании в плитку/разворачивании на Авроре. Убрать после
+	// девайс-прогона.
+	spdlog::info("windowevent: {} ({})", WindowEventName(event.event), static_cast<int>(event.event));
+
 	if (event.event == SDL_WINDOWEVENT_CLOSE) {
 		Stop();
 	}

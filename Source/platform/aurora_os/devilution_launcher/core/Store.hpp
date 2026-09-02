@@ -10,7 +10,9 @@
 #include "services/IPathProvider.hpp"
 
 #include <deque>
+#include <functional>
 #include <mutex>
+#include <thread>
 
 namespace launcher {
 
@@ -31,6 +33,12 @@ public:
 
 	/// Читает настройки и делает первичный поиск файлов.
 	void Init();
+
+	/// Колбэк «в очередь пришёл интент из фонового потока». Главный цикл
+	/// в свёрнутом состоянии спит в SDL_WaitEvent и сам о новых интентах
+	/// (прогресс загрузок из потоков zoe) не узнает — Application вешает
+	/// сюда пинок в очередь событий SDL. Ставится один раз, до Init().
+	void SetWakeCallback(std::function<void()> callback);
 
 	/// Ставит интент в очередь. Потокобезопасно; применяется при
 	/// следующем Poll() на главном потоке.
@@ -61,6 +69,11 @@ private:
 
 	LauncherConfig m_config;
 	LauncherState m_state;
+
+	/// Поток, создавший Store (по договорённости — главный). Dispatch с
+	/// любого другого потока дёргает wake-колбэк.
+	std::thread::id m_mainThreadId;
+	std::function<void()> m_wakeCallback;
 
 	std::deque<Intent> m_queue;
 	std::mutex m_queueMutex;

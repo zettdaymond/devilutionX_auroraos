@@ -34,6 +34,8 @@ struct Args {
 	std::optional<launcher::Screen> screen;
 	bool openBrowser = false;
 	std::optional<launcher::Dialog> dialog;
+	bool coverPreview = false;
+	bool coverDownload = false;
 	int windowWidth = 540;
 	int windowHeight = 960;
 };
@@ -58,6 +60,10 @@ Args ParseArgs(int argc, char **argv)
 			}
 		} else if (arg == "--open-browser") {
 			args.openBrowser = true;
+		} else if (arg == "--cover-preview") {
+			args.coverPreview = true;
+		} else if (arg == "--cover-download") {
+			args.coverDownload = true;
 		} else if (arg.rfind("--dialog=", 0) == 0) {
 			const std::string value = arg.substr(std::strlen("--dialog="));
 			if (value == "confirm-demo") {
@@ -78,7 +84,7 @@ Args ParseArgs(int argc, char **argv)
 				args.windowHeight = std::atoi(x + 1);
 			}
 		} else if (arg == "--help" || arg == "-h") {
-			spdlog::info("Usage: devilution_launcher [--mock-scenario=<name>] [--screen=home|data|settings|about] [--dialog=confirm-reset-settings] [--window=<WxH>]");
+			spdlog::info("Usage: devilution_launcher [--mock-scenario=<name>] [--screen=home|data|settings|about] [--dialog=confirm-reset-settings] [--cover-preview] [--window=<WxH>]");
 			spdlog::info("Scenarios:");
 			for (const auto &name : launcher::MockScenario::Names()) {
 				spdlog::info("  {}", name);
@@ -138,6 +144,12 @@ int main(int argc, char **argv)
 	}
 	if (args.dialog.has_value()) {
 		app->SetInitialDialog(*args.dialog);
+	}
+	if (args.coverPreview) {
+		app->SetCoverPreview(true);
+	}
+	if (args.coverDownload) {
+		app->SetInitialDownload(true);
 	}
 
 	const App::AppResult result = app->Run();

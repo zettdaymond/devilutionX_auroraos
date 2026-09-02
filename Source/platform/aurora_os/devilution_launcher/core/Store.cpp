@@ -43,6 +43,7 @@ Store::Store(IConfigService &configService,
     , m_downloadService(downloadService)
     , m_pathProvider(pathProvider)
     , m_engineOptionsService(engineOptionsService)
+    , m_mainThreadId(std::this_thread::get_id())
 {
 }
 
@@ -54,10 +55,27 @@ void Store::Init()
 	RescanAndDerive();
 }
 
-void Store::Dispatch(Intent intent)
+void Store::SetWakeCallback(std::function<void()> callback)
 {
 	std::lock_guard<std::mutex> lock(m_queueMutex);
-	m_queue.push_back(std::move(intent));
+	m_wakeCallback = std::move(callback);
+}
+
+void Store::Dispatch(Intent intent)
+{
+	std::function<void()> wake;
+	{
+		std::lock_guard<std::mutex> lock(m_queueMutex);
+		m_queue.push_back(std::move(intent));
+		// Будим главный поток только для «чужих» вызовов: свои интенты
+		// (пользовательский ввод) он и так применит в ближайшем кадре.
+		if (std::this_thread::get_id() != m_mainThreadId) {
+			wake = m_wakeCallback;
+		}
+	}
+	if (wake != nullptr) {
+		wake();
+	}
 }
 
 // ---- Intent handlers ----

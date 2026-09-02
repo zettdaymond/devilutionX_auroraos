@@ -1,6 +1,7 @@
 #include "LauncherView.hpp"
 
 #include "Animation.hpp"
+#include "Format.hpp"
 #include "Icons.hpp"
 #include "Scale.hpp"
 #include "Theme.hpp"
@@ -11,7 +12,12 @@
 #include <imgui.h>
 #include <spdlog/spdlog.h>
 
+#ifndef LAUNCHER_APP_VERSION
+#	define LAUNCHER_APP_VERSION "dev"
+#endif
+
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -424,6 +430,121 @@ void LauncherView::RenderLaunchIris(const LauncherState &state)
 	draw->AddCircle(center, radius, ImGui::GetColorU32(ImVec4(1.0F, 0.58F, 0.16F, rimAlpha)), 48, Scale::Px(0.1F));
 	draw->AddCircle(center, radius * 0.96F,
 	    ImGui::GetColorU32(ImVec4(0.91F, 0.55F, 0.16F, rimAlpha * 0.6F)), 48, Scale::Px(0.18F));
+}
+
+void LauncherView::RenderCover(const LauncherState &state)
+{
+	const ImGuiViewport *viewport = ImGui::GetMainViewport();
+	// Текст на background-списке в этой паре ImGui/SDL_Renderer не
+	// рендерится (картинки — рендерятся, глифы — нет), поэтому вся
+	// обложка рисуется в foreground-списке: в кадре обложки больше
+	// ничего нет, так что «поверх всего» — то, что нужно.
+	ImDrawList *draw = ImGui::GetForegroundDrawList();
+	const ImVec2 &top = viewport->WorkPos;
+	const ImVec2 &v = viewport->WorkSize;
+	const float centerX = top.x + v.x * 0.5F;
+
+	// Фон — тот же aspect-fill кроп, что у главного экрана.
+	if (m_backgroundTexture != nullptr && m_backgroundTextureSize.x > 0.0F && m_backgroundTextureSize.y > 0.0F) {
+		const ImVec2 &t = m_backgroundTextureSize;
+		const float scale = std::max(v.x / t.x, v.y / t.y);
+		const ImVec2 shown(t.x * scale, t.y * scale);
+		const ImVec2 crop(0.5F - (v.x / shown.x) * 0.5F, 0.5F - (v.y / shown.y) * 0.5F);
+		draw->AddImage(m_backgroundTexture, top, top + v,
+		    ImVec2(crop.x, crop.y), ImVec2(1.0F - crop.x, 1.0F - crop.y));
+	}
+
+	// Затемнение плотнее, чем на главном экране: плитка мелкая, тексту
+	// нужен контраст. Угольки не рисуем — кадр статичный между правками.
+	draw->AddRectFilled(top, top + v, ImGui::GetColorU32(ImVec4(0.02F, 0.01F, 0.01F, 0.45F)));
+
+	// Композитор кропает буфер под пропорции плитки — контент держим
+	// в центральной полосе шириной ~72%, края небезопасны.
+	const float contentWidth = v.x * 0.72F;
+	float y = top.y + v.y * 0.24F;
+
+	// Логотип Exocet. Рисуем строго нативным размером шрифта: этот бранч
+	// ImGui печёт глифы по-размерно, и произвольный размер потребовал бы
+	// пересборки текстуры атласа прямо в кадре (бэкенд SDL_Renderer её
+	// не подтягивает — текст молча пропадал).
+	ImFont *heading = Theme::Font(FontRole::Heading);
+	if (heading != nullptr) {
+		constexpr const char *kTitle = "DEVILUTIONX";
+		const float size = heading->LegacySize;
+		const ImVec2 textSize = heading->CalcTextSizeA(size, FLT_MAX, 0.0F, kTitle);
+		draw->AddText(heading, size, ImVec2(centerX - textSize.x * 0.5F, y),
+		    Theme::ColorU32(ColorRole::GoldBright), kTitle);
+		y += textSize.y + Scale::Px(0.55F);
+	}
+
+	// Подпись с версией и разделитель.
+	{
+		Theme::PushFont(FontRole::Body);
+		const std::string subtitle = std::string("порт для Aurora OS · ") + LAUNCHER_APP_VERSION;
+		const ImVec2 textSize = ImGui::CalcTextSize(subtitle.c_str());
+		draw->AddText(ImVec2(centerX - textSize.x * 0.5F, y), Theme::ColorU32(ColorRole::TextDim),
+		    subtitle.c_str());
+		Theme::PopFont();
+		y += textSize.y + Scale::Px(0.9F);
+	}
+	Theme::DrawDivider(ImVec2(centerX - contentWidth * 0.5F, y), ImVec2(centerX + contentWidth * 0.5F, y), 0.7F);
+
+	// Активная загрузка: имя файла, полоса с «горячим» краем, процент и
+	// скорость — упрощённый вариант бара экрана данных.
+	if (state.DownloadInProgress()) {
+		const DownloadState &d = *state.download;
+		const FileSpec &spec = FileSpecOf(d.file);
+		// Отрезаем пояснение в скобках («демо-версия») — имя файла в
+		// плитке узнаётся и без него.
+		const std::string_view displayName = spec.displayName.substr(0, spec.displayName.find(" ("));
+
+		float dy = top.y + v.y * 0.50F;
+		Theme::PushFont(FontRole::BodyBold);
+		const ImVec2 nameSize = ImGui::CalcTextSize(displayName.data(), displayName.data() + displayName.size());
+		draw->AddText(ImVec2(centerX - nameSize.x * 0.5F, dy), Theme::ColorU32(ColorRole::TextBody),
+		    displayName.data(), displayName.data() + displayName.size());
+		Theme::PopFont();
+
+		// Полоса: тёмный трек в золотой рамке, заливка и мягкий свет
+		// на переднем крае.
+		dy += nameSize.y + Scale::Px(0.7F);
+		const float barHeight = Scale::Px(0.55F);
+		const float barLeft = centerX - contentWidth * 0.5F;
+		draw->AddRectFilled(ImVec2(barLeft, dy), ImVec2(barLeft + contentWidth, dy + barHeight),
+		    Theme::ColorU32(ColorRole::Panel));
+		const float fill = contentWidth * std::clamp(d.fraction, 0.0F, 1.0F);
+		if (fill > 0.0F) {
+			draw->AddRectFilled(ImVec2(barLeft, dy), ImVec2(barLeft + fill, dy + barHeight),
+			    Theme::ColorU32(ColorRole::GoldDim));
+			draw->AddCircleFilled(ImVec2(barLeft + fill, dy + barHeight * 0.5F), barHeight,
+			    ImGui::GetColorU32(Theme::Color(ColorRole::GoldBright) * ImVec4(1.0F, 1.0F, 1.0F, 0.35F)), 12);
+		}
+		draw->AddRect(ImVec2(barLeft, dy), ImVec2(barLeft + contentWidth, dy + barHeight),
+		    Theme::ColorU32(ColorRole::BorderGold), 1.0F);
+
+		dy += barHeight + Scale::Px(0.55F);
+		Theme::PushFont(FontRole::Body);
+		const std::string stat = std::to_string(static_cast<int>(d.fraction * 100.0F + 0.5F)) + "% · "
+		    + FormatBytes(d.bytesPerSec) + "/с";
+		const ImVec2 statSize = ImGui::CalcTextSize(stat.c_str());
+		draw->AddText(ImVec2(centerX - statSize.x * 0.5F, dy), Theme::ColorU32(ColorRole::TextDim),
+		    stat.c_str());
+		Theme::PopFont();
+	}
+
+	// ВРЕМЕННАЯ телеметрия «обложка» (env LAUNCHER_COVER_PROBE=1): номер
+	// кадра в углу. Если число тикает в плитке — композитор берёт наши
+	// перерисовки скрытого окна и живой прогресс в плитке возможен.
+	// Удалить после девайс-прогона.
+	static const bool probeCounter = [] {
+		const char *env = std::getenv("LAUNCHER_COVER_PROBE");
+		return env != nullptr && env[0] == '1';
+	}();
+	if (probeCounter) {
+		const std::string counter = std::to_string(ImGui::GetFrameCount());
+		draw->AddText(ImVec2(top.x + Scale::Px(0.6F), top.y + v.y - Scale::Px(2.2F)),
+		    IM_COL32(255, 255, 255, 220), counter.c_str());
+	}
 }
 
 void LauncherView::RenderBackground() const

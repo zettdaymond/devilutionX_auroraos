@@ -58,6 +58,13 @@ public:
 /// confirm-demo | confirm-ru | hellfire-missing | error.
 	void SetInitialDialog(launcher::Dialog dialog) { m_initialDialog = dialog; }
 
+/// Рисовать вместо интерфейса кадр «обложки» свёрнутого приложения
+/// (отладка обложки на десктопе, без сворачивания окна).
+	void SetCoverPreview(bool enabled) { m_coverPreview = enabled; }
+
+/// Начать загрузку демо сразу при старте (отладка обложки с прогрессом).
+	void SetInitialDownload(bool start) { m_initialDownload = start; }
+
 	void Stop();
 	void OnEvent(const SDL_WindowEvent &event);
 
@@ -71,6 +78,12 @@ private:
 	/// Дублирует лог в файл рядом с настройками: на устройстве системный
 	/// журнал читается только рутом, а файл доступен пользователю напрямую.
 	void AttachFileLog();
+
+	/// Один кадр «обложки» для плитки Авроры: после сворачивания композитор
+	/// показывает буфер окна в плитке домашнего экрана, поэтому вместо
+	/// интерфейса рисуем фирменный кадр (LauncherView::RenderCover) и
+	/// обновляем его только по факту изменений (прогресс загрузки).
+	void RenderCoverFrame();
 
 	SDL_Window *m_window { nullptr };
 	SDL_Renderer *m_renderer { nullptr };
@@ -99,6 +112,17 @@ private:
 	std::optional<launcher::Screen> m_initialScreen;
 	bool m_initialBrowser = false;
 	std::optional<launcher::Dialog> m_initialDialog;
+	bool m_coverPreview = false;
+	bool m_initialDownload = false;
+
+	/// Тип пользовательского SDL-события: «фоновый поток положил интент
+	/// в очередь Store» — будит блокирующее ожидание свёрнутого цикла.
+	Uint32 m_wakeEventType { 0 };
+
+	/// Состояние обложки свёрнутого окна: был ли кадр уже нарисован и
+	/// устарел ли он (пришёл wake-пинок с новым прогрессом загрузки).
+	bool m_wasHidden = false;
+	bool m_coverDirty = false;
 };
 
 } // namespace App

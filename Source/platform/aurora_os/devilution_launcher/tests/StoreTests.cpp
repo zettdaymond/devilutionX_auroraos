@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <thread>
@@ -65,6 +66,33 @@ TEST_F(StoreTest, InitialStateIsEmpty)
 	EXPECT_FALSE(state().hellfire.available);
 	EXPECT_FALSE(state().demo.available);
 	EXPECT_FALSE(state().download.has_value());
+}
+
+TEST_F(StoreTest, WakeCallbackFiresOnlyForBackgroundDispatch)
+{
+	construct();
+
+	std::atomic<int> wakes { 0 };
+	m_store->SetWakeCallback([&wakes] { ++wakes; });
+
+	// Интент с главного потока не будит: свой ввод цикл и так применит
+	// в ближайшем кадре.
+	m_store->Dispatch(intent::UiNavigate { Screen::About });
+	pump();
+	EXPECT_EQ(wakes.load(), 0);
+	EXPECT_EQ(state().screen, Screen::About);
+
+	// Интент из фонового потока (как прогресс загрузки из zoe) будит —
+	// свёрнутый цикл спит в блокирующем ожидании и без пинка проспал бы
+	// изменение состояния.
+	std::thread background([&store = *m_store] {
+		store.Dispatch(intent::UiNavigate { Screen::Data });
+	});
+	background.join();
+	EXPECT_EQ(wakes.load(), 1);
+
+	pump();
+	EXPECT_EQ(state().screen, Screen::Data);
 }
 
 TEST_F(StoreTest, FolderSelectedScansAndEnablesDiablo)
