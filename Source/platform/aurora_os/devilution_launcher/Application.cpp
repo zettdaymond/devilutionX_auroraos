@@ -744,8 +744,12 @@ qt_extended_surface_listener kCoverExtendedListener = {
 	CoverClose,
 };
 
-void CoverRegistryGlobal(void *, wl_registry *registry, uint32_t name, const char *interface, uint32_t)
+void CoverRegistryGlobal(void *, wl_registry *registry, uint32_t name, const char *interface, uint32_t version)
 {
+	// ВРЕМЕННАЯ телеметрия «cover-probe»: разовый дамп всех глобалов
+	// композитора — вдруг besides qt_surface_extension есть и другие
+	// полезные приватные расширения. Убрать после девайс-прогона.
+	spdlog::info("cover-probe: global {} v{}", interface, version);
 	if (std::strcmp(interface, "qt_surface_extension") == 0) {
 		g_coverExtensionBound = static_cast<qt_surface_extension *>(
 		    wl_registry_bind(registry, name, &qt_surface_extension_interface, 1u));
@@ -809,25 +813,31 @@ void Application::StopCoverWatch()
 
 void Application::OnCoverProperty(const char *name, const wl_array *value)
 {
-	// ВРЕМЕННАЯ телеметрия «cover-probe»: сырые байты значения — формат
-	// свойства документирован плохо, сверим на устройстве. Убрать.
-	std::string hex;
+	// ВРЕМЕННАЯ телеметрия «cover-probe»: максимальный дамп значения —
+	// байты, печатаемая строка и int-трактовка (формат свойства в
+	// источниках Lipstick не описан, ловим эмпирически). Убрать.
 	const auto *bytes = static_cast<const unsigned char *>(value->data);
-	for (size_t i = 0; i < value->size && i < 16; ++i) {
+	std::string hex;
+	std::string ascii;
+	for (size_t i = 0; i < value->size && i < 64; ++i) {
 		char buf[4];
 		std::snprintf(buf, sizeof(buf), "%02x ", bytes[i]);
 		hex += buf;
+		ascii += bytes[i] >= 0x20 && bytes[i] < 0x7F ? static_cast<char>(bytes[i]) : '.';
 	}
-	spdlog::info("cover-probe: property '{}' = [{}] ({} байт)", name, hex, value->size);
+	int32_t asInt = 0;
+	if (value->size >= sizeof(asInt)) {
+		std::memcpy(&asInt, value->data, sizeof(asInt));
+	}
+	spdlog::info("cover-probe: property '{}' = int({}) str('{}') [{}] ({} байт)",
+	    name, asInt, ascii, hex, value->size);
 
 	if (std::strcmp(name, "cover_status") != 0 && std::strcmp(name, "jolla.cover_status") != 0) {
 		return;
 	}
-	int32_t status = 0;
-	if (value->size >= sizeof(status)) {
-		std::memcpy(&status, value->data, sizeof(status));
-	}
-	m_coverActive = status != 0;
+	// Формат значения неизвестен заранее: ждём int32 (как в D-Bus сигнале
+	// coverstatus) или строковые "1"/"2"; точную трактовку даст лог пробы.
+	m_coverActive = asInt != 0 || ascii == "1" || ascii == "2";
 	if (m_coverActive) {
 		if (!m_focusLostAt.has_value()) {
 			m_focusLostAt = std::chrono::steady_clock::now();
