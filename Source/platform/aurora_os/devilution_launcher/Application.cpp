@@ -141,28 +141,6 @@ SDL_Texture *LoadAssetTexture(SDL_Renderer *renderer, const char *path, ImVec2 &
 	}
 }
 
-/// Читаемое имя события окна для журнала (временная телеметрия «обложка»:
-/// на Авроре важно, какую последовательность шлёт композитор при
-/// сворачивании в плитку; прочие события — числом).
-const char *WindowEventName(Uint8 event)
-{
-	switch (event) {
-	case SDL_WINDOWEVENT_SHOWN: return "SHOWN";
-	case SDL_WINDOWEVENT_HIDDEN: return "HIDDEN";
-	case SDL_WINDOWEVENT_EXPOSED: return "EXPOSED";
-	case SDL_WINDOWEVENT_MOVED: return "MOVED";
-	case SDL_WINDOWEVENT_RESIZED: return "RESIZED";
-	case SDL_WINDOWEVENT_SIZE_CHANGED: return "SIZE_CHANGED";
-	case SDL_WINDOWEVENT_MINIMIZED: return "MINIMIZED";
-	case SDL_WINDOWEVENT_MAXIMIZED: return "MAXIMIZED";
-	case SDL_WINDOWEVENT_RESTORED: return "RESTORED";
-	case SDL_WINDOWEVENT_FOCUS_GAINED: return "FOCUS_GAINED";
-	case SDL_WINDOWEVENT_FOCUS_LOST: return "FOCUS_LOST";
-	case SDL_WINDOWEVENT_CLOSE: return "CLOSE";
-	default: return "OTHER";
-	}
-}
-
 } // namespace
 
 Application::Application(SDL_Window *window, const std::string &companyNamespace, const std::string &appName)
@@ -468,23 +446,11 @@ void Application::RenderCoverFrame()
 	SDL_SetRenderDrawColor(m_renderer, 10, 7, 5, 255);
 	SDL_RenderClear(m_renderer);
 	ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_renderer);
-	// Телеметрия (временная, «обложка»): present в скрытом окне может
-	// блокироваться на frame-callback Wayland — на устройстве сверим
-	// длительность с кадром видимого режима.
-	const auto presentStart = std::chrono::steady_clock::now();
 	SDL_RenderPresent(m_renderer);
-	const auto presentMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-	    std::chrono::steady_clock::now() - presentStart);
-	spdlog::info("cover: present за {} мс", presentMs.count());
 }
 
 void Application::OnEvent(const SDL_WindowEvent &event)
 {
-	// Временная телеметрия «обложка»: последовательность событий окна при
-	// сворачивании в плитку/разворачивании на Авроре. Убрать после
-	// девайс-прогона.
-	spdlog::info("windowevent: {} ({})", WindowEventName(event.event), static_cast<int>(event.event));
-
 #ifdef AURORA_OS
 	if (event.event == SDL_WINDOWEVENT_FOCUS_LOST) {
 		m_focusLostAt = std::chrono::steady_clock::now();

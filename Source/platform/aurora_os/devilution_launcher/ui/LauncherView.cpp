@@ -531,20 +531,6 @@ void LauncherView::RenderCover(const LauncherState &state)
 		    stat.c_str());
 		Theme::PopFont();
 	}
-
-	// ВРЕМЕННАЯ телеметрия «обложка» (env LAUNCHER_COVER_PROBE=1): номер
-	// кадра в углу. Если число тикает в плитке — композитор берёт наши
-	// перерисовки скрытого окна и живой прогресс в плитке возможен.
-	// Удалить после девайс-прогона.
-	static const bool probeCounter = [] {
-		const char *env = std::getenv("LAUNCHER_COVER_PROBE");
-		return env != nullptr && env[0] == '1';
-	}();
-	if (probeCounter) {
-		const std::string counter = std::to_string(ImGui::GetFrameCount());
-		draw->AddText(ImVec2(top.x + Scale::Px(0.6F), top.y + v.y - Scale::Px(2.2F)),
-		    IM_COL32(255, 255, 255, 220), counter.c_str());
-	}
 }
 
 void LauncherView::RenderBackground() const
