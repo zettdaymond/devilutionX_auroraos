@@ -8,10 +8,12 @@
 #include "services/ServiceFactory.hpp"
 
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
+#include <thread>
 
 namespace launcher {
 class Store;
@@ -129,11 +131,28 @@ private:
 	bool m_wasHidden = false;
 	bool m_coverDirty = false;
 
+	/// Дисплей включён. На Авроре — из сигнала демона mce, на десктопе —
+	/// всегда true. Погашенный экран = не рендерить вовсе: композитор
+	/// окно не показывает, а кадры в тёмную матрицу тратят батарею.
+	std::atomic<bool> m_displayOn { true };
+
 #ifdef AURORA_OS
 	/// Аврора не шлёт MINIMIZED/HIDDEN при сворачивании в плитку — только
-	/// FOCUS_LOST. Устойчивая потеря фокуса (>=0.4 с) считается «в
+	/// FOCUS_LOST. Устойчивая потеря фокуса (>=100 мс) считается «в
 	/// плитке»; пусто — фокус есть (или был с самого старта).
 	std::optional<std::chrono::steady_clock::time_point> m_focusLostAt;
+
+	/// Наблюдатель состояния дисплея: поток слушает D-Bus сигнал
+	/// display_status_ind демона mce (наследие Sailfish) и переправляет
+	/// его в очередь событий SDL своим пользовательским событием.
+	std::thread m_displayWatch;
+	std::atomic<bool> m_displayWatchStop { false };
+	Uint32 m_displayEventType { 0 };
+
+	void StartDisplayWatch();
+	void StopDisplayWatch();
+	void DisplayWatchLoop();
+	void PushDisplayEvent(bool on);
 #endif
 };
 

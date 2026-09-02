@@ -212,6 +212,9 @@ else()
 
   add_devilutionx_object_library(devilution_launcher ${LAUNCHER_UI_SOURCES})
   target_include_directories(devilution_launcher PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+  # Наблюдатель состояния дисплея (Application.cpp) слушает D-Bus: те же
+  # пути инклюдов, что у соседней libdevilutionx_aurora_os.
+  target_include_directories(devilution_launcher PUBLIC "/usr/include/dbus-1.0" "/usr/lib/dbus-1.0/include")
   target_compile_definitions(devilution_launcher PRIVATE LAUNCHER_APP_VERSION="${LAUNCHER_APP_VERSION_STRING}")
   target_link_libraries(devilution_launcher
       PUBLIC
