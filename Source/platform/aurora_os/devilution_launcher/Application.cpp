@@ -39,8 +39,10 @@
 #ifdef AURORA_OS
 #	include <dbus/dbus.h>
 #	include <unistd.h>
-#	include <wayland-client.h>
 #	include <SDL_syswm.h>
+// Сгенерированный протокол приватного расширения Qt — лежит в private
+// инклюдах QtWaylandClient SDK (см. CMakeLists: include-путь глобом).
+#	include <wayland-surface-extension-client-protocol.h>
 #endif
 
 CMRC_DECLARE(assets);
@@ -712,56 +714,13 @@ void Application::DisplayWatchLoop()
 // Wayland-хук «плитки»: приватное расширение Qt (qt_surface_extension из
 // QtWayland, поддерживается Lipstick). Композитор сообщает окну состояние
 // обложки свойством cover_status через qt_extended_surface — в отличие от
-// D-Bus/SDL-событий это происходит в НАЧАЛЕ жеста сворачивания. Биндинги
-// протокола собраны руками (в SDK Авроры сгенерированных заголовков нет,
-// интерфейсы тривиальны: один запрос у расширения, три события у поверхности).
+// D-Bus/SDL-событий это происходит в НАЧАЛЕ жеста сворачивания.
 // ---------------------------------------------------------------------------
 
 namespace {
 
-const wl_message kQtSurfaceExtensionRequests[] = {
-	{ "get_extended_surface", "no", nullptr },
-};
-const wl_message kQtExtendedSurfaceRequests[] = {
-	{ "destroy", "", nullptr },
-};
-const wl_message kQtExtendedSurfaceEvents[] = {
-	{ "onscreen_visibility", "i", nullptr },
-	{ "set_generic_property", "sa", nullptr },
-	{ "close", "", nullptr },
-};
-
-const wl_interface kQtSurfaceExtensionInterface = {
-	"qt_surface_extension", 1,
-	1, kQtSurfaceExtensionRequests,
-	0, nullptr,
-};
-const wl_interface kQtExtendedSurfaceInterface = {
-	"qt_extended_surface", 1,
-	1, kQtExtendedSurfaceRequests,
-	3, kQtExtendedSurfaceEvents,
-};
-
-struct qt_extended_surface_listener {
-	void (*onscreen_visibility)(void *data, qt_extended_surface *surface, int32_t visible);
-	void (*set_generic_property)(void *data, qt_extended_surface *surface, const char *name, wl_array *value);
-	void (*close)(void *data, qt_extended_surface *surface);
-};
-
 /// Заполняется слушателем реестра (глобалы приходят до roundtrip).
 qt_surface_extension *g_coverExtensionBound = nullptr;
-
-qt_extended_surface *QtGetExtendedSurface(qt_surface_extension *extension, wl_surface *surface)
-{
-	return static_cast<qt_extended_surface *>(wl_proxy_marshal_constructor(reinterpret_cast<wl_proxy *>(extension),
-	    0, &kQtExtendedSurfaceInterface, nullptr, surface));
-}
-
-void QtDestroyExtendedSurface(qt_extended_surface *extended)
-{
-	wl_proxy_marshal(reinterpret_cast<wl_proxy *>(extended), 0);
-	wl_proxy_destroy(reinterpret_cast<wl_proxy *>(extended));
-}
 
 void CoverOnscreenVisibility(void *, qt_extended_surface *, int32_t visible)
 {
@@ -789,7 +748,7 @@ void CoverRegistryGlobal(void *, wl_registry *registry, uint32_t name, const cha
 {
 	if (std::strcmp(interface, "qt_surface_extension") == 0) {
 		g_coverExtensionBound = static_cast<qt_surface_extension *>(
-		    wl_registry_bind(registry, name, &kQtSurfaceExtensionInterface, 1u));
+		    wl_registry_bind(registry, name, &qt_surface_extension_interface, 1u));
 	}
 }
 void CoverRegistryGlobalRemove(void *, wl_registry *, uint32_t)
@@ -830,9 +789,8 @@ void Application::InitCoverWatch()
 	}
 	m_coverExtension = g_coverExtensionBound;
 
-	m_coverSurface = QtGetExtendedSurface(m_coverExtension, surface);
-	wl_proxy_add_listener(reinterpret_cast<wl_proxy *>(m_coverSurface),
-	    reinterpret_cast<wl_notify_func_t *>(&kCoverExtendedListener), this);
+	m_coverSurface = qt_surface_extension_get_extended_surface(m_coverExtension, surface);
+	qt_extended_surface_add_listener(m_coverSurface, &kCoverExtendedListener, this);
 	wl_display_roundtrip(display);
 	spdlog::info("cover-watch: подписан на события qt_extended_surface");
 }
@@ -840,7 +798,7 @@ void Application::InitCoverWatch()
 void Application::StopCoverWatch()
 {
 	if (m_coverSurface != nullptr) {
-		QtDestroyExtendedSurface(m_coverSurface);
+		qt_extended_surface_destroy(m_coverSurface);
 		m_coverSurface = nullptr;
 	}
 	if (m_coverRegistry != nullptr) {
