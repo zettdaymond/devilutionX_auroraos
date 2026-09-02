@@ -403,6 +403,19 @@ AppResult Application::Run()
 		// SDL_WaitEvent — никакого опроса по таймеру. Будят только события
 		// окна (разворачивание) и wake-пинки фоновых интентов (прогресс
 		// загрузок), по которым обложка перерисовывается с новым процентом.
+#ifdef AURORA_OS
+		// ВРЕМЕННАЯ телеметрия «aurora-probe»: переходы в/из режима плитки.
+		if (IsTiled() != m_wasTiledProbe) {
+			m_wasTiledProbe = !m_wasTiledProbe;
+			spdlog::info("aurora-probe: {} (display={} tklock={} focusLostMs={})",
+			    m_wasTiledProbe ? "TILED" : "VISIBLE", m_displayOn ? 1 : 0, m_tkLocked ? 1 : 0,
+			    m_focusLostAt.has_value()
+			        ? std::chrono::duration_cast<std::chrono::milliseconds>(
+			              std::chrono::steady_clock::now() - *m_focusLostAt)
+			              .count()
+			         : -1);
+		}
+#endif
 		if (IsTiled()) {
 			// Анимировать закрытое окно не для кого: iris не стартует без
 			// рендера, и цикл выше никогда не увидел бы его завершения.
@@ -525,6 +538,12 @@ void Application::StopDisplayWatch()
 
 void Application::PushStateEvent(int what, bool value)
 {
+	// ВРЕМЕННАЯ телеметрия «aurora-probe»: логируем приход каждого
+	// сигнала — на устройстве сверим тайминги с SDL-фокусом. Убрать
+	// после отладки жеста/блокировки.
+	static const char *const kNames[] = { "display", "tklock", "topmost" };
+	spdlog::info("aurora-probe: sig {} = {}", kNames[what], value ? 1 : 0);
+
 	SDL_Event event {};
 	event.type = m_displayEventType;
 	event.user.code = what;
@@ -646,8 +665,10 @@ void Application::OnEvent(const SDL_WindowEvent &event)
 {
 #ifdef AURORA_OS
 	if (event.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+		spdlog::info("aurora-probe: SDL FOCUS_LOST");
 		m_focusLostAt = std::chrono::steady_clock::now();
 	} else if (event.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+		spdlog::info("aurora-probe: SDL FOCUS_GAINED");
 		m_focusLostAt.reset();
 	}
 #endif

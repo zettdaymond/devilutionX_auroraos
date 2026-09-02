@@ -153,6 +153,9 @@ private:
 	std::atomic<bool> m_displayWatchStop { false };
 	Uint32 m_displayEventType { 0 };
 
+	/// ВРЕМЕННАЯ телеметрия «aurora-probe» (переходы режима плитки).
+	bool m_wasTiledProbe = false;
+
 	void StartDisplayWatch();
 	void StopDisplayWatch();
 	void DisplayWatchLoop();
