@@ -485,17 +485,24 @@ AppResult Application::Run()
 		    && !m_store->State().pendingLaunch.has_value()) {
 			if (m_coverFadeStartedAt < 0.0) {
 				m_coverFadeStartedAt = ImGui::GetTime();
+				// ВРЕМЕННАЯ телеметрия «aurora-probe» — убедиться, что
+				// фейд на устройстве вообще выполняется. Убрать.
+				spdlog::info("aurora-probe: cover fade start");
 			}
-			constexpr float kCoverFade = 0.2F;
-			const float fade = static_cast<float>(ImGui::GetTime() - m_coverFadeStartedAt);
-			if (fade < kCoverFade) {
+			constexpr float kCoverFade = 0.3F;
+			const float t = std::clamp(static_cast<float>(ImGui::GetTime() - m_coverFadeStartedAt) / kCoverFade,
+			    0.0F, 1.0F);
+			if (t < 1.0F) {
 				coverFading = true;
-				coverAlpha = fade / kCoverFade;
+				// smoothstep: линейный фейд воспринимается резким вначале.
+				coverAlpha = t * t * (3.0F - 2.0F * t);
 			} else {
 				m_coverFadeStartedAt = -1.0;
+				spdlog::info("aurora-probe: cover fade done");
 			}
-		} else {
+		} else if (m_coverFadeStartedAt >= 0.0) {
 			m_coverFadeStartedAt = -1.0;
+			spdlog::info("aurora-probe: cover fade cancelled");
 		}
 #else
 		constexpr bool coverFading = false;
