@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <iterator>
@@ -185,6 +186,13 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 			m_flickTrail[0] = FlickSample { ImGui::GetTime(), io.MousePos.y };
 			m_flickActive = true;
 		} else if (m_flickActive && !ImGui::IsMouseDown(0)) {
+			// TODO(кинетика): временная ручка для подбора затухания на
+			// устройстве без пересборки (LAUNCHER_FLICK_DECAY=4.5) —
+			// убрать вместе с flick-логом после утверждения ощущений.
+			static const float flickDecay = [] {
+				const char *env = std::getenv("LAUNCHER_FLICK_DECAY");
+				return env != nullptr ? std::max(1.0F, static_cast<float>(std::atof(env))) : 3.5F;
+			}();
 			if (m_flickTrailLen > 0) {
 				// Скорость — по окну ~120 мс: палец тормозит перед
 				// подъёмом, скорость последних кадров занижена. Берём
@@ -211,7 +219,7 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 			// Кинетическая прокрутка: движение по инерции с экспоненциальным
 			// затуханием; у краёв списка и при новом касании — стоп.
 			ImGui::SetScrollY(ImGui::GetScrollY() + m_flickSpeed * io.DeltaTime);
-			m_flickSpeed *= std::exp(-6.0F * io.DeltaTime);
+			m_flickSpeed *= std::exp(-flickDecay * io.DeltaTime);
 			const float y = ImGui::GetScrollY();
 			if (std::abs(m_flickSpeed) < 40.0F || y <= 0.0F || y >= contentScrollMaxY) {
 				m_flickActive = false;
