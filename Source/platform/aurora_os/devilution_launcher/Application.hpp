@@ -19,6 +19,11 @@ namespace launcher {
 class Store;
 }
 
+struct wl_registry;
+struct wl_array;
+struct qt_surface_extension;
+struct qt_extended_surface;
+
 namespace launcher::ui {
 class LauncherView;
 }
@@ -165,10 +170,25 @@ private:
 	/// ВРЕМЕННАЯ телеметрия «aurora-probe» (переходы режима плитки).
 	bool m_wasTiledProbe = false;
 
+	/// Wayland-хук плитки: реестр, расширение Qt и обёртка нашей
+	/// поверхности; активна ли «плитка» по слову композитора.
+	struct wl_registry *m_coverRegistry = nullptr;
+	struct qt_surface_extension *m_coverExtension = nullptr;
+	struct qt_extended_surface *m_coverSurface = nullptr;
+	bool m_coverActive = false;
+
 	void StartDisplayWatch();
 	void StopDisplayWatch();
 	void DisplayWatchLoop();
 	void PushStateEvent(int what, bool value);
+
+	/// Хук на Wayland-расширение Qt (qt_surface_extension): Lipstick
+	/// сообщает окну состояние «плитки» свойством cover_status ещё ДО
+	/// отпускания пальца в жесте сворачивания. Колбэки приходят в потоке
+	/// SDL (внутри Poll/WaitEvent) — состояние меняем прямо из них.
+	void InitCoverWatch();
+	void StopCoverWatch();
+	void OnCoverProperty(const char *name, const struct wl_array *value);
 #endif
 };
 

@@ -28,6 +28,7 @@
 #endif
 
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <iterator>
@@ -38,6 +39,8 @@
 #ifdef AURORA_OS
 #	include <dbus/dbus.h>
 #	include <unistd.h>
+#	include <wayland-client.h>
+#	include <SDL_syswm.h>
 #endif
 
 CMRC_DECLARE(assets);
@@ -300,6 +303,7 @@ AppResult Application::Run()
 	// шлёт системные события в начале жеста сворачивания.
 	SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
 	StartDisplayWatch();
+	InitCoverWatch();
 #endif
 
 	// Setup() создаёт контекст ImGui и грузит шрифты, поэтому вид (и его
@@ -526,6 +530,7 @@ AppResult Application::Run()
 
 #ifdef AURORA_OS
 	StopDisplayWatch();
+	StopCoverWatch();
 #endif
 
 	AppResult result;
@@ -703,6 +708,179 @@ void Application::DisplayWatchLoop()
 	dbus_connection_unref(bus);
 }
 
+// ---------------------------------------------------------------------------
+// Wayland-хук «плитки»: приватное расширение Qt (qt_surface_extension из
+// QtWayland, поддерживается Lipstick). Композитор сообщает окну состояние
+// обложки свойством cover_status через qt_extended_surface — в отличие от
+// D-Bus/SDL-событий это происходит в НАЧАЛЕ жеста сворачивания. Биндинги
+// протокола собраны руками (в SDK Авроры сгенерированных заголовков нет,
+// интерфейсы тривиальны: один запрос у расширения, три события у поверхности).
+// ---------------------------------------------------------------------------
+
+namespace {
+
+const wl_message kQtSurfaceExtensionRequests[] = {
+	{ "get_extended_surface", "no", nullptr },
+};
+const wl_message kQtExtendedSurfaceRequests[] = {
+	{ "destroy", "", nullptr },
+};
+const wl_message kQtExtendedSurfaceEvents[] = {
+	{ "onscreen_visibility", "i", nullptr },
+	{ "set_generic_property", "sa", nullptr },
+	{ "close", "", nullptr },
+};
+
+const wl_interface kQtSurfaceExtensionInterface = {
+	"qt_surface_extension", 1,
+	1, kQtSurfaceExtensionRequests,
+	0, nullptr,
+};
+const wl_interface kQtExtendedSurfaceInterface = {
+	"qt_extended_surface", 1,
+	1, kQtExtendedSurfaceRequests,
+	3, kQtExtendedSurfaceEvents,
+};
+
+struct qt_extended_surface_listener {
+	void (*onscreen_visibility)(void *data, qt_extended_surface *surface, int32_t visible);
+	void (*set_generic_property)(void *data, qt_extended_surface *surface, const char *name, wl_array *value);
+	void (*close)(void *data, qt_extended_surface *surface);
+};
+
+/// Заполняется слушателем реестра (глобалы приходят до roundtrip).
+qt_surface_extension *g_coverExtensionBound = nullptr;
+
+qt_extended_surface *QtGetExtendedSurface(qt_surface_extension *extension, wl_surface *surface)
+{
+	return static_cast<qt_extended_surface *>(wl_proxy_marshal_constructor(reinterpret_cast<wl_proxy *>(extension),
+	    0, &kQtExtendedSurfaceInterface, nullptr, surface));
+}
+
+void QtDestroyExtendedSurface(qt_extended_surface *extended)
+{
+	wl_proxy_marshal(reinterpret_cast<wl_proxy *>(extended), 0);
+	wl_proxy_destroy(reinterpret_cast<wl_proxy *>(extended));
+}
+
+void CoverOnscreenVisibility(void *, qt_extended_surface *, int32_t visible)
+{
+	// ВРЕМЕННАЯ телеметрия «cover-probe» — убрать после девайс-прогона.
+	spdlog::info("cover-probe: onscreen_visibility={}", visible);
+}
+
+void CoverSetGenericProperty(void *data, qt_extended_surface *, const char *name, wl_array *value)
+{
+	static_cast<Application *>(data)->OnCoverProperty(name, value);
+}
+
+void CoverClose(void *, qt_extended_surface *)
+{
+	spdlog::info("cover-probe: close от композитора");
+}
+
+qt_extended_surface_listener kCoverExtendedListener = {
+	CoverOnscreenVisibility,
+	CoverSetGenericProperty,
+	CoverClose,
+};
+
+void CoverRegistryGlobal(void *, wl_registry *registry, uint32_t name, const char *interface, uint32_t)
+{
+	if (std::strcmp(interface, "qt_surface_extension") == 0) {
+		g_coverExtensionBound = static_cast<qt_surface_extension *>(
+		    wl_registry_bind(registry, name, &kQtSurfaceExtensionInterface, 1u));
+	}
+}
+void CoverRegistryGlobalRemove(void *, wl_registry *, uint32_t)
+{
+}
+
+const wl_registry_listener kCoverRegistryListener = {
+	CoverRegistryGlobal,
+	CoverRegistryGlobalRemove,
+};
+
+} // namespace
+
+void Application::InitCoverWatch()
+{
+	SDL_SysWMinfo wm;
+	SDL_VERSION(&wm.version);
+	if (!SDL_GetWindowWMInfo(m_window, &wm) || wm.subsystem != SDL_SYSWM_WAYLAND) {
+		spdlog::info("cover-watch: окно не wayland — хук плитки пропущен");
+		return;
+	}
+	wl_display *display = wm.info.wl.display;
+	wl_surface *surface = wm.info.wl.surface;
+	if (display == nullptr || surface == nullptr) {
+		spdlog::warn("cover-watch: нет wayland display/surface");
+		return;
+	}
+
+	g_coverExtensionBound = nullptr;
+	m_coverRegistry = wl_display_get_registry(display);
+	wl_registry_add_listener(m_coverRegistry, &kCoverRegistryListener, nullptr);
+	wl_display_roundtrip(display);
+	if (g_coverExtensionBound == nullptr) {
+		spdlog::info("cover-watch: композитор не экспортирует qt_surface_extension");
+		wl_registry_destroy(m_coverRegistry);
+		m_coverRegistry = nullptr;
+		return;
+	}
+	m_coverExtension = g_coverExtensionBound;
+
+	m_coverSurface = QtGetExtendedSurface(m_coverExtension, surface);
+	wl_proxy_add_listener(reinterpret_cast<wl_proxy *>(m_coverSurface),
+	    reinterpret_cast<wl_notify_func_t *>(&kCoverExtendedListener), this);
+	wl_display_roundtrip(display);
+	spdlog::info("cover-watch: подписан на события qt_extended_surface");
+}
+
+void Application::StopCoverWatch()
+{
+	if (m_coverSurface != nullptr) {
+		QtDestroyExtendedSurface(m_coverSurface);
+		m_coverSurface = nullptr;
+	}
+	if (m_coverRegistry != nullptr) {
+		wl_registry_destroy(m_coverRegistry);
+		m_coverRegistry = nullptr;
+	}
+}
+
+void Application::OnCoverProperty(const char *name, const wl_array *value)
+{
+	// ВРЕМЕННАЯ телеметрия «cover-probe»: сырые байты значения — формат
+	// свойства документирован плохо, сверим на устройстве. Убрать.
+	std::string hex;
+	const auto *bytes = static_cast<const unsigned char *>(value->data);
+	for (size_t i = 0; i < value->size && i < 16; ++i) {
+		char buf[4];
+		std::snprintf(buf, sizeof(buf), "%02x ", bytes[i]);
+		hex += buf;
+	}
+	spdlog::info("cover-probe: property '{}' = [{}] ({} байт)", name, hex, value->size);
+
+	if (std::strcmp(name, "cover_status") != 0 && std::strcmp(name, "jolla.cover_status") != 0) {
+		return;
+	}
+	int32_t status = 0;
+	if (value->size >= sizeof(status)) {
+		std::memcpy(&status, value->data, sizeof(status));
+	}
+	m_coverActive = status != 0;
+	if (m_coverActive) {
+		if (!m_focusLostAt.has_value()) {
+			m_focusLostAt = std::chrono::steady_clock::now();
+		}
+	} else {
+		m_focusLostAt.reset();
+		m_topmostLost = false;
+	}
+	m_coverDirty = true;
+}
+
 #endif
 
 void Application::OnEvent(const SDL_WindowEvent &event)
@@ -716,6 +894,7 @@ void Application::OnEvent(const SDL_WindowEvent &event)
 		m_focusLostAt.reset();
 		m_topmostLost = false;
 	}
+    spdlog::info("aurora-probe: SDL WINDOW EVVENT: {}", event.event);
 #endif
 
 	if (event.event == SDL_WINDOWEVENT_CLOSE) {
@@ -730,6 +909,11 @@ bool Application::IsTiled() const
 	// окно формально в фокусе — кадры в тёмную матрицу тратят батарею, а
 	// на экран блокировки обложке показываться незачем.
 	if (!m_displayOn || m_tkLocked) {
+		return true;
+	}
+	// Слово композитора через qt_extended_surface (cover_status): жест
+	// сворачивания ещё держат — уже показываем обложку, не ждём фокуса.
+	if (m_coverActive) {
 		return true;
 	}
 	// Грейс после пробуждения: рендерим интерфейс как передний план.
