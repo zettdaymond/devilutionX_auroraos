@@ -186,13 +186,19 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 			m_flickTrail[0] = FlickSample { ImGui::GetTime(), io.MousePos.y };
 			m_flickActive = true;
 		} else if (m_flickActive && !ImGui::IsMouseDown(0)) {
-			// TODO(кинетика): временная ручка для подбора замедления на
-			// устройстве без пересборки (LAUNCHER_FLICK_DECEL=2800) —
-			// убрать вместе с glide-логом после утверждения ощущений.
-			static const float flickDecel = [] {
+			// TODO(кинетика): временная ручка для подбора на устройстве без
+			// пересборки — убрать вместе с glide-логом после утверждения.
+#ifdef LAUNCHER_EXPONENTIAL_GLIDE
+			static const float flickK = [] {
+				const char *env = std::getenv("LAUNCHER_FLICK_DECAY");
+				return env != nullptr ? std::max(1.0F, static_cast<float>(std::atof(env))) : 6.0F;
+			}();
+#else
+			static const float flickK = [] {
 				const char *env = std::getenv("LAUNCHER_FLICK_DECEL");
 				return env != nullptr ? std::max(500.0F, static_cast<float>(std::atof(env))) : 2800.0F;
 			}();
+#endif
 			if (m_flickTrailLen > 0) {
 				// Скорость — по окну ~120 мс: палец тормозит перед
 				// подъёмом, скорость последних кадров занижена. Берём
@@ -219,10 +225,21 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 			// «лаг», а не планирование. У краёв списка и при новом
 			// касании — стоп.
 			ImGui::SetScrollY(ImGui::GetScrollY() + m_flickSpeed * io.DeltaTime);
-			const float decel = flickDecel * io.DeltaTime;
+#ifdef LAUNCHER_EXPONENTIAL_GLIDE
+			// Вариант А: экспоненциальное затухание (длинное «планирование»,
+			// мягкий хвост). Ручка LAUNCHER_FLICK_DECAY (меньше = дольше).
+			m_flickSpeed *= std::exp(-flickK * io.DeltaTime);
+			const bool glideStopped = std::abs(m_flickSpeed) < 40.0F;
+#else
+			// Вариант Б (по умолчанию): равномерное торможение и решительный
+			// стоп — экспоненциальный хвост на 60 Гц экране читался как
+			// «лаг». Ручка LAUNCHER_FLICK_DECEL (меньше = дольше).
+			const float decel = flickK * io.DeltaTime;
 			m_flickSpeed -= std::copysign(std::min(std::abs(m_flickSpeed), decel), m_flickSpeed);
+			const bool glideStopped = m_flickSpeed == 0.0F;
+#endif
 			const float y = ImGui::GetScrollY();
-			if (m_flickSpeed == 0.0F || y <= 0.0F || y >= contentScrollMaxY) {
+			if (glideStopped || y <= 0.0F || y >= contentScrollMaxY) {
 				// TODO(кинетика): временная диагностика (fps в момент
 				// остановки — io.Framerate усреднён по последней секунде).
 				spdlog::info("glide: {}px за {:.2f}s, fps={}",

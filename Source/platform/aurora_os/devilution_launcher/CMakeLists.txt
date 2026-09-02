@@ -8,6 +8,9 @@ option(LAUNCHER_TESTS "Build launcher unit tests" ${LAUNCHER_DESKTOP})
 # включённого тумблера путает модели (читают «золотая ручка» как вкл),
 # этот флаг делает ручку золотой в обоих состояниях.
 option(LAUNCHER_VISION_DEBUG_TOGGLES "Постоянная золотая ручка тумблеров для vision-отладки" OFF)
+# Кинетическая прокрутка: равномерное торможение (по умолчанию) или
+# экспоненциальное затухание — сравниваем варианты на устройстве.
+option(LAUNCHER_EXPONENTIAL_GLIDE "Инерция прокрутки с экспоненциальным затуханием" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -223,4 +226,7 @@ endif()
 # Обе ветки (desktop exe и aurora object library) собирают ui/widgets.
 if(LAUNCHER_VISION_DEBUG_TOGGLES)
   target_compile_definitions(devilution_launcher PRIVATE LAUNCHER_VISION_DEBUG_TOGGLES=1)
+endif()
+if(LAUNCHER_EXPONENTIAL_GLIDE)
+  target_compile_definitions(devilution_launcher PRIVATE LAUNCHER_EXPONENTIAL_GLIDE=1)
 endif()
