@@ -37,6 +37,7 @@
 
 #ifdef AURORA_OS
 #	include <dbus/dbus.h>
+#	include <unistd.h>
 #endif
 
 CMRC_DECLARE(assets);
@@ -350,9 +351,37 @@ AppResult Application::Run()
 		}
 #ifdef AURORA_OS
 		if (event.type == m_displayEventType) {
-			// Сменилось состояние дисплея (mce): на вернувшийся экран
-			// плитка показывает последний буфер — обложку переоценить.
+			// Сменилось состояние дисплея/блокировки/верхнего окна: кадр
+			// надо переоценить — на вернувшийся экран плитка показывает
+			// последний буфер.
 			m_coverDirty = true;
+			const bool wasAwake = m_displayOn && !m_tkLocked;
+			switch (event.user.code) {
+			case 0:
+				m_displayOn = event.user.data1 != nullptr;
+				break;
+			case 1:
+				m_tkLocked = event.user.data1 != nullptr;
+				break;
+			case 2:
+				// Верхнее окно композитора: сигнал приходит раньше SDL-фокуса
+				// и покрывает случай «жест ещё держат, а приложение уже в плитке».
+				if (event.user.data1 != nullptr) {
+					m_focusLostAt.reset();
+				} else if (!m_focusLostAt.has_value()) {
+					m_focusLostAt = std::chrono::steady_clock::now();
+				}
+				break;
+			default:
+				break;
+			}
+			// Пробуждение при потерянном переднем плане: даём фокусу сотню
+			// миллисекунд вернуться, иначе обложка мигнёт на разблокировке
+			// раньше FOCUS_GAINED/topmost-сигнала.
+			const bool awake = m_displayOn && !m_tkLocked;
+			if (wasAwake != awake && awake && m_focusLostAt.has_value()) {
+				m_focusLostAt = std::chrono::steady_clock::now();
+			}
 		}
 #endif
 		if (event.type == SDL_QUIT) {
@@ -380,9 +409,10 @@ AppResult Application::Run()
 			if (m_store->State().pendingLaunch.has_value()) {
 				break;
 			}
-			// Погашенный дисплей (блокировка) — не рисуем вовсе; обложку
-			// рисуем только на включённый экран (плитка/переключатель).
-			if (m_displayOn.load() && (!m_wasHidden || m_coverDirty)) {
+			// Погашенный/заблокированный экран — не рисуем вовсе; обложку
+			// рисуем только на включённый разблокированный экран
+			// (плитка/переключатель задач).
+			if (m_displayOn && !m_tkLocked && (!m_wasHidden || m_coverDirty)) {
 				RenderCoverFrame();
 				m_coverDirty = false;
 			}
@@ -475,11 +505,12 @@ void Application::RenderCoverFrame()
 
 void Application::StartDisplayWatch()
 {
-	// Дисплейным состоянием на Авроре ведает демон mce (наследие
-	// Sailfish): рассылает display_status_ind("on"/"dimmed"/"off") в
-	// системной шине D-Bus. Это единственный способ отличить блокировку
-	// экрана от сворачивания в плитку — событий SDL в обоих случаях
-	// приходит одинаковый набор (FOCUS_LOST/GAINED).
+	// Состоянием экрана на Авроре ведают два источника в системной шине
+	// D-Bus: демон mce (наследие Sailfish; дисплей и блокировка) и сам
+	// композитор Lipstick (верхнее окно). События SDL не различают
+	// блокировку и сворачивание в плитку (в обоих случаях лишь
+	// FOCUS_LOST/GAINED), а сигнал композитора приходит раньше SDL-фокуса
+	// и покрывает случай «жест сворачивания ещё держат».
 	m_displayEventType = SDL_RegisterEvents(1);
 	m_displayWatch = std::thread([this]() { DisplayWatchLoop(); });
 }
@@ -492,12 +523,12 @@ void Application::StopDisplayWatch()
 	}
 }
 
-void Application::PushDisplayEvent(bool on)
+void Application::PushStateEvent(int what, bool value)
 {
-	m_displayOn.store(on);
 	SDL_Event event {};
 	event.type = m_displayEventType;
-	event.user.code = on ? 1 : 0;
+	event.user.code = what;
+	event.user.data1 = value ? reinterpret_cast<void *>(1) : nullptr;
 	SDL_PushEvent(&event);
 }
 
@@ -509,65 +540,100 @@ void Application::DisplayWatchLoop()
 	dbus_error_init(&error);
 	DBusConnection *bus = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
 	if (bus == nullptr) {
-		spdlog::warn("mce: системная шина недоступна ({}), считаем дисплей включённым",
+		spdlog::warn("aurora-watch: системная шина недоступна ({}), работаем по SDL-фокусу",
 		    error.message != nullptr ? error.message : "?");
 		dbus_error_free(&error);
 		return;
 	}
 
-	dbus_bus_add_match(bus,
-	    "type='signal',sender='com.nokia.mce',interface='com.nokia.mce.signal',member='display_status_ind'",
-	    &error);
-	if (dbus_error_is_set(&error)) {
-		spdlog::warn("mce: не удалось подписаться на display_status_ind ({})", error.message);
+	// Дисплей + блокировка от mce, верхнее окно от Lipstick.
+	dbus_bus_add_match(bus, "type='signal',sender='com.nokia.mce',interface='com.nokia.mce.signal'", &error);
+	const bool mceOk = !dbus_error_is_set(&error);
+	if (!mceOk) {
+		spdlog::warn("aurora-watch: подписка на mce не удалась ({})", error.message);
 		dbus_error_free(&error);
+	}
+	dbus_bus_add_match(bus,
+	    "type='signal',interface='org.nemomobile.compositor',member='privateTopmostWindowProcessIdChanged'",
+	    &error);
+	const bool compositorOk = !dbus_error_is_set(&error);
+	if (!compositorOk) {
+		spdlog::warn("aurora-watch: подписка на композитор не удалась ({})", error.message);
+		dbus_error_free(&error);
+	}
+	if (!mceOk && !compositorOk) {
 		dbus_connection_unref(bus);
 		return;
 	}
 
-	// Начальное состояние — синхронным запросом, чтобы не ждать первого
-	// переключения экрана (лаунчер могут запустить уже заблокированным).
-	DBusMessage *call = dbus_message_new_method_call(
-	    "com.nokia.mce", "/com/nokia/mce/request", "com.nokia.mce.request", "get_display_status");
-	if (call != nullptr) {
-		DBusMessage *reply = dbus_connection_send_with_reply_and_block(bus, call, 1000, &error);
+	// Начальные состояния — синхронными запросами, чтобы не ждать первых
+	// переключений (лаунчер могут запустить уже заблокированным).
+	const auto queryMceString = [&bus](const char *method) -> std::string {
+		DBusMessage *call = dbus_message_new_method_call(
+		    "com.nokia.mce", "/com/nokia/mce/request", "com.nokia.mce.request", method);
+		if (call == nullptr) {
+			return {};
+		}
+		DBusError queryError;
+		dbus_error_init(&queryError);
+		DBusMessage *reply = dbus_connection_send_with_reply_and_block(bus, call, 1000, &queryError);
 		dbus_message_unref(call);
+		std::string status;
 		if (reply != nullptr) {
-			const char *status = nullptr;
-			if (dbus_message_get_args(reply, &error, DBUS_TYPE_STRING, &status, DBUS_TYPE_INVALID)
-			    && status != nullptr) {
-				spdlog::info("mce: дисплей '{}'", status);
-				PushDisplayEvent(std::strcmp(status, "off") != 0);
+			const char *value = nullptr;
+			if (dbus_message_get_args(reply, &queryError, DBUS_TYPE_STRING, &value, DBUS_TYPE_INVALID)
+			    && value != nullptr) {
+				status = value;
 			}
 			dbus_message_unref(reply);
 		}
-		if (dbus_error_is_set(&error)) {
-			spdlog::warn("mce: get_display_status не удался ({})", error.message);
-			dbus_error_free(&error);
+		dbus_error_free(&queryError);
+		return status;
+	};
+	if (mceOk) {
+		const std::string display = queryMceString("get_display_status");
+		if (!display.empty()) {
+			spdlog::info("aurora-watch: дисплей '{}'", display);
+			PushStateEvent(0, display != "off");
+		}
+		const std::string lock = queryMceString("get_tklock_mode");
+		if (!lock.empty()) {
+			spdlog::info("aurora-watch: tklock '{}'", lock);
+			PushStateEvent(1, lock == "locked");
 		}
 	}
+	const int32_t ourPid = static_cast<int32_t>(::getpid());
 
 	// Блокирующее чтение с таймаутом: просыпаемся четыре раза в секунду
 	// только чтобы проверить флаг завершения — дешевле интеграции шины
 	// в цикл событий.
 	while (!m_displayWatchStop.load()) {
 		if (!dbus_connection_read_write(bus, 250)) {
-			spdlog::warn("mce: соединение с шиной потеряно");
+			spdlog::warn("aurora-watch: соединение с шиной потеряно");
 			break;
 		}
 		while (DBusMessage *message = dbus_connection_pop_message(bus)) {
-			if (dbus_message_is_signal(message, "com.nokia.mce.signal", "display_status_ind")) {
-				const char *status = nullptr;
-				DBusError parse;
-				dbus_error_init(&parse);
-				if (dbus_message_get_args(message, &parse, DBUS_TYPE_STRING, &status, DBUS_TYPE_INVALID)
-				    && status != nullptr) {
-					// «dimmed» и прочие промежуточные состояния считаем
-					// включённым экраном: рисовать ещё есть для кого.
-					PushDisplayEvent(std::strcmp(status, "off") != 0);
+			DBusError parse;
+			dbus_error_init(&parse);
+			const char *status = nullptr;
+			if (dbus_message_is_signal(message, "com.nokia.mce.signal", "display_status_ind")
+			    && dbus_message_get_args(message, &parse, DBUS_TYPE_STRING, &status, DBUS_TYPE_INVALID)
+			    && status != nullptr) {
+				// «dimmed» и прочие промежуточные состояния считаем
+				// включённым экраном: рисовать ещё есть для кого.
+				PushStateEvent(0, std::strcmp(status, "off") != 0);
+			} else if (dbus_message_is_signal(message, "com.nokia.mce.signal", "tklock_mode_ind")
+			    && dbus_message_get_args(message, &parse, DBUS_TYPE_STRING, &status, DBUS_TYPE_INVALID)
+			    && status != nullptr) {
+				PushStateEvent(1, std::strcmp(status, "locked") == 0);
+			} else if (dbus_message_is_signal(message, "org.nemomobile.compositor",
+			               "privateTopmostWindowProcessIdChanged")) {
+				int32_t pid = 0;
+				if (dbus_message_get_args(message, &parse, DBUS_TYPE_INT32, &pid, DBUS_TYPE_INVALID)) {
+					PushStateEvent(2, pid == ourPid);
 				}
-				dbus_error_free(&parse);
 			}
+			dbus_error_free(&parse);
 			dbus_message_unref(message);
 		}
 	}
@@ -594,17 +660,18 @@ void Application::OnEvent(const SDL_WindowEvent &event)
 bool Application::IsTiled() const
 {
 #ifdef AURORA_OS
-	// Погашенный дисплей (блокировка): не рендерить ничего, даже если окно
-	// формально в фокусе — кадры в тёмную матрицу тратят батарею.
-	if (!m_displayOn.load()) {
+	// Погашенный или заблокированный экран: не рендерить ничего, даже если
+	// окно формально в фокусе — кадры в тёмную матрицу тратят батарею, а
+	// на экран блокировки обложке показываться незачем.
+	if (!m_displayOn || m_tkLocked) {
 		return true;
 	}
 	if ((SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0) {
 		return true;
 	}
-	// Аврора не шлёт MINIMIZED/HIDDEN при сворачивании в плитку — только
-	// FOCUS_LOST, поэтому «в плитке» = фокус потерян чуть дольше
-	// мгновенной потери (мигание обложкой от шторок/баннеров отсекаем).
+	// Аврора не шлёт MINIMIZED/HIDDEN при сворачивании в плитку, поэтому
+	// «в плитке» = потеря переднего плана (композитор или SDL-фокус) чуть
+	// дольше мгновенной потери — мигание обложкой от шторок отсекаем.
 	return m_focusLostAt.has_value()
 	    && std::chrono::steady_clock::now() - *m_focusLostAt >= std::chrono::milliseconds(100);
 #else

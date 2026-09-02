@@ -131,20 +131,24 @@ private:
 	bool m_wasHidden = false;
 	bool m_coverDirty = false;
 
-	/// Дисплей включён. На Авроре — из сигнала демона mce, на десктопе —
-	/// всегда true. Погашенный экран = не рендерить вовсе: композитор
-	/// окно не показывает, а кадры в тёмную матрицу тратят батарею.
-	std::atomic<bool> m_displayOn { true };
+	/// Дисплей включён и не заблокирован. На Авроре — из сигналов демона
+	/// mce, на десктопе — всегда true. Погашенный/заблокированный экран =
+	/// не рендерить вовсе: композитор окно не показывает, а кадры в тёмную
+	/// матрицу тратят батарею.
+	bool m_displayOn = true;
+	bool m_tkLocked = false;
 
 #ifdef AURORA_OS
 	/// Аврора не шлёт MINIMIZED/HIDDEN при сворачивании в плитку — только
-	/// FOCUS_LOST. Устойчивая потеря фокуса (>=100 мс) считается «в
-	/// плитке»; пусто — фокус есть (или был с самого старта).
+	/// FOCUS_LOST. «В плитке» = устойчивая (>=100 мс) потеря переднего
+	/// плана; источники два, питают один таймер: SDL-фокус (фолбэк) и
+	/// сигнал композитора privateTopmostWindowProcessIdChanged (правда от
+	/// Lipstick — приходит и в начале жеста сворачивания).
 	std::optional<std::chrono::steady_clock::time_point> m_focusLostAt;
 
-	/// Наблюдатель состояния дисплея: поток слушает D-Bus сигнал
-	/// display_status_ind демона mce (наследие Sailfish) и переправляет
-	/// его в очередь событий SDL своим пользовательским событием.
+	/// Наблюдатель состояния: поток слушает D-Bus (демон mce — дисплей и
+	/// блокировка; композитор Lipstick — верхнее окно) и переправляет
+	/// изменения в очередь событий SDL своим пользовательским событием.
 	std::thread m_displayWatch;
 	std::atomic<bool> m_displayWatchStop { false };
 	Uint32 m_displayEventType { 0 };
@@ -152,7 +156,7 @@ private:
 	void StartDisplayWatch();
 	void StopDisplayWatch();
 	void DisplayWatchLoop();
-	void PushDisplayEvent(bool on);
+	void PushStateEvent(int what, bool value);
 #endif
 };
 
