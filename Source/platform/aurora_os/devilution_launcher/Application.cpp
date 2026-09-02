@@ -367,6 +367,8 @@ AppResult Application::Run()
 			continue;
 		}
 
+		const auto renderStart = std::chrono::steady_clock::now();
+
 		ImGui_ImplSDLRenderer2_NewFrame();
 		ImGui_ImplSDL2_NewFrame();
 		ImGui::NewFrame();
@@ -379,6 +381,26 @@ AppResult Application::Run()
 		SDL_RenderClear(m_renderer);
 		ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_renderer);
 		SDL_RenderPresent(m_renderer);
+		const auto presentDone = std::chrono::steady_clock::now();
+
+		// TODO(кинетика): временная телеметрия секций кадра — убрать
+		// после локализации просадки на устройстве.
+		{
+			const auto pollMs = std::chrono::duration<double, std::milli>(renderStart - frameStart).count();
+			const auto renderMs = std::chrono::duration<double, std::milli>(presentDone - renderStart).count();
+			static double pollAcc = 0.0;
+			static double renderAcc = 0.0;
+			static int frames = 0;
+			pollAcc += pollMs;
+			renderAcc += renderMs;
+			++frames;
+			if (frames >= 60) {
+				spdlog::info("frame: poll={:.2f}ms render+present={:.2f}ms fps={}",
+				    pollAcc / frames, renderAcc / frames, static_cast<int>(ImGui::GetIO().Framerate));
+				pollAcc = renderAcc = 0.0;
+				frames = 0;
+			}
+		}
 
 		// Кадровый темп ~60 fps: без паузы цикл крутится вхолостую на
 		// 100% CPU — на устройстве governor сбрасывает частоту от нагрева,

@@ -572,6 +572,15 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 
 void Settings(const LauncherState &state, const Dispatcher &dispatch)
 {
+	// TODO(кинетика): временная ручка диагностики стоимости списка
+	// (LAUNCHER_SETTINGS_ROWS=12) — убрать после локализации.
+	static const int rowsLimit = [] {
+		const char *env = std::getenv("LAUNCHER_SETTINGS_ROWS");
+		return env != nullptr ? std::atoi(env) : 0;
+	}();
+	static int rowsDrawn = 0;
+	rowsDrawn = 0;
+
 	// Раскладка как на экране данных: строки на всю ширину контента,
 	// без капа и Indent — SameLine-выравнивание FileRow на Indent не
 	// рассчитывает.
@@ -591,6 +600,10 @@ void Settings(const LauncherState &state, const Dispatcher &dispatch)
 
 		for (const SettingSpec &spec : kSettingCatalog) {
 			if (spec.group != group.group) {
+				continue;
+			}
+			++rowsDrawn;
+			if (rowsLimit > 0 && rowsDrawn > rowsLimit) {
 				continue;
 			}
 			RenderSettingRow(spec, state.settingValues[static_cast<size_t>(spec.id)], dispatch);
