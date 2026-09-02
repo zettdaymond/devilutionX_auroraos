@@ -188,13 +188,17 @@ void PopButtonStyle()
 	ImGui::PopStyleColor(4);
 }
 
-void DrawDivider(ImVec2 from, ImVec2 to, float alpha)
+void DrawDivider(ImDrawList *draw, ImVec2 from, ImVec2 to, float alpha)
 {
-	ImDrawList *draw = ImGui::GetWindowDrawList();
 	const ImU32 gold = ImGui::GetColorU32(ImVec4(Color(ColorRole::BorderGold).x, Color(ColorRole::BorderGold).y,
 	    Color(ColorRole::BorderGold).z, alpha));
 	const ImU32 transparent = gold & 0x00FFFFFF;
 	draw->AddRectFilledMultiColor(from, to, transparent, gold, gold, transparent);
+}
+
+void DrawDivider(ImVec2 from, ImVec2 to, float alpha)
+{
+	DrawDivider(ImGui::GetWindowDrawList(), from, to, alpha);
 }
 
 } // namespace launcher::ui::Theme

@@ -495,7 +495,7 @@ void LauncherView::RenderCover(const LauncherState &state, float coverAlpha)
 		Theme::PopFont();
 		y += textSize.y + Scale::Px(0.9F);
 	}
-	Theme::DrawDivider(ImVec2(centerX - contentWidth * 0.5F, y), ImVec2(centerX + contentWidth * 0.5F, y),
+	Theme::DrawDivider(draw, ImVec2(centerX - contentWidth * 0.5F, y), ImVec2(centerX + contentWidth * 0.5F, y),
 	    0.7F * coverAlpha);
 
 	// Активная загрузка: имя файла, полоса с «горячим» краем, процент и

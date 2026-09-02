@@ -55,6 +55,10 @@ void PushButtonStyle(bool accent = false);
 void PopButtonStyle();
 
 /// Золотая волосяная линия с затухающими концами — разделитель секций.
+/// Версия с явным draw-list'ом — для рисования вне окон (обложка плитки):
+/// GetWindowDrawList() вне окна рисует в неявное окно ImGui «Debug» и
+/// делает его видимым.
+void DrawDivider(ImDrawList *draw, ImVec2 from, ImVec2 to, float alpha = 1.0F);
 void DrawDivider(ImVec2 from, ImVec2 to, float alpha = 1.0F);
 
 } // namespace Theme
