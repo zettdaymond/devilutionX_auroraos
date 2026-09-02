@@ -632,8 +632,8 @@ void Application::PushStateEvent(int what, bool value)
 	// ВРЕМЕННАЯ телеметрия «aurora-probe»: логируем приход каждого
 	// сигнала — на устройстве сверим тайминги с SDL-фокусом. Убрать
 	// после отладки жеста/блокировки.
-	static const char *const kNames[] = { "display", "tklock", "topmost" };
-	spdlog::info("aurora-probe: sig {} = {}", kNames[what], value ? 1 : 0);
+	static const char *const kNames[] = { "display", "tklock", "topmost", "cover" };
+	spdlog::info("aurora-probe: sig {} = {}", kNames[std::clamp(what, 0, 3)], value ? 1 : 0);
 
 	SDL_Event event {};
 	event.type = m_displayEventType;
