@@ -90,6 +90,10 @@ private:
 	float m_flickSpeed = 0.0F;
 	bool m_flickActive = false;
 
+	/// Телеметрия текущего скольжения (временная диагностика).
+	float m_glideStartY = 0.0F;
+	double m_glideStartedAt = 0.0;
+
 	/// Времена появления текущего экрана/диалога — для fade-анимаций
 	/// (чисто презентационное состояние view-слоя).
 	Screen m_lastScreen = Screen::Home;
