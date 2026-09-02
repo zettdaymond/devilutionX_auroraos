@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.19)
 
 project(devilution_launcher LANGUAGES CXX)
 
+# Перезаписываем путь игнорирования, чтобы CMake не заходил в сломанный конфиг пакета
+set(CMAKE_IGNORE_PATH "/opt/cross/armv7hl-meego-linux-gnueabi/sys-root/usr/lib/cmake/CURL" CACHE STRING "" FORCE)
+
+
 option(LAUNCHER_DESKTOP "Build the standalone desktop launcher executable" OFF)
 option(LAUNCHER_TESTS "Build launcher unit tests" ${LAUNCHER_DESKTOP})
 # Отладка UI по скриншотам через vision-модели: обычная тёмная ручка
@@ -210,10 +214,11 @@ else()
   # (CMake/Dependencies.cmake -> 3rdParty/simpleini).
   target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe simpleini)
 
-  add_devilutionx_object_library(devilution_launcher ${LAUNCHER_UI_SOURCES})
+  # AuroraStateWatch.cpp — наблюдатель D-Bus (только Aurora-сборка).
+  add_devilutionx_object_library(devilution_launcher ${LAUNCHER_UI_SOURCES} AuroraStateWatch.cpp)
   target_include_directories(devilution_launcher PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-  # Наблюдатель состояния дисплея/плитки (Application.cpp) слушает D-Bus:
-  # те же пути инклюдов, что у соседней libdevilutionx_aurora_os.
+  # Наблюдателю нужны заголовки D-Bus: те же пути инклюдов, что у
+  # соседней libdevilutionx_aurora_os.
   target_include_directories(devilution_launcher PUBLIC "/usr/include/dbus-1.0" "/usr/lib/dbus-1.0/include")
   target_compile_definitions(devilution_launcher PRIVATE LAUNCHER_APP_VERSION="${LAUNCHER_APP_VERSION_STRING}")
   target_link_libraries(devilution_launcher

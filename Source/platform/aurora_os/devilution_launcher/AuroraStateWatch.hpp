@@ -1,0 +1,58 @@
+#pragma once
+
+#ifdef AURORA_OS
+
+#include <SDL2/SDL.h>
+
+#include <atomic>
+#include <thread>
+
+namespace launcher::aurora {
+
+/// Какое состояние прибывал наблюдатель. Код кладётся в
+/// SDL_Event::user::code — значения фиксированы, порядок не менять.
+enum class StateEvent : int {
+	DisplayOn = 0,   ///< Дисплей включён (mce display_status_ind).
+	TkLocked = 1,    ///< Экран заблокирован (mce tklock_mode_ind).
+	TopmostOurs = 2, ///< Наш процесс — верхнее окно (композитор Lipstick).
+	CoverActive = 3, ///< Жест сворачивания дошёл до плитки (coverstatus=2).
+};
+
+/// Наблюдатель состояния Авроры: поток слушает D-Bus и переправляет
+/// изменения в очередь SDL пользовательским событием.
+///
+/// Источники (снимались на устройстве, см. память проекта):
+/// - системная шина: демон mce — дисплей и блокировка экрана;
+///   композитор (org.nemomobile.compositor) — верхнее окно по pid;
+/// - сессионная шина: com.jolla.lipstick — coverstatus жеста плитки
+///   (на системной шине этого имени нет вовсе).
+///
+/// Событий SDL, различающих блокировку и сворачивание, не существует:
+/// в обоих случаях приходит только FOCUS_LOST — поэтому вся логика
+/// состояния живёт здесь, а Application лишь применяет события.
+class StateWatch final {
+public:
+	StateWatch();
+	~StateWatch();
+
+	StateWatch(const StateWatch &) = delete;
+	StateWatch &operator=(const StateWatch &) = delete;
+
+	/// Тип пользовательского SDL-события, по которому приходят состояния.
+	[[nodiscard]] Uint32 EventType() const { return m_eventType; }
+
+private:
+	/// Тело потока: подключение к шинам и диспетчеризация до остановки.
+	void Run();
+
+	/// Отправляет состояние в очередь SDL (потокобезопасно).
+	void Push(StateEvent what, bool value);
+
+	const Uint32 m_eventType;
+	std::thread m_thread;
+	std::atomic<bool> m_stop { false };
+};
+
+} // namespace launcher::aurora
+
+#endif

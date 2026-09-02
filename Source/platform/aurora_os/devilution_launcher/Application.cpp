@@ -27,18 +27,15 @@
 #   include "../StandartPaths.hpp"
 #endif
 
+#include <algorithm>
 #include <chrono>
-#include <cstdio>
-#include <cstring>
 #include <filesystem>
 #include <iterator>
-#include <thread>
 #include <utility>
 #include <vector>
 
 #ifdef AURORA_OS
-#	include <dbus/dbus.h>
-#	include <unistd.h>
+#	include "AuroraStateWatch.hpp"
 #endif
 
 CMRC_DECLARE(assets);
@@ -297,10 +294,7 @@ AppResult Application::Run()
 		SDL_PushEvent(&wake);
 	});
 #ifdef AURORA_OS
-	// ВРЕМЕННАЯ телеметрия «aurora-probe»: вдруг патченная SDL Авроры
-	// шлёт системные события в начале жеста сворачивания.
-	SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
-	StartDisplayWatch();
+	m_stateWatch = std::make_unique<launcher::aurora::StateWatch>();
 #endif
 
 	// Setup() создаёт контекст ImGui и грузит шрифты, поэтому вид (и его
@@ -348,97 +342,18 @@ AppResult Application::Run()
 	auto processEvent = [this](const SDL_Event &event) {
 		ImGui_ImplSDL2_ProcessEvent(&event);
 
-#ifdef AURORA_OS
-		// ВРЕМЕННАЯ телеметрия «aurora-probe»: редкие типы событий SDL —
-		// ищем хоть один сигнал, приходящий в НАЧАЛЕ жеста сворачивания.
-		switch (event.type) {
-		case SDL_FINGERDOWN:
-			spdlog::info("aurora-probe: FINGERDOWN");
-			break;
-		case SDL_FINGERUP:
-			spdlog::info("aurora-probe: FINGERUP");
-			break;
-		case SDL_MOUSEBUTTONDOWN:
-		case SDL_MOUSEBUTTONUP:
-		case SDL_KEYDOWN:
-		case SDL_TEXTEDITING:
-		case SDL_TEXTINPUT:
-			break;
-		default:
-			if (event.type == SDL_WINDOWEVENT || event.type == SDL_QUIT
-			    || event.type == SDL_MOUSEMOTION || event.type == SDL_FINGERMOTION
-			    || event.type == SDL_MOUSEWHEEL || event.type >= SDL_USEREVENT) {
-				break;
-			}
-			spdlog::info("aurora-probe: event type={} (display={})",
-			    event.type, event.type == SDL_DISPLAYEVENT ? static_cast<int>(event.display.event) : -1);
-			break;
-		}
-#endif
-
 		if (event.type == m_wakeEventType) {
 			// Фоновый поток положил интент в Store — в свёрнутом состоянии
 			// это значит, что обложку (прогресс в плитке) надо перерисовать.
 			m_coverDirty = true;
 		}
 #ifdef AURORA_OS
-		if (event.type == m_displayEventType) {
-			// Сменилось состояние дисплея/блокировки/верхнего окна: кадр
-			// надо переоценить — на вернувшийся экран плитка показывает
-			// последний буфер.
+		if (m_stateWatch != nullptr && event.type == m_stateWatch->EventType()) {
+			// Сменилось состояние Авроры — кадр надо переоценить: на
+			// вернувшийся экран плитка показывает последний буфер.
 			m_coverDirty = true;
-			const bool wasAwake = m_displayOn && !m_tkLocked;
-			switch (event.user.code) {
-			case 0:
-				m_displayOn = event.user.data1 != nullptr;
-				break;
-			case 1:
-				m_tkLocked = event.user.data1 != nullptr;
-				break;
-			case 2:
-				// Верхнее окно композитора — авторитетный источник: реагируем
-				// мгновенно, без дебаунса (он нужен только SDL-фокусу).
-				if (event.user.data1 != nullptr) {
-					m_topmostLost = false;
-					m_focusLostAt.reset();
-				} else {
-					m_topmostLost = true;
-					if (!m_focusLostAt.has_value()) {
-						m_focusLostAt = std::chrono::steady_clock::now();
-					}
-				}
-				break;
-			case 3:
-				// coverstatus от Lipstick: 1 и 2 прилетают ПАРОЙ в самом
-				// начале жеста, 3 и 0 — парой при возврате из плитки.
-				// Вход по ним не делаем (обложка включается по потере
-				// верхнего окна, в момент отпускания пальца), а вот выход —
-				// мгновенный, не ждём FOCUS_GAINED. «1» до «2» безвредна:
-				// фокус ещё не потерян, сбрасывать нечего.
-				if (event.user.data1 == nullptr) {
-					m_focusLostAt.reset();
-					m_topmostLost = false;
-				}
-				break;
-			default:
-				break;
-			}
-			// Пробуждение: пару секунд считаем себя передним планом и
-			// рендерим интерфейс — между «экран разблокирован» и «окно
-			// поднято» идёт анимация локскрина, и обложка в этом зазоре
-			// мелькает. Перед сном были плиткой — грейс не нужен: после
-			// разблокировки сразу остаёмся обложкой.
-			const bool awake = m_displayOn && !m_tkLocked;
-			if (wasAwake != awake) {
-				if (awake) {
-					if (!m_skipWakeGrace) {
-						m_wakeGraceUntil =
-						    std::chrono::steady_clock::now() + std::chrono::milliseconds(1500);
-					}
-				} else {
-					m_skipWakeGrace = m_wasHidden;
-				}
-			}
+			ApplyAuroraState(static_cast<launcher::aurora::StateEvent>(event.user.code),
+			    event.user.data1 != nullptr);
 		}
 #endif
 		if (event.type == SDL_QUIT) {
@@ -461,49 +376,8 @@ AppResult Application::Run()
 		// окна (разворачивание) и wake-пинки фоновых интентов (прогресс
 		// загрузок), по которым обложка перерисовывается с новым процентом.
 #ifdef AURORA_OS
-		// ВРЕМЕННАЯ телеметрия «aurora-probe»: переходы в/из режима плитки.
-		if (IsTiled() != m_wasTiledProbe) {
-			m_wasTiledProbe = !m_wasTiledProbe;
-			spdlog::info("aurora-probe: {} (display={} tklock={} focusLostMs={})",
-			    m_wasTiledProbe ? "TILED" : "VISIBLE", m_displayOn ? 1 : 0, m_tkLocked ? 1 : 0,
-			    m_focusLostAt.has_value()
-			        ? std::chrono::duration_cast<std::chrono::milliseconds>(
-			              std::chrono::steady_clock::now() - *m_focusLostAt)
-			              .count()
-			         : -1);
-		}
-#endif
-#ifdef AURORA_OS
-		// Кросс-фейд на входе в плитку: первые kCoverFade секунд кадр —
-		// интерфейс с обложкой поверх (непрозрачность обложки растёт от
-		// нуля), чтобы переход не был резким скачком; затем обычный
-		// режим плитки (одна обложка и сон). Разворачивание мгновенное,
-		// без фейда.
-		bool coverFading = false;
 		float coverAlpha = 1.0F;
-		if (IsTiled() && m_displayOn && !m_tkLocked
-		    && !m_store->State().pendingLaunch.has_value()) {
-			if (m_coverFadeStartedAt < 0.0) {
-				m_coverFadeStartedAt = ImGui::GetTime();
-				// ВРЕМЕННАЯ телеметрия «aurora-probe» — убедиться, что
-				// фейд на устройстве вообще выполняется. Убрать.
-				spdlog::info("aurora-probe: cover fade start");
-			}
-			constexpr float kCoverFade = 0.3F;
-			const float t = std::clamp(static_cast<float>(ImGui::GetTime() - m_coverFadeStartedAt) / kCoverFade,
-			    0.0F, 1.0F);
-			if (t < 1.0F) {
-				coverFading = true;
-				// smoothstep: линейный фейд воспринимается резким вначале.
-				coverAlpha = t * t * (3.0F - 2.0F * t);
-			} else {
-				m_coverFadeStartedAt = -1.0;
-				spdlog::info("aurora-probe: cover fade done");
-			}
-		} else if (m_coverFadeStartedAt >= 0.0) {
-			m_coverFadeStartedAt = -1.0;
-			spdlog::info("aurora-probe: cover fade cancelled");
-		}
+		const bool coverFading = CoverFadeFrame(coverAlpha);
 #else
 		constexpr bool coverFading = false;
 #endif
@@ -579,7 +453,7 @@ AppResult Application::Run()
 	}
 
 #ifdef AURORA_OS
-	StopDisplayWatch();
+	m_stateWatch.reset();
 #endif
 
 	AppResult result;
@@ -614,196 +488,84 @@ void Application::RenderCoverFrame()
 
 #ifdef AURORA_OS
 
-void Application::StartDisplayWatch()
+void Application::ApplyAuroraState(launcher::aurora::StateEvent what, bool value)
 {
-	// Состоянием экрана на Авроре ведают два источника в системной шине
-	// D-Bus: демон mce (наследие Sailfish; дисплей и блокировка) и сам
-	// композитор Lipstick (верхнее окно). События SDL не различают
-	// блокировку и сворачивание в плитку (в обоих случаях лишь
-	// FOCUS_LOST/GAINED), а сигнал композитора приходит раньше SDL-фокуса
-	// и покрывает случай «жест сворачивания ещё держат».
-	m_displayEventType = SDL_RegisterEvents(1);
-	m_displayWatch = std::thread([this]() { DisplayWatchLoop(); });
+	const bool wasAwake = m_displayOn && !m_tkLocked;
+	switch (what) {
+	case launcher::aurora::StateEvent::DisplayOn:
+		m_displayOn = value;
+		break;
+	case launcher::aurora::StateEvent::TkLocked:
+		m_tkLocked = value;
+		break;
+	case launcher::aurora::StateEvent::TopmostOurs:
+		// Верхнее окно композитора — авторитетный источник: реагируем
+		// мгновенно, без дебаунса (он нужен только SDL-фокусу-фолбэку).
+		if (value) {
+			m_topmostLost = false;
+			m_focusLostAt.reset();
+		} else {
+			m_topmostLost = true;
+			if (!m_focusLostAt.has_value()) {
+				m_focusLostAt = std::chrono::steady_clock::now();
+			}
+		}
+		break;
+	case launcher::aurora::StateEvent::CoverActive:
+		// coverstatus: 1 и 2 прилетают парой в начале жеста, 3 и 0 —
+		// парой при возврате из плитки. Вход не делаем (обложка
+		// включается по TopmostOurs, в момент отпускания пальца), а вот
+		// выход мгновенный, не ждём FOCUS_GAINED. «1» до «2» безвредна:
+		// фокус ещё не потерян, сбрасывать нечего.
+		if (!value) {
+			m_focusLostAt.reset();
+			m_topmostLost = false;
+		}
+		break;
+	}
+
+	// Пробуждение: пару секунд считаем себя передним планом и рендерим
+	// интерфейс — между «экран разблокирован» и «окно поднято» идёт
+	// анимация локскрина, и обложка в этом зазоре мелькает. Перед сном
+	// были плиткой — грейс не нужен: после разблокировки сразу остаёмся
+	// обложкой.
+	const bool awake = m_displayOn && !m_tkLocked;
+	if (wasAwake != awake) {
+		if (awake) {
+			if (!m_skipWakeGrace) {
+				m_wakeGraceUntil =
+				    std::chrono::steady_clock::now() + std::chrono::milliseconds(1500);
+			}
+		} else {
+			m_skipWakeGrace = m_wasHidden;
+		}
+	}
 }
 
-void Application::StopDisplayWatch()
+bool Application::CoverFadeFrame(float &alpha)
 {
-	if (m_displayWatch.joinable()) {
-		m_displayWatchStop.store(true);
-		m_displayWatch.join();
+	if (!IsTiled() || !m_displayOn || m_tkLocked
+	    || m_store->State().pendingLaunch.has_value()) {
+		m_coverFadeStartedAt = -1.0;
+		return false;
 	}
-}
-
-void Application::PushStateEvent(int what, bool value)
-{
-	// ВРЕМЕННАЯ телеметрия «aurora-probe»: логируем приход каждого
-	// сигнала — на устройстве сверим тайминги с SDL-фокусом. Убрать
-	// после отладки жеста/блокировки.
-	static const char *const kNames[] = { "display", "tklock", "topmost", "cover" };
-	spdlog::info("aurora-probe: sig {} = {}", kNames[std::clamp(what, 0, 3)], value ? 1 : 0);
-
-	SDL_Event event {};
-	event.type = m_displayEventType;
-	event.user.code = what;
-	event.user.data1 = value ? reinterpret_cast<void *>(1) : nullptr;
-	SDL_PushEvent(&event);
-}
-
-void Application::DisplayWatchLoop()
-{
-	dbus_threads_init_default();
-
-	DBusError error;
-	dbus_error_init(&error);
-	DBusConnection *bus = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
-	if (bus == nullptr) {
-		spdlog::warn("aurora-watch: системная шина недоступна ({}), работаем по SDL-фокусу",
-		    error.message != nullptr ? error.message : "?");
-		dbus_error_free(&error);
-		return;
+	if (m_coverFadeStartedAt < 0.0) {
+		m_coverFadeStartedAt = ImGui::GetTime();
 	}
-
-	// Дисплей + блокировка от mce, верхнее окно от композитора — системная
-	// шина. А вот coverstatus (начало жеста сворачивания, до потери
-	// фокуса) композитор вещает под именем com.jolla.lipstick на
-	// СЕССИОННОЙ шине — на системной этого имени нет вовсе.
-	dbus_bus_add_match(bus, "type='signal',sender='com.nokia.mce',interface='com.nokia.mce.signal'", &error);
-	const bool mceOk = !dbus_error_is_set(&error);
-	if (!mceOk) {
-		spdlog::warn("aurora-watch: подписка на mce не удалась ({})", error.message);
-		dbus_error_free(&error);
+	// Кросс-фейд на входе в плитку: первые kCoverFade секунд кадр —
+	// интерфейс с обложкой поверх (непрозрачность растёт), чтобы переход
+	// не был резким скачком; затем обычный режим плитки. Разворачивание
+	// мгновенное, без фейда.
+	constexpr float kCoverFade = 0.3F;
+	const float t = std::clamp(static_cast<float>(ImGui::GetTime() - m_coverFadeStartedAt) / kCoverFade,
+	    0.0F, 1.0F);
+	if (t >= 1.0F) {
+		m_coverFadeStartedAt = -1.0;
+		return false;
 	}
-	dbus_bus_add_match(bus,
-	    "type='signal',interface='org.nemomobile.compositor',member='privateTopmostWindowProcessIdChanged'",
-	    &error);
-	const bool compositorOk = !dbus_error_is_set(&error);
-	if (!compositorOk) {
-		spdlog::warn("aurora-watch: подписка на композитор не удалась ({})", error.message);
-		dbus_error_free(&error);
-	}
-	if (!mceOk && !compositorOk) {
-		dbus_connection_unref(bus);
-		return;
-	}
-
-	// Сигнал без идентификатора окна: атрибуируем «жест наш», пока мы
-	// в фокусе (жест бывает только на переднем плане).
-	DBusConnection *session = dbus_bus_get(DBUS_BUS_SESSION, &error);
-	if (session == nullptr) {
-		spdlog::warn("aurora-watch: сессионная шина недоступна ({}), жесты не увидим",
-		    error.message != nullptr ? error.message : "?");
-		dbus_error_free(&error);
-	} else {
-		dbus_bus_add_match(session, "type='signal',interface='com.jolla.lipstick',member='coverstatus'", &error);
-		if (dbus_error_is_set(&error)) {
-			spdlog::warn("aurora-watch: подписка на coverstatus не удалась ({})", error.message);
-			dbus_error_free(&error);
-			dbus_connection_unref(session);
-			session = nullptr;
-		}
-	}
-
-	// Начальные состояния — синхронными запросами, чтобы не ждать первых
-	// переключений (лаунчер могут запустить уже заблокированным).
-	const auto queryMceString = [&bus](const char *method) -> std::string {
-		DBusMessage *call = dbus_message_new_method_call(
-		    "com.nokia.mce", "/com/nokia/mce/request", "com.nokia.mce.request", method);
-		if (call == nullptr) {
-			return {};
-		}
-		DBusError queryError;
-		dbus_error_init(&queryError);
-		DBusMessage *reply = dbus_connection_send_with_reply_and_block(bus, call, 1000, &queryError);
-		dbus_message_unref(call);
-		std::string status;
-		if (reply != nullptr) {
-			const char *value = nullptr;
-			if (dbus_message_get_args(reply, &queryError, DBUS_TYPE_STRING, &value, DBUS_TYPE_INVALID)
-			    && value != nullptr) {
-				status = value;
-			}
-			dbus_message_unref(reply);
-		}
-		dbus_error_free(&queryError);
-		return status;
-	};
-	if (mceOk) {
-		const std::string display = queryMceString("get_display_status");
-		if (!display.empty()) {
-			spdlog::info("aurora-watch: дисплей '{}'", display);
-			PushStateEvent(0, display != "off");
-		}
-		const std::string lock = queryMceString("get_tklock_mode");
-		if (!lock.empty()) {
-			spdlog::info("aurora-watch: tklock '{}'", lock);
-			PushStateEvent(1, lock == "locked");
-		}
-	}
-	const int32_t ourPid = static_cast<int32_t>(::getpid());
-
-	// Диспетчеризация одного сообщения: интерфейс определяет источник,
-	// шина значения не имеет (coverstatus ходит по сессии, остальное —
-	// по системной).
-	const auto drainBus = [this, ourPid](DBusConnection *connection) {
-		while (DBusMessage *message = dbus_connection_pop_message(connection)) {
-			DBusError parse;
-			dbus_error_init(&parse);
-			const char *status = nullptr;
-			if (dbus_message_is_signal(message, "com.nokia.mce.signal", "display_status_ind")
-			    && dbus_message_get_args(message, &parse, DBUS_TYPE_STRING, &status, DBUS_TYPE_INVALID)
-			    && status != nullptr) {
-				// «dimmed» и прочие промежуточные состояния считаем
-				// включённым экраном: рисовать ещё есть для кого.
-				PushStateEvent(0, std::strcmp(status, "off") != 0);
-			} else if (dbus_message_is_signal(message, "com.nokia.mce.signal", "tklock_mode_ind")
-			    && dbus_message_get_args(message, &parse, DBUS_TYPE_STRING, &status, DBUS_TYPE_INVALID)
-			    && status != nullptr) {
-				PushStateEvent(1, std::strcmp(status, "locked") == 0);
-			} else if (dbus_message_is_signal(message, "org.nemomobile.compositor",
-			               "privateTopmostWindowProcessIdChanged")) {
-				int32_t pid = 0;
-				if (dbus_message_get_args(message, &parse, DBUS_TYPE_INT32, &pid, DBUS_TYPE_INVALID)) {
-					PushStateEvent(2, pid == ourPid);
-				}
-			} else if (dbus_message_is_signal(message, "com.jolla.lipstick", "coverstatus")) {
-				int32_t cover = 0;
-				if (dbus_message_get_args(message, &parse, DBUS_TYPE_INT32, &cover, DBUS_TYPE_INVALID)) {
-					spdlog::info("aurora-probe: coverstatus = {}", cover);
-					// 1 — жест начался, окно ещё полноэкранное; 2 — драг
-					// дошёл до порога и окно сжалось в плитку (порог — на
-					// совести композитора, у нас данных о пальце нет);
-					// 3 — возврат из плитки; 0 — обычный режим.
-					PushStateEvent(3, cover == 2);
-				}
-			}
-			dbus_error_free(&parse);
-			dbus_message_unref(message);
-		}
-	};
-
-	// Блокирующее чтение с таймаутом по каждой из шин по очереди:
-	// просыпаемся ~7 раз в секунду только чтобы проверить флаг
-	// завершения — дешевле интеграции шин в цикл событий.
-	while (!m_displayWatchStop.load()) {
-		if (!dbus_connection_read_write(bus, 70)) {
-			spdlog::warn("aurora-watch: системная шина потеряна");
-			break;
-		}
-		drainBus(bus);
-		if (session != nullptr) {
-			if (!dbus_connection_read_write(session, 70)) {
-				spdlog::warn("aurora-watch: сессионная шина потеряна");
-				dbus_connection_unref(session);
-				session = nullptr;
-				continue;
-			}
-			drainBus(session);
-		}
-	}
-	dbus_connection_unref(bus);
-	if (session != nullptr) {
-		dbus_connection_unref(session);
-	}
+	// smoothstep: линейный фейд воспринимается резким вначале.
+	alpha = t * t * (3.0F - 2.0F * t);
+	return true;
 }
 
 #endif
@@ -812,14 +574,11 @@ void Application::OnEvent(const SDL_WindowEvent &event)
 {
 #ifdef AURORA_OS
 	if (event.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-		spdlog::info("aurora-probe: SDL FOCUS_LOST");
 		m_focusLostAt = std::chrono::steady_clock::now();
 	} else if (event.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-		spdlog::info("aurora-probe: SDL FOCUS_GAINED");
 		m_focusLostAt.reset();
 		m_topmostLost = false;
 	}
-    spdlog::info("aurora-probe: SDL WINDOW EVVENT: {}", event.event);
 #endif
 
 	if (event.event == SDL_WINDOWEVENT_CLOSE) {

@@ -19,6 +19,11 @@ namespace launcher {
 class Store;
 }
 
+namespace launcher::aurora {
+class StateWatch;
+enum class StateEvent : int;
+}
+
 
 namespace launcher::ui {
 class LauncherView;
@@ -161,20 +166,15 @@ private:
 	std::optional<std::chrono::steady_clock::time_point> m_wakeGraceUntil;
 	bool m_skipWakeGrace = false;
 
-	/// Наблюдатель состояния: поток слушает D-Bus (демон mce — дисплей и
-	/// блокировка; композитор Lipstick — верхнее окно) и переправляет
-	/// изменения в очередь событий SDL своим пользовательским событием.
-	std::thread m_displayWatch;
-	std::atomic<bool> m_displayWatchStop { false };
-	Uint32 m_displayEventType { 0 };
+	/// Наблюдатель состояния Авроры (aurora::StateWatch).
+	std::unique_ptr<aurora::StateWatch> m_stateWatch;
 
-	/// ВРЕМЕННАЯ телеметрия «aurora-probe» (переходы режима плитки).
-	bool m_wasTiledProbe = false;
+	/// Применяет событие наблюдателя к состоянию цикла.
+	void ApplyAuroraState(aurora::StateEvent what, bool value);
 
-	void StartDisplayWatch();
-	void StopDisplayWatch();
-	void DisplayWatchLoop();
-	void PushStateEvent(int what, bool value);
+	/// Кросс-фейд на входе в плитку: пока возвращает true, кадр рисует
+	/// интерфейс и обложку поверх с растущей непрозрачностью (alpha).
+	bool CoverFadeFrame(float &alpha);
 
 #endif
 };
