@@ -9,6 +9,7 @@
 #include "thirdparty/FileBrowser.h"
 
 #include <imgui.h>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cmath>
@@ -186,10 +187,12 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 		} else if (m_flickActive && !ImGui::IsMouseDown(0)) {
 			if (m_flickTrailLen > 0) {
 				// Скорость — по окну ~120 мс: палец тормозит перед
-				// подъёмом, скорость последних кадров занижена.
+				// подъёмом, скорость последних кадров занижена. Берём
+				// САМЫЙ СТАРЫЙ образец не старше 120 мс (след хранится
+				// от свежего к старому, ищем с конца).
 				const double now = ImGui::GetTime();
-				int base = m_flickTrailLen - 1;
-				for (int i = 0; i < m_flickTrailLen; ++i) {
+				int base = 0;
+				for (int i = m_flickTrailLen - 1; i >= 0; --i) {
 					if (now - m_flickTrail[i].time <= 0.12) {
 						base = i;
 						break;
@@ -199,6 +202,10 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 				m_flickSpeed = window > 1.0e-3
 				    ? -(io.MousePos.y - m_flickTrail[base].y) / static_cast<float>(window)
 				    : 0.0F;
+				// TODO(кинетика): временная диагностика для отладки на
+				// устройстве — убрать после подтверждения.
+				spdlog::info("flick: speed={}px/s window={:.3f}s samples={}",
+				    static_cast<int>(m_flickSpeed), window, m_flickTrailLen);
 				m_flickTrailLen = 0;
 			}
 			// Кинетическая прокрутка: движение по инерции с экспоненциальным
@@ -222,7 +229,10 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 			m_flickSpeed = 0.0F;
 			m_flickTrailLen = 0;
 		}
-		if (ImGui::IsMouseDown(0)) {
+		// Новое нажатие стопит инерцию — но не во время самого жеста:
+		// иначе след позиций стирается каждый кадр зажатой кнопки и
+		// скорость броска всегда нулевая.
+		if (ImGui::IsMouseDown(0) && !m_gestureDrag) {
 			m_flickActive = false;
 			m_flickSpeed = 0.0F;
 			m_flickTrailLen = 0;
