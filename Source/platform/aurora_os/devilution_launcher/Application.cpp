@@ -733,11 +733,10 @@ bool Application::IsTiled() const
 		return true;
 	}
 	// Грейс после пробуждения: рендерим интерфейс как передний план.
-	if (m_wakeGraceUntil.has_value()) {
-		if (std::chrono::steady_clock::now() < *m_wakeGraceUntil) {
-			return false;
-		}
-		m_wakeGraceUntil.reset();
+	// Просроченный грейс просто проваливается дальше (метод константный,
+	// сбрасывать optional не нужно — следующий пробой его перепишет).
+	if (m_wakeGraceUntil.has_value() && std::chrono::steady_clock::now() < *m_wakeGraceUntil) {
+		return false;
 	}
 	if ((SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0) {
 		return true;
