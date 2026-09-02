@@ -380,10 +380,7 @@ AppResult Application::Run()
 		// SDL_WaitEvent — никакого опроса по таймеру. Будят только события
 		// окна (разворачивание) и wake-пинки фоновых интентов (прогресс
 		// загрузок), по которым обложка перерисовывается с новым процентом.
-		const Uint32 windowFlags = SDL_GetWindowFlags(m_window);
-		const bool hidden = (windowFlags & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
-
-		if (hidden) {
+		if (IsTiled()) {
 			// Анимировать закрытое окно не для кого: iris не стартует без
 			// рендера, и цикл выше никогда не увидел бы его завершения.
 			if (m_store->State().pendingLaunch.has_value()) {
@@ -410,7 +407,7 @@ AppResult Application::Run()
 		m_store->Poll();
 
 		// Обработанные события могли развернуть окно — видим ли мы ещё?
-		if ((SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0) {
+		if (IsTiled()) {
 			continue;
 		}
 
@@ -488,9 +485,35 @@ void Application::OnEvent(const SDL_WindowEvent &event)
 	// девайс-прогона.
 	spdlog::info("windowevent: {} ({})", WindowEventName(event.event), static_cast<int>(event.event));
 
+#ifdef AURORA_OS
+	if (event.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+		m_focusLostAt = std::chrono::steady_clock::now();
+	} else if (event.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+		m_focusLostAt.reset();
+	}
+#endif
+
 	if (event.event == SDL_WINDOWEVENT_CLOSE) {
 		Stop();
 	}
+}
+
+bool Application::IsTiled() const
+{
+	const Uint32 flags = SDL_GetWindowFlags(m_window);
+	const bool hidden = (flags & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
+#ifdef AURORA_OS
+	if (hidden) {
+		return true;
+	}
+	// Аврора не шлёт MINIMIZED/HIDDEN при сворачивании в плитку — только
+	// FOCUS_LOST, поэтому «в плитке» = фокус потерян устойчиво долго
+	// (краткие потери от системных шторок/диалогов отсекаем).
+	return m_focusLostAt.has_value()
+	    && std::chrono::steady_clock::now() - *m_focusLostAt >= std::chrono::milliseconds(400);
+#else
+	return hidden;
+#endif
 }
 
 } // namespace App

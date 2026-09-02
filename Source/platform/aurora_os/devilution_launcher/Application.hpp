@@ -8,6 +8,7 @@
 #include "services/ServiceFactory.hpp"
 
 #include <array>
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
@@ -68,6 +69,10 @@ public:
 	void Stop();
 	void OnEvent(const SDL_WindowEvent &event);
 
+	/// Правда, если окно сейчас «в плитке»: скрыто/свёрнуто (десктоп) или
+	/// надолго потеряло фокус (Аврора — см. m_focusLostAt).
+	[[nodiscard]] bool IsTiled() const;
+
 private:
 	/// Общий бутстрап SDL/ImGui; false — фатальная ошибка инициализации.
 	bool Setup();
@@ -123,6 +128,13 @@ private:
 	/// устарел ли он (пришёл wake-пинок с новым прогрессом загрузки).
 	bool m_wasHidden = false;
 	bool m_coverDirty = false;
+
+#ifdef AURORA_OS
+	/// Аврора не шлёт MINIMIZED/HIDDEN при сворачивании в плитку — только
+	/// FOCUS_LOST. Устойчивая потеря фокуса (>=0.4 с) считается «в
+	/// плитке»; пусто — фокус есть (или был с самого старта).
+	std::optional<std::chrono::steady_clock::time_point> m_focusLostAt;
+#endif
 };
 
 } // namespace App
