@@ -80,6 +80,12 @@ public:
 	/// надолго потеряло фокус (Аврора — см. m_focusLostAt).
 	[[nodiscard]] bool IsTiled() const;
 
+#ifdef AURORA_OS
+	/// Приём свойства от qt_extended_surface (публичен: вызывается
+	/// file-scope слушателем протокола из колбэка wayland).
+	void OnCoverProperty(const char *name, const struct wl_array *value);
+#endif
+
 private:
 	/// Общий бутстрап SDL/ImGui; false — фатальная ошибка инициализации.
 	bool Setup();
@@ -188,7 +194,6 @@ private:
 	/// SDL (внутри Poll/WaitEvent) — состояние меняем прямо из них.
 	void InitCoverWatch();
 	void StopCoverWatch();
-	void OnCoverProperty(const char *name, const struct wl_array *value);
 #endif
 };
 
