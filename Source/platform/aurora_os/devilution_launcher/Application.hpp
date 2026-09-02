@@ -19,10 +19,6 @@ namespace launcher {
 class Store;
 }
 
-struct wl_registry;
-struct wl_array;
-struct qt_surface_extension;
-struct qt_extended_surface;
 
 namespace launcher::ui {
 class LauncherView;
@@ -79,12 +75,6 @@ public:
 	/// Правда, если окно сейчас «в плитке»: скрыто/свёрнуто (десктоп) или
 	/// надолго потеряло фокус (Аврора — см. m_focusLostAt).
 	[[nodiscard]] bool IsTiled() const;
-
-#ifdef AURORA_OS
-	/// Приём свойства от qt_extended_surface (публичен: вызывается
-	/// file-scope слушателем протокола из колбэка wayland).
-	void OnCoverProperty(const char *name, const struct wl_array *value);
-#endif
 
 private:
 	/// Общий бутстрап SDL/ImGui; false — фатальная ошибка инициализации.
@@ -157,6 +147,11 @@ private:
 	std::optional<std::chrono::steady_clock::time_point> m_focusLostAt;
 	bool m_topmostLost = false;
 
+	/// Кросс-фейд на входе в плитку (время ImGui; <0 — анимации нет):
+	/// первые доли секунды кадр содержит интерфейс и обложку поверх с
+	/// растущей непрозрачностью, чтобы переход не был скачком.
+	double m_coverFadeStartedAt = -1.0;
+
 	/// Грейс после пробуждения (разблокировка): пару секунд считаем себя
 	/// передним планом — между «экран разблокирован» и «композитор поднял
 	/// окно» проходит анимация локскрина, и обложка в этом зазоре
@@ -176,24 +171,11 @@ private:
 	/// ВРЕМЕННАЯ телеметрия «aurora-probe» (переходы режима плитки).
 	bool m_wasTiledProbe = false;
 
-	/// Wayland-хук плитки: реестр, расширение Qt и обёртка нашей
-	/// поверхности; активна ли «плитка» по слову композитора.
-	struct wl_registry *m_coverRegistry = nullptr;
-	struct qt_surface_extension *m_coverExtension = nullptr;
-	struct qt_extended_surface *m_coverSurface = nullptr;
-	bool m_coverActive = false;
-
 	void StartDisplayWatch();
 	void StopDisplayWatch();
 	void DisplayWatchLoop();
 	void PushStateEvent(int what, bool value);
 
-	/// Хук на Wayland-расширение Qt (qt_surface_extension): Lipstick
-	/// сообщает окну состояние «плитки» свойством cover_status ещё ДО
-	/// отпускания пальца в жесте сворачивания. Колбэки приходят в потоке
-	/// SDL (внутри Poll/WaitEvent) — состояние меняем прямо из них.
-	void InitCoverWatch();
-	void StopCoverWatch();
 #endif
 };
 

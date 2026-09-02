@@ -432,7 +432,7 @@ void LauncherView::RenderLaunchIris(const LauncherState &state)
 	    ImGui::GetColorU32(ImVec4(0.91F, 0.55F, 0.16F, rimAlpha * 0.6F)), 48, Scale::Px(0.18F));
 }
 
-void LauncherView::RenderCover(const LauncherState &state)
+void LauncherView::RenderCover(const LauncherState &state, float coverAlpha)
 {
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
 	// Текст на background-списке в этой паре ImGui/SDL_Renderer не
@@ -444,6 +444,13 @@ void LauncherView::RenderCover(const LauncherState &state)
 	const ImVec2 &v = viewport->WorkSize;
 	const float centerX = top.x + v.x * 0.5F;
 
+	// Цвет темы с альфой кросс-фейда (1.0 — обычный кадр обложки).
+	const auto argb = [coverAlpha](ColorRole role) {
+		ImVec4 color = Theme::Color(role);
+		color.w *= coverAlpha;
+		return ImGui::GetColorU32(color);
+	};
+
 	// Фон — тот же aspect-fill кроп, что у главного экрана.
 	if (m_backgroundTexture != nullptr && m_backgroundTextureSize.x > 0.0F && m_backgroundTextureSize.y > 0.0F) {
 		const ImVec2 &t = m_backgroundTextureSize;
@@ -451,12 +458,13 @@ void LauncherView::RenderCover(const LauncherState &state)
 		const ImVec2 shown(t.x * scale, t.y * scale);
 		const ImVec2 crop(0.5F - (v.x / shown.x) * 0.5F, 0.5F - (v.y / shown.y) * 0.5F);
 		draw->AddImage(m_backgroundTexture, top, top + v,
-		    ImVec2(crop.x, crop.y), ImVec2(1.0F - crop.x, 1.0F - crop.y));
+		    ImVec2(crop.x, crop.y), ImVec2(1.0F - crop.x, 1.0F - crop.y),
+		    ImGui::GetColorU32(ImVec4(1.0F, 1.0F, 1.0F, coverAlpha)));
 	}
 
 	// Затемнение плотнее, чем на главном экране: плитка мелкая, тексту
 	// нужен контраст. Угольки не рисуем — кадр статичный между правками.
-	draw->AddRectFilled(top, top + v, ImGui::GetColorU32(ImVec4(0.02F, 0.01F, 0.01F, 0.45F)));
+	draw->AddRectFilled(top, top + v, ImGui::GetColorU32(ImVec4(0.02F, 0.01F, 0.01F, 0.45F * coverAlpha)));
 
 	// Композитор кропает буфер под пропорции плитки — контент держим
 	// в центральной полосе шириной ~72%, края небезопасны.
@@ -473,7 +481,7 @@ void LauncherView::RenderCover(const LauncherState &state)
 		const float size = heading->LegacySize;
 		const ImVec2 textSize = heading->CalcTextSizeA(size, FLT_MAX, 0.0F, kTitle);
 		draw->AddText(heading, size, ImVec2(centerX - textSize.x * 0.5F, y),
-		    Theme::ColorU32(ColorRole::GoldBright), kTitle);
+		    argb(ColorRole::GoldBright), kTitle);
 		y += textSize.y + Scale::Px(0.55F);
 	}
 
@@ -482,12 +490,13 @@ void LauncherView::RenderCover(const LauncherState &state)
 		Theme::PushFont(FontRole::Body);
 		const std::string subtitle = std::string("порт для Aurora OS · ") + LAUNCHER_APP_VERSION;
 		const ImVec2 textSize = ImGui::CalcTextSize(subtitle.c_str());
-		draw->AddText(ImVec2(centerX - textSize.x * 0.5F, y), Theme::ColorU32(ColorRole::TextDim),
+		draw->AddText(ImVec2(centerX - textSize.x * 0.5F, y), argb(ColorRole::TextDim),
 		    subtitle.c_str());
 		Theme::PopFont();
 		y += textSize.y + Scale::Px(0.9F);
 	}
-	Theme::DrawDivider(ImVec2(centerX - contentWidth * 0.5F, y), ImVec2(centerX + contentWidth * 0.5F, y), 0.7F);
+	Theme::DrawDivider(ImVec2(centerX - contentWidth * 0.5F, y), ImVec2(centerX + contentWidth * 0.5F, y),
+	    0.7F * coverAlpha);
 
 	// Активная загрузка: имя файла, полоса с «горячим» краем, процент и
 	// скорость — упрощённый вариант бара экрана данных.
@@ -501,7 +510,7 @@ void LauncherView::RenderCover(const LauncherState &state)
 		float dy = top.y + v.y * 0.50F;
 		Theme::PushFont(FontRole::BodyBold);
 		const ImVec2 nameSize = ImGui::CalcTextSize(displayName.data(), displayName.data() + displayName.size());
-		draw->AddText(ImVec2(centerX - nameSize.x * 0.5F, dy), Theme::ColorU32(ColorRole::TextBody),
+		draw->AddText(ImVec2(centerX - nameSize.x * 0.5F, dy), argb(ColorRole::TextBody),
 		    displayName.data(), displayName.data() + displayName.size());
 		Theme::PopFont();
 
@@ -511,23 +520,25 @@ void LauncherView::RenderCover(const LauncherState &state)
 		const float barHeight = Scale::Px(0.55F);
 		const float barLeft = centerX - contentWidth * 0.5F;
 		draw->AddRectFilled(ImVec2(barLeft, dy), ImVec2(barLeft + contentWidth, dy + barHeight),
-		    Theme::ColorU32(ColorRole::Panel));
+		    argb(ColorRole::Panel));
 		const float fill = contentWidth * std::clamp(d.fraction, 0.0F, 1.0F);
 		if (fill > 0.0F) {
 			draw->AddRectFilled(ImVec2(barLeft, dy), ImVec2(barLeft + fill, dy + barHeight),
-			    Theme::ColorU32(ColorRole::GoldDim));
+			    argb(ColorRole::GoldDim));
 			draw->AddCircleFilled(ImVec2(barLeft + fill, dy + barHeight * 0.5F), barHeight,
-			    ImGui::GetColorU32(Theme::Color(ColorRole::GoldBright) * ImVec4(1.0F, 1.0F, 1.0F, 0.35F)), 12);
+			    ImGui::GetColorU32(Theme::Color(ColorRole::GoldBright)
+			        * ImVec4(1.0F, 1.0F, 1.0F, 0.35F * coverAlpha)),
+			    12);
 		}
 		draw->AddRect(ImVec2(barLeft, dy), ImVec2(barLeft + contentWidth, dy + barHeight),
-		    Theme::ColorU32(ColorRole::BorderGold), 1.0F);
+		    argb(ColorRole::BorderGold), 1.0F);
 
 		dy += barHeight + Scale::Px(0.55F);
 		Theme::PushFont(FontRole::Body);
 		const std::string stat = std::to_string(static_cast<int>(d.fraction * 100.0F + 0.5F)) + "% · "
 		    + FormatBytes(d.bytesPerSec) + "/с";
 		const ImVec2 statSize = ImGui::CalcTextSize(stat.c_str());
-		draw->AddText(ImVec2(centerX - statSize.x * 0.5F, dy), Theme::ColorU32(ColorRole::TextDim),
+		draw->AddText(ImVec2(centerX - statSize.x * 0.5F, dy), argb(ColorRole::TextDim),
 		    stat.c_str());
 		Theme::PopFont();
 	}

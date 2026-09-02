@@ -212,12 +212,9 @@ else()
 
   add_devilutionx_object_library(devilution_launcher ${LAUNCHER_UI_SOURCES})
   target_include_directories(devilution_launcher PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-  # Наблюдатель состояния дисплея (Application.cpp) слушает D-Bus, а хук
-  # «плитки» использует протокол qt_surface_extension из private-инклюдов
-  # QtWaylandClient (версия каталога меняется между SDK — берём глобом).
+  # Наблюдатель состояния дисплея/плитки (Application.cpp) слушает D-Bus:
+  # те же пути инклюдов, что у соседней libdevilutionx_aurora_os.
   target_include_directories(devilution_launcher PUBLIC "/usr/include/dbus-1.0" "/usr/lib/dbus-1.0/include")
-  file(GLOB LAUNCHER_QTWAYLAND_PRIVATE "/usr/include/qt5/QtWaylandClient/*/QtWaylandClient/private")
-  target_include_directories(devilution_launcher PUBLIC ${LAUNCHER_QTWAYLAND_PRIVATE})
   target_compile_definitions(devilution_launcher PRIVATE LAUNCHER_APP_VERSION="${LAUNCHER_APP_VERSION_STRING}")
   target_link_libraries(devilution_launcher
       PUBLIC

@@ -39,10 +39,6 @@
 #ifdef AURORA_OS
 #	include <dbus/dbus.h>
 #	include <unistd.h>
-#	include <SDL_syswm.h>
-// Сгенерированный протокол приватного расширения Qt — лежит в private
-// инклюдах QtWaylandClient SDK (см. CMakeLists: include-путь глобом).
-#	include <wayland-surface-extension-client-protocol.h>
 #endif
 
 CMRC_DECLARE(assets);
@@ -305,7 +301,6 @@ AppResult Application::Run()
 	// шлёт системные события в начале жеста сворачивания.
 	SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
 	StartDisplayWatch();
-	InitCoverWatch();
 #endif
 
 	// Setup() создаёт контекст ImGui и грузит шрифты, поэтому вид (и его
@@ -414,19 +409,13 @@ AppResult Application::Run()
 				}
 				break;
 			case 3:
-				// coverstatus = 2 от Lipstick: драг сворачивания прошёл
-				// порог и окно сжалось в плитку — показываем обложку, не
-				// дожидаясь потери фокуса (она придёт только с отпусканием
-				// пальца). 1 — жест только начался, окно ещё полноэкранное;
-				// 0/3 — обычный режим/возврат. Сигнал не адресован окну:
-				// атрибуция через «жест бывает только на переднем плане».
-				if (event.user.data1 != nullptr) {
-					if (!m_focusLostAt.has_value()) {
-						m_focusLostAt = std::chrono::steady_clock::now();
-					}
-					m_coverActive = true;
-				} else if (m_coverActive) {
-					m_coverActive = false;
+				// coverstatus от Lipstick: 1 и 2 прилетают ПАРОЙ в самом
+				// начале жеста, 3 и 0 — парой при возврате из плитки.
+				// Вход по ним не делаем (обложка включается по потере
+				// верхнего окна, в момент отпускания пальца), а вот выход —
+				// мгновенный, не ждём FOCUS_GAINED. «1» до «2» безвредна:
+				// фокус ещё не потерян, сбрасывать нечего.
+				if (event.user.data1 == nullptr) {
 					m_focusLostAt.reset();
 					m_topmostLost = false;
 				}
@@ -484,7 +473,34 @@ AppResult Application::Run()
 			         : -1);
 		}
 #endif
-		if (IsTiled()) {
+#ifdef AURORA_OS
+		// Кросс-фейд на входе в плитку: первые kCoverFade секунд кадр —
+		// интерфейс с обложкой поверх (непрозрачность обложки растёт от
+		// нуля), чтобы переход не был резким скачком; затем обычный
+		// режим плитки (одна обложка и сон). Разворачивание мгновенное,
+		// без фейда.
+		bool coverFading = false;
+		float coverAlpha = 1.0F;
+		if (IsTiled() && m_displayOn && !m_tkLocked
+		    && !m_store->State().pendingLaunch.has_value()) {
+			if (m_coverFadeStartedAt < 0.0) {
+				m_coverFadeStartedAt = ImGui::GetTime();
+			}
+			constexpr float kCoverFade = 0.2F;
+			const float fade = static_cast<float>(ImGui::GetTime() - m_coverFadeStartedAt);
+			if (fade < kCoverFade) {
+				coverFading = true;
+				coverAlpha = fade / kCoverFade;
+			} else {
+				m_coverFadeStartedAt = -1.0;
+			}
+		} else {
+			m_coverFadeStartedAt = -1.0;
+		}
+#else
+		constexpr bool coverFading = false;
+#endif
+		if (IsTiled() && !coverFading) {
 			// Анимировать закрытое окно не для кого: iris не стартует без
 			// рендера, и цикл выше никогда не увидел бы его завершения.
 			if (m_store->State().pendingLaunch.has_value()) {
@@ -514,7 +530,7 @@ AppResult Application::Run()
 		m_store->Poll();
 
 		// Обработанные события могли развернуть окно — видим ли мы ещё?
-		if (IsTiled()) {
+		if (IsTiled() && !coverFading) {
 			continue;
 		}
 
@@ -526,6 +542,13 @@ AppResult Application::Run()
 			m_view->RenderCover(m_store->State());
 		} else {
 			m_view->Render(m_store->State(), dispatch);
+#ifdef AURORA_OS
+			// Кадр кросс-фейда: обложка поверх интерфейса (проверка IsTiled
+			// свежая — событие выше могло успеть развернуть окно).
+			if (coverFading && IsTiled()) {
+				m_view->RenderCover(m_store->State(), coverAlpha);
+			}
+#endif
 		}
 
 		ImGui::Render();
@@ -550,7 +573,6 @@ AppResult Application::Run()
 
 #ifdef AURORA_OS
 	StopDisplayWatch();
-	StopCoverWatch();
 #endif
 
 	AppResult result;
@@ -777,145 +799,6 @@ void Application::DisplayWatchLoop()
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Wayland-хук «плитки»: приватное расширение Qt (qt_surface_extension из
-// QtWayland, поддерживается Lipstick). Композитор сообщает окну состояние
-// обложки свойством cover_status через qt_extended_surface — в отличие от
-// D-Bus/SDL-событий это происходит в НАЧАЛЕ жеста сворачивания.
-// ---------------------------------------------------------------------------
-
-namespace {
-
-/// Заполняется слушателем реестра (глобалы приходят до roundtrip).
-qt_surface_extension *g_coverExtensionBound = nullptr;
-
-void CoverOnscreenVisibility(void *, qt_extended_surface *, int32_t visible)
-{
-	// ВРЕМЕННАЯ телеметрия «cover-probe» — убрать после девайс-прогона.
-	spdlog::info("cover-probe: onscreen_visibility={}", visible);
-}
-
-void CoverSetGenericProperty(void *data, qt_extended_surface *, const char *name, wl_array *value)
-{
-	static_cast<Application *>(data)->OnCoverProperty(name, value);
-}
-
-void CoverClose(void *, qt_extended_surface *)
-{
-	spdlog::info("cover-probe: close от композитора");
-}
-
-qt_extended_surface_listener kCoverExtendedListener = {
-	CoverOnscreenVisibility,
-	CoverSetGenericProperty,
-	CoverClose,
-};
-
-void CoverRegistryGlobal(void *, wl_registry *registry, uint32_t name, const char *interface, uint32_t version)
-{
-	// ВРЕМЕННАЯ телеметрия «cover-probe»: разовый дамп всех глобалов
-	// композитора — вдруг besides qt_surface_extension есть и другие
-	// полезные приватные расширения. Убрать после девайс-прогона.
-	spdlog::info("cover-probe: global {} v{}", interface, version);
-	if (std::strcmp(interface, "qt_surface_extension") == 0) {
-		g_coverExtensionBound = static_cast<qt_surface_extension *>(
-		    wl_registry_bind(registry, name, &qt_surface_extension_interface, 1u));
-	}
-}
-void CoverRegistryGlobalRemove(void *, wl_registry *, uint32_t)
-{
-}
-
-const wl_registry_listener kCoverRegistryListener = {
-	CoverRegistryGlobal,
-	CoverRegistryGlobalRemove,
-};
-
-} // namespace
-
-void Application::InitCoverWatch()
-{
-	SDL_SysWMinfo wm;
-	SDL_VERSION(&wm.version);
-	if (!SDL_GetWindowWMInfo(m_window, &wm) || wm.subsystem != SDL_SYSWM_WAYLAND) {
-		spdlog::info("cover-watch: окно не wayland — хук плитки пропущен");
-		return;
-	}
-	wl_display *display = wm.info.wl.display;
-	wl_surface *surface = wm.info.wl.surface;
-	if (display == nullptr || surface == nullptr) {
-		spdlog::warn("cover-watch: нет wayland display/surface");
-		return;
-	}
-
-	g_coverExtensionBound = nullptr;
-	m_coverRegistry = wl_display_get_registry(display);
-	wl_registry_add_listener(m_coverRegistry, &kCoverRegistryListener, nullptr);
-	wl_display_roundtrip(display);
-	if (g_coverExtensionBound == nullptr) {
-		spdlog::info("cover-watch: композитор не экспортирует qt_surface_extension");
-		wl_registry_destroy(m_coverRegistry);
-		m_coverRegistry = nullptr;
-		return;
-	}
-	m_coverExtension = g_coverExtensionBound;
-
-	m_coverSurface = qt_surface_extension_get_extended_surface(m_coverExtension, surface);
-	qt_extended_surface_add_listener(m_coverSurface, &kCoverExtendedListener, this);
-	wl_display_roundtrip(display);
-	spdlog::info("cover-watch: подписан на события qt_extended_surface");
-}
-
-void Application::StopCoverWatch()
-{
-	if (m_coverSurface != nullptr) {
-		qt_extended_surface_destroy(m_coverSurface);
-		m_coverSurface = nullptr;
-	}
-	if (m_coverRegistry != nullptr) {
-		wl_registry_destroy(m_coverRegistry);
-		m_coverRegistry = nullptr;
-	}
-}
-
-void Application::OnCoverProperty(const char *name, const wl_array *value)
-{
-	// ВРЕМЕННАЯ телеметрия «cover-probe»: максимальный дамп значения —
-	// байты, печатаемая строка и int-трактовка (формат свойства в
-	// источниках Lipstick не описан, ловим эмпирически). Убрать.
-	const auto *bytes = static_cast<const unsigned char *>(value->data);
-	std::string hex;
-	std::string ascii;
-	for (size_t i = 0; i < value->size && i < 64; ++i) {
-		char buf[4];
-		std::snprintf(buf, sizeof(buf), "%02x ", bytes[i]);
-		hex += buf;
-		ascii += bytes[i] >= 0x20 && bytes[i] < 0x7F ? static_cast<char>(bytes[i]) : '.';
-	}
-	int32_t asInt = 0;
-	if (value->size >= sizeof(asInt)) {
-		std::memcpy(&asInt, value->data, sizeof(asInt));
-	}
-	spdlog::info("cover-probe: property '{}' = int({}) str('{}') [{}] ({} байт)",
-	    name, asInt, ascii, hex, value->size);
-
-	if (std::strcmp(name, "cover_status") != 0 && std::strcmp(name, "jolla.cover_status") != 0) {
-		return;
-	}
-	// Формат значения неизвестен заранее: ждём int32 (как в D-Bus сигнале
-	// coverstatus) или строковые "1"/"2"; точную трактовку даст лог пробы.
-	m_coverActive = asInt != 0 || ascii == "1" || ascii == "2";
-	if (m_coverActive) {
-		if (!m_focusLostAt.has_value()) {
-			m_focusLostAt = std::chrono::steady_clock::now();
-		}
-	} else {
-		m_focusLostAt.reset();
-		m_topmostLost = false;
-	}
-	m_coverDirty = true;
-}
-
 #endif
 
 void Application::OnEvent(const SDL_WindowEvent &event)
@@ -944,11 +827,6 @@ bool Application::IsTiled() const
 	// окно формально в фокусе — кадры в тёмную матрицу тратят батарею, а
 	// на экран блокировки обложке показываться незачем.
 	if (!m_displayOn || m_tkLocked) {
-		return true;
-	}
-	// Слово композитора через qt_extended_surface (cover_status): жест
-	// сворачивания ещё держат — уже показываем обложку, не ждём фокуса.
-	if (m_coverActive) {
 		return true;
 	}
 	// Грейс после пробуждения: рендерим интерфейс как передний план.
