@@ -171,10 +171,10 @@ private:
 	bool m_skipWakeGrace = false;
 
 	/// Наблюдатель состояния Авроры (aurora::StateWatch).
-	std::unique_ptr<aurora::StateWatch> m_stateWatch;
+	std::unique_ptr<launcher::aurora::StateWatch> m_stateWatch;
 
 	/// Применяет событие наблюдателя к состоянию цикла.
-	void ApplyAuroraState(aurora::StateEvent what, bool value);
+	void ApplyAuroraState(launcher::aurora::StateEvent what, bool value);
 
 	/// Кросс-фейд на входе в плитку: пока возвращает true, кадр рисует
 	/// интерфейс и обложку поверх с растущей непрозрачностью (alpha).
