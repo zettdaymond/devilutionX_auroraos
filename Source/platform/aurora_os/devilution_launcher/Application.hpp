@@ -8,12 +8,10 @@
 #include "services/ServiceFactory.hpp"
 
 #include <array>
-#include <atomic>
 #include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
-#include <thread>
 
 namespace launcher {
 class Store;
