@@ -8,16 +8,40 @@
 #include "core/CoverMachine.hpp"
 
 #include "../ComposerAdapter.hpp"
+#include "../ScreenOrientation.hpp"
 
 #include <spdlog/spdlog.h>
+
+#include <SDL2/SDL.h>
 
 #include <chrono>
 #include <memory>
 #include <vector>
 
+// Пауза аудиоустройства SDL_audiolib в свёрнутом состоянии: колбэк
+// устройства продолжал микшировать заглушённую музыку (~10% CPU в
+// плитке из геймплея). Публичного API у библиотеки нет, id устройства —
+// приватный статик (src/stream_p.h); частичное объявление класса ради
+// статика резолвится в тот же символ pinned-версии зависимости.
+// ОБЯЗАТЕЛЬНО на файловом уровне: внутри анонимного namespace символ
+// получал внутреннюю линковку и не находился линкером.
+namespace Aulib {
+struct Stream_priv {
+	static SDL_AudioDeviceID fDeviceId;
+};
+}
+
 namespace launcher::aurora {
 
 namespace {
+
+void PauseAudioDevice(bool pause)
+{
+	if (Aulib::Stream_priv::fDeviceId != 0) {
+		SDL_PauseAudioDevice(Aulib::Stream_priv::fDeviceId, pause ? SDL_TRUE : SDL_FALSE);
+		spdlog::info("aurora: аудиоустройство {}", pause ? "на паузе (плитка)" : "возобновлено");
+	}
+}
 
 struct CoverState {
 	std::unique_ptr<StateWatch> watch; ///< второй экземпляр на время движка
@@ -42,13 +66,15 @@ CoverState &Cover()
 }
 
 /// В плитке буфер окна показывается «как есть» — портретная карточка,
-/// как у лаунчера; в игре — ландшафтный режим порта (transform 270,
-/// контент предращает ротатор). NORMAL соответствует всем ориентациям
-/// кроме LANDSCAPE/LANDSCAPE_FLIPPED (см. WaylandComposerAdapter).
+/// как у лаунчера. Возврат к игре — в ТЕКУЩИЙ ландшафт: телефон могли
+/// перевернуть, пока приложение было свёрнуто.
 void SetTileOrientation(SDL_Window *window, bool tile)
 {
-	devilution::WaylandComposerAdapter::SetWindowOrientation(
-	    window, tile ? SDL_ORIENTATION_PORTRAIT : SDL_ORIENTATION_LANDSCAPE_FLIPPED);
+	if (tile) {
+		devilution::WaylandComposerAdapter::SetWindowOrientation(window, SDL_ORIENTATION_PORTRAIT);
+		return;
+	}
+	devilution::AuroraApplyWindowTransform(window);
 }
 
 /// Границы фокуса → события машины. Антидребезг 100 мс — единственная
@@ -214,7 +240,8 @@ bool GameCover::BeginCoverFrame(SDL_Renderer *renderer)
 		}
 		if (!s.coverActive) {
 			s.coverActive = true;
-			if (s.portraitRotated && s.window != nullptr) {
+			PauseAudioDevice(true);
+			if (s.window != nullptr) {
 				SetTileOrientation(s.window, true);
 			}
 		}
@@ -223,7 +250,8 @@ bool GameCover::BeginCoverFrame(SDL_Renderer *renderer)
 	case CoverAction::RenderGame:
 		if (s.coverActive) {
 			s.coverActive = false;
-			if (s.portraitRotated && s.window != nullptr) {
+			PauseAudioDevice(false);
+			if (s.window != nullptr) {
 				SetTileOrientation(s.window, false);
 			}
 		}
