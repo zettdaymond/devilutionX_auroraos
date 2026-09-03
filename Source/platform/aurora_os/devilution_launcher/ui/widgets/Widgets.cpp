@@ -572,10 +572,6 @@ void FileRow(bool present, const char *name, const char *status, const char *pat
 			ImGui::SetCursorPosX(startX + indent);
 			ImGui::TextUnformatted(line.c_str());
 		}
-		if (onDelete) {
-			ImGui::SetCursorPosX(startX + indent);
-			ImGui::Text("%s скачан", icons::Download);
-		}
 		ImGui::PopStyleColor();
 	}
 

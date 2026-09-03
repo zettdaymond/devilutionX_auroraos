@@ -190,10 +190,13 @@ void PopButtonStyle()
 
 void DrawDivider(ImDrawList *draw, ImVec2 from, ImVec2 to, float alpha)
 {
+	// Прямоугольник нулевой высоты не растеризуется вовсе — черта
+	// обязана иметь явную толщину, иначе разделители «невидимы».
+	const float thickness = Scale::Px(0.07F);
 	const ImU32 gold = ImGui::GetColorU32(ImVec4(Color(ColorRole::BorderGold).x, Color(ColorRole::BorderGold).y,
 	    Color(ColorRole::BorderGold).z, alpha));
 	const ImU32 transparent = gold & 0x00FFFFFF;
-	draw->AddRectFilledMultiColor(from, to, transparent, gold, gold, transparent);
+	draw->AddRectFilledMultiColor(from, ImVec2(to.x, from.y + thickness), transparent, gold, gold, transparent);
 }
 
 void DrawDivider(ImVec2 from, ImVec2 to, float alpha)

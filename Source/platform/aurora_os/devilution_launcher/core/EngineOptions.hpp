@@ -270,10 +270,10 @@ struct SettingGroupSpec {
 };
 
 inline constexpr std::array<SettingGroupSpec, 4> kSettingGroups { {
-	{ SettingGroup::Gameplay, "Геймплей" },
-	{ SettingGroup::Interface, "Интерфейс" },
-	{ SettingGroup::Graphics, "Графика" },
-	{ SettingGroup::Audio, "Звук" },
+	{ SettingGroup::Gameplay, "ГЕЙМПЛЕЙ" },
+	{ SettingGroup::Interface, "ИНТЕРФЕЙС" },
+	{ SettingGroup::Graphics, "ГРАФИКА" },
+	{ SettingGroup::Audio, "ЗВУК" },
 } };
 
 /// Значения по умолчанию для всех настроек, индекс — SettingId.

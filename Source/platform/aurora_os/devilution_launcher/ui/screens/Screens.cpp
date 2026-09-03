@@ -332,7 +332,7 @@ void RenderFileGroup(const LauncherState &state, const Dispatcher &dispatch, con
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(missing == 0 ? ColorRole::Success : ColorRole::TextDim));
 	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + Scale::Px(0.15F));
 	if (strcmp(group.title, "Прочее") == 0) {
-		ImGui::TextWrapped("— не обязательны для запуска · свободно %s", FormatBytes(state.freeDiskBytes).c_str());
+		ImGui::TextUnformatted("— не обязательны для запуска");
 	} else if (missing == 0) {
 		ImGui::TextUnformatted("— всё на месте");
 	} else if (group.files.size() == 1) {
@@ -419,6 +419,12 @@ void Data(const LauncherState &state, const Dispatcher &dispatch)
 	ImGui::PopFont();
 	RenderChecklist(state, dispatch);
 
+	// Свободное место — отдельной строкой под чек-листом: это свойство
+	// хранилища, а не какого-то файла из списка.
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.6F)));
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
+	ImGui::Text("%s  Свободно: %s", icons::Hdd, FormatBytes(state.freeDiskBytes).c_str());
+	ImGui::PopStyleColor();
 }
 
 // ---------------------------------------------------------------------------
@@ -471,25 +477,45 @@ StepperGeometry StepperMetricsOf(const SettingSpec &spec)
 
 /// Строка настройки — та же схема, что у FileRow на экране данных:
 /// имя и прижатый вправо контрол на первой линии, описание прямо под
-/// именем (SetCursorPosY под линию имени, как путь у файла), перенос
-/// описания не заезжает под контрол, а следующая строка не наезжает
-/// на его низ. Контролы только отправляют интенты.
+/// именем (SetCursorPosY под линию имени, как путь у файла). Имя, как
+/// и описание, переносится левее контрола, а сам контрол ставится на
+/// первую линию абсолютной позицией — SameLine после многострочного
+/// имени относился бы к его последней строке. Контролы только
+/// отправляют интенты.
 void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &dispatch)
 {
 	ImGui::PushID(spec.key.data());
 
 	const float startX = ImGui::GetCursorPosX();
+	const ImVec2 rowStart = ImGui::GetCursorScreenPos();
 	const float rowWidth = ImGui::GetContentRegionAvail().x;
-	const float rightEdge = startX + rowWidth;
 
-	ImGui::TextUnformatted(spec.nameRu.data());
-
+	// Правая зона контрола: в неё не заезжают ни имя, ни описание.
+	// Ширина известна до отрисовки — по ней же переносится имя.
 	const StepperGeometry stepper = StepperMetricsOf(spec);
-	float controlWidth = 0.0F; // правая зона, в которую не заезжает описание
+	float controlWidth = 0.0F;
 	switch (spec.kind) {
 	case SettingKind::Toggle:
 		controlWidth = Scale::Px(2.4F);
-		ImGui::SameLine(rightEdge - controlWidth);
+		break;
+	case SettingKind::Cycle:
+		controlWidth = stepper.totalWidth;
+		break;
+	case SettingKind::Slider:
+	case SettingKind::PercentVolume:
+		controlWidth = ImGui::CalcTextSize(SettingValueText(spec, value).c_str()).x;
+		break;
+	}
+	const float controlGap = controlWidth > 0.0F ? controlWidth + Scale::Px(0.6F) : 0.0F;
+
+	ImGui::PushTextWrapPos(startX + rowWidth - controlGap);
+	ImGui::TextUnformatted(spec.nameRu.data());
+	ImGui::PopTextWrapPos();
+	const float nameBottom = ImGui::GetCursorPosY();
+
+	ImGui::SetCursorScreenPos(ImVec2(rowStart.x + rowWidth - controlWidth, rowStart.y));
+	switch (spec.kind) {
+	case SettingKind::Toggle:
 		widgets::ToggleSwitch("switch", value != 0, [&dispatch, id = spec.id](bool next) {
 			dispatch(intent::SettingChanged { id, next ? 1 : 0 });
 		});
@@ -500,10 +526,8 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 		// самому широкому варианту, чтобы степпер не прыгал при смене.
 		// Варианты переключаются по индексу, а в интент уходит
 		// optionValues индекса — у зелий значения 0/1/2/4/8/16.
-		controlWidth = stepper.totalWidth;
 		const int count = static_cast<int>(spec.optionCount);
 		const int currentIndex = SettingCycleIndex(spec, value);
-		ImGui::SameLine(rightEdge - controlWidth);
 		widgets::GhostButton(icons::ChevronLeft, "", ImVec2(stepper.button, stepper.button),
 		    [&dispatch, &spec, count, currentIndex] {
 			    const int next = (currentIndex + count - 1) % count;
@@ -532,7 +556,6 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 	case SettingKind::Slider:
 	case SettingKind::PercentVolume: {
 		const std::string text = SettingValueText(spec, value);
-		ImGui::SameLine(rightEdge - ImGui::CalcTextSize(text.c_str()).x);
 		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextHeading));
 		ImGui::TextUnformatted(text.c_str());
 		ImGui::PopStyleColor();
@@ -540,13 +563,12 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 	}
 	}
 
-	// Конец линии имени — как textBottom в FileRow.
-	const float textBottom = ImGui::GetCursorPosY();
+	// Конец линии имени — низ имени (могло занять несколько строк)
+	// или контрола первой линии, что ниже.
+	const float textBottom = std::max(nameBottom, ImGui::GetCursorPosY());
 
 	if (!spec.descriptionRu.empty()) {
 		ImGui::SetCursorPosY(textBottom);
-		// Перенос описания — левее контрола, висящего справа.
-		const float controlGap = controlWidth > 0.0F ? controlWidth + Scale::Px(0.6F) : 0.0F;
 		ImGui::PushTextWrapPos(startX + rowWidth - controlGap);
 		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 		ImGui::TextUnformatted(spec.descriptionRu.data());
@@ -596,13 +618,15 @@ void Settings(const LauncherState &state, const Dispatcher &dispatch)
 	ImGui::PopStyleColor();
 
 	for (const SettingGroupSpec &group : kSettingGroups) {
-		ImGui::Dummy(ImVec2(0, Scale::Px(0.6F)));
+		ImGui::Dummy(ImVec2(0, Scale::Px(0.9F)));
 		ImGui::PushFont(Theme::Font(FontRole::BodyBold));
+		ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::GoldBright));
 		ImGui::TextUnformatted(group.titleRu.data());
+		ImGui::PopStyleColor();
 		ImGui::PopFont();
 		ImGui::Dummy(ImVec2(0, Scale::Px(0.35F)));
 		Theme::DrawDivider(ImGui::GetCursorScreenPos(),
-		    ImGui::GetCursorScreenPos() + ImVec2(ImGui::GetContentRegionAvail().x, 0), 0.6F);
+		    ImGui::GetCursorScreenPos() + ImVec2(ImGui::GetContentRegionAvail().x, 0), 0.7F);
 		ImGui::Dummy(ImVec2(0, Scale::Px(0.5F)));
 
 		for (const SettingSpec &spec : kSettingCatalog) {

@@ -89,7 +89,7 @@ void OptionSlider(const char *strId, int value, int minValue, int maxValue,
 /// (или «можно скачать»/«не найден») и действие — корзинка для
 /// скачанного, кнопка «Скачать» для отсутствующего скачиваемого.
 /// Ниже — путь целиком на всю ширину (перенос только по разделителям
-/// «/» и «\\») и пометка «скачан».
+/// «/» и «\\»).
 void FileRow(bool present, const char *name, const char *status, const char *path,
     const std::function<void()> &onDownload, const std::function<void()> &onDelete);
 
