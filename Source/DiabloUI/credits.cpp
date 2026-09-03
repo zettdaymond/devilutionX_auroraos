@@ -18,6 +18,13 @@
 #include "utils/log.hpp"
 #include "utils/sdl_compat.h"
 
+#ifdef AURORA_OS
+#include <chrono>
+
+#include "GameCover.hpp"
+#include "engine/dx.h"
+#endif
+
 namespace devilution {
 
 namespace {
@@ -70,6 +77,12 @@ public:
 
 	void Render();
 
+	/// Пауза в свёрнутом/пригашенном состоянии: рендер не гоняем, а базу
+	/// настольных часов прокрутки сдвигаем на длительность паузы — иначе
+	/// позиция скролла (она считается от тиков) прыгает при возврате.
+	/// Блокирует до события, меняющего скрытость.
+	void PauseIfHidden();
+
 	[[nodiscard]] bool Finished() const
 	{
 		return finished_;
@@ -85,6 +98,10 @@ private:
 	bool finished_;
 	Uint32 ticks_begin_;
 	int prev_offset_y_;
+#ifdef AURORA_OS
+	bool paused_ = false;
+	std::chrono::steady_clock::time_point pause_started_at_ {};
+#endif
 };
 
 void CreditsRenderer::Render()
@@ -131,6 +148,37 @@ void CreditsRenderer::Render()
 	}
 }
 
+void CreditsRenderer::PauseIfHidden()
+{
+#ifdef AURORA_OS
+	if (!launcher::aurora::GameCover::IsHidden()) {
+		if (paused_) {
+			paused_ = false;
+			ticks_begin_ += static_cast<Uint32>(std::chrono::duration_cast<std::chrono::milliseconds>(
+			    std::chrono::steady_clock::now() - pause_started_at_)
+			    .count());
+			SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "aurora: титры сняты с паузы");
+		}
+		return;
+	}
+	if (!paused_) {
+		paused_ = true;
+		pause_started_at_ = std::chrono::steady_clock::now();
+		SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "aurora: титры на паузе");
+	}
+	// RenderPresent кормит машину обложки и держит кадр-карточку; спим
+	// до события (фокус/дисплей всегда событием), проснутое возвращаем
+	// в очередь — его обработает насос цикла диалога.
+	RenderPresent();
+	SDL_Event wait {};
+	if (SDL_WaitEvent(&wait) == 1) {
+		SDL_PushEvent(&wait);
+	} else {
+		SDL_Delay(100);
+	}
+#endif
+}
+
 bool TextDialog(char const *const *text, std::size_t textLines)
 {
 	CreditsRenderer creditsRenderer(text, textLines);
@@ -141,6 +189,7 @@ bool TextDialog(char const *const *text, std::size_t textLines)
 
 	SDL_Event event;
 	do {
+		creditsRenderer.PauseIfHidden();
 		creditsRenderer.Render();
 		UiFadeIn();
 		while (PollEvent(&event) != 0) {

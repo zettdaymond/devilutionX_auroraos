@@ -6,6 +6,10 @@
 
 #include <cstdint>
 
+#ifdef AURORA_OS
+#include <chrono>
+#endif
+
 #include "controls/plrctrls.h"
 #include "diablo.h"
 #include "effects.h"
@@ -46,6 +50,10 @@ void play_movie(const char *pszMovie, bool userCanClose)
 	if (SVidPlayBegin(pszMovie, loop_movie ? 0x100C0808 : 0x10280808)) {
 		SDL_Event event;
 		uint16_t modState;
+#ifdef AURORA_OS
+		bool videoPaused = false;
+		std::chrono::steady_clock::time_point videoPauseStartedAt {};
+#endif
 		while (movie_playing) {
 			while (movie_playing && FetchMessage(&event, &modState)) {
 				if (userCanClose) {
@@ -85,14 +93,20 @@ void play_movie(const char *pszMovie, bool userCanClose)
 				}
 			}
 #ifdef AURORA_OS
-			// Плитка/гашение экрана: честная пауза видео — не декодируем
-			// вхолостую (звук глушится diablo_focus_pause по потере
-			// фокуса), время видео стоит до возврата фокуса. RenderPresent
-			// кормит машину обложки краями фокуса/дисплея и держит
-			// кадр-карточку. Спим до события (смена фокуса/дисплея всегда
-			// приходит событием); событие возвращаем в очередь — его
-			// обработает насос наверху цикла.
+			// Плитка/гашение экрана: честная пауза видео — декод стоит
+			// (звук глушится diablo_focus_pause по потере фокуса).
+			// Pacing видео — от настенных часов (SDL_GetTicks): при снятии
+			// с паузы сдвигаем базу часов на её длительность, иначе декод
+			// молниеносно догоняет реальное время и видео «не стояло на
+			// паузе». Спим до события (смена фокуса/дисплея всегда
+			// приходит событием); проснутое событие возвращаем в очередь —
+			// его обработает насос наверху цикла.
 			if (launcher::aurora::GameCover::IsHidden()) {
+				if (!videoPaused) {
+					videoPaused = true;
+					videoPauseStartedAt = std::chrono::steady_clock::now();
+					SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "aurora: видео на паузе");
+				}
 				RenderPresent();
 				SDL_Event wait {};
 				if (SDL_WaitEvent(&wait) == 1) {
@@ -101,6 +115,14 @@ void play_movie(const char *pszMovie, bool userCanClose)
 					SDL_Delay(100);
 				}
 				continue;
+			}
+			if (videoPaused) {
+				videoPaused = false;
+				const auto pausedMicros = std::chrono::duration_cast<std::chrono::microseconds>(
+				    std::chrono::steady_clock::now() - videoPauseStartedAt);
+				SVidShiftFrameClock(static_cast<double>(pausedMicros.count()));
+				SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "aurora: видео снято с паузы, часы сдвинуты на %.0f мс",
+				    static_cast<double>(pausedMicros.count()) / 1000.0);
 			}
 #endif
 			if (!SVidPlayContinue())

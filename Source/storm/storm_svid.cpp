@@ -412,6 +412,13 @@ void SVidPlayEnd()
 #endif
 }
 
+#ifdef AURORA_OS
+void SVidShiftFrameClock(double deltaMicros)
+{
+	SVidFrameEnd += deltaMicros;
+}
+#endif
+
 void SVidMute()
 {
 #ifndef NOSOUND
