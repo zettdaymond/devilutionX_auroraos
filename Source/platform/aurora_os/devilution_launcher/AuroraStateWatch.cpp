@@ -9,6 +9,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <chrono>
 #include <cstring>
 #include <string>
 
@@ -105,29 +106,29 @@ void StateWatch::Run()
 
 	// Начальные состояния — синхронными запросами, чтобы не ждать первых
 	// переключений (лаунчер могут запустить уже заблокированным).
+	const auto queryMceString = [&system](const char *method) -> std::string {
+		DBusMessage *call = dbus_message_new_method_call(
+		    "com.nokia.mce", "/com/nokia/mce/request", "com.nokia.mce.request", method);
+		if (call == nullptr) {
+			return {};
+		}
+		DBusError queryError;
+		dbus_error_init(&queryError);
+		DBusMessage *reply = dbus_connection_send_with_reply_and_block(system, call, 1000, &queryError);
+		dbus_message_unref(call);
+		std::string status;
+		if (reply != nullptr) {
+			const char *value = nullptr;
+			if (dbus_message_get_args(reply, &queryError, DBUS_TYPE_STRING, &value, DBUS_TYPE_INVALID)
+			    && value != nullptr) {
+				status = value;
+			}
+			dbus_message_unref(reply);
+		}
+		dbus_error_free(&queryError);
+		return status;
+	};
 	if (mceOk) {
-		const auto queryMceString = [&system](const char *method) -> std::string {
-			DBusMessage *call = dbus_message_new_method_call(
-			    "com.nokia.mce", "/com/nokia/mce/request", "com.nokia.mce.request", method);
-			if (call == nullptr) {
-				return {};
-			}
-			DBusError queryError;
-			dbus_error_init(&queryError);
-			DBusMessage *reply = dbus_connection_send_with_reply_and_block(system, call, 1000, &queryError);
-			dbus_message_unref(call);
-			std::string status;
-			if (reply != nullptr) {
-				const char *value = nullptr;
-				if (dbus_message_get_args(reply, &queryError, DBUS_TYPE_STRING, &value, DBUS_TYPE_INVALID)
-				    && value != nullptr) {
-					status = value;
-				}
-				dbus_message_unref(reply);
-			}
-			dbus_error_free(&queryError);
-			return status;
-		};
 		const std::string display = queryMceString("get_display_status");
 		if (display.empty()) {
 			// Пустой ответ = таймаут/отказ: под песочницей Авроры (иконочный
@@ -176,12 +177,30 @@ void StateWatch::Run()
 	// Блокирующее чтение с таймаутом: просыпаемся четыре раза в секунду
 	// только чтобы проверить флаг завершения — дешевле интеграции шины
 	// в цикл событий.
+	//
+	// Песочница Авроры не форвардит ИНДИКАТОРЫ mce (display_status_ind и
+	// прочие сигналы), но разовые ЗАПРОСЫ пропускает (частично) — поэтому
+	// состояние дисплея дополнительно опрашиваем сами, редко и с
+	// дедупликацией: иначе под иконкой «экран погашен» не узнать, и
+	// движок рисовал бы обложку в тёмную матрицу.
+	auto lastDisplayPoll = std::chrono::steady_clock::now();
+	constexpr auto kDisplayPollInterval = std::chrono::seconds(2);
 	while (!m_stop.load()) {
 		if (!dbus_connection_read_write(system, 250)) {
 			spdlog::warn("aurora: системная шина потеряна");
 			break;
 		}
 		drain(system);
+		if (mceOk && std::chrono::steady_clock::now() - lastDisplayPoll >= kDisplayPollInterval) {
+			lastDisplayPoll = std::chrono::steady_clock::now();
+			const std::string display = queryMceString("get_display_status");
+			if (!display.empty()) {
+				const bool on = display != "off";
+				if (on != m_displayOn.load(std::memory_order_relaxed)) {
+					Push(StateEvent::DisplayOn, on);
+				}
+			}
+		}
 	}
 	// Приватную коннекцию нужно явно закрыть (разделяемая закрывается
 	// сама при обнулении ссылок).
