@@ -28,23 +28,34 @@ static void on_audio_resource_aquired(audioresource_t* resource, bool aquired, v
 
 std::unique_ptr<AudioResource> AudioResource::Aquire()
 {
+    // Aquire вызывается из SDL-фильтра событий (InputAdapter на
+    // FOCUS_GAINED), то есть прямо из внутренностей SDL_PollEvent —
+    // виснуть здесь нельзя: кадр не будет показан и композитор убьёт
+    // окно. После тайм-аута больше не пытаемся: каждый следующий
+    // FOCUS_GAINED снова блокировал бы цикл на весь тайм-аут.
+    static bool acquisitionAbandoned = false;
+    if(acquisitionAbandoned) {
+        return nullptr;
+    }
+
     auto impl = std::make_unique<AudioResource::Impl>();
 
     auto audio_resource = audioresource_init(AUDIO_RESOURCE_GAME, on_audio_resource_aquired, impl.get());
     audioresource_acquire(audio_resource);
 
-    // Ждём ответа сервиса аудиополитики блокирующе (may_block=false в
-    // старом цикле крутил CPU вхолостую) и не дольше тайм-аута:
-    // g_timeout-источник будит итерацию, если ответа так и нет.
-    constexpr guint kAcquireTimeoutMs = 3000;
-    const guint wakeSource = g_timeout_add(kAcquireTimeoutMs,
-        [](gpointer) -> gboolean { return G_SOURCE_REMOVE; }, nullptr);
-    const gint64 deadline = g_get_monotonic_time()
-        + static_cast<gint64>(kAcquireTimeoutMs) * 1000;
+    // Ждём ответа, перебирая дефолтный glib-контекст БЕЗ блокировки:
+    // g_main_context_iteration(nullptr, TRUE) уходила в poll() без
+    // будильников и не просыпалась никогда (репродукция 2026-09-03:
+    // чёрный экран на старте движка, wchan главного потока =
+    // poll_schedule_timeout). Пустые проходы спят 200 мкс, общий
+    // срок — 3 секунды.
+    constexpr gint64 kAcquireTimeoutMs = 3000;
+    const gint64 deadline = g_get_monotonic_time() + kAcquireTimeoutMs * 1000;
     while(!impl->callback_finished && g_get_monotonic_time() < deadline) {
-        g_main_context_iteration(nullptr, TRUE);
+        if(!g_main_context_iteration(nullptr, FALSE)) {
+            g_usleep(200);
+        }
     }
-    g_source_remove(wakeSource);
 
     impl->audio_resource = audio_resource;
 
@@ -62,6 +73,7 @@ std::unique_ptr<AudioResource> AudioResource::Aquire()
         // Impl нельзя (колбэк получил бы висячий указатель) — оставляем
         // их висеть, игра стартует без аудиоресурса.
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Audioresource acquire timed out");
+        acquisitionAbandoned = true;
         impl.release();
     }
 
