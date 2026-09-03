@@ -191,7 +191,11 @@ void StateWatch::Run()
 			break;
 		}
 		drain(system);
-		if (mceOk && std::chrono::steady_clock::now() - lastDisplayPoll >= kDisplayPollInterval) {
+		// Пинок RefreshDisplay() (смена SDL-фокуса) опрашивает дисплей
+		// немедленно, не дожидаясь интервала.
+		const bool poked = m_refreshDisplay.exchange(false, std::memory_order_relaxed);
+		if (mceOk
+		    && (poked || std::chrono::steady_clock::now() - lastDisplayPoll >= kDisplayPollInterval)) {
 			lastDisplayPoll = std::chrono::steady_clock::now();
 			const std::string display = queryMceString("get_display_status");
 			if (!display.empty()) {

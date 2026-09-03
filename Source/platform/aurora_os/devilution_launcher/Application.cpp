@@ -597,9 +597,19 @@ void Application::OnEvent(const SDL_WindowEvent &event)
 #ifdef AURORA_OS
 	if (event.event == SDL_WINDOWEVENT_FOCUS_LOST) {
 		m_focusLostAt = std::chrono::steady_clock::now();
+		// Смена фокуса — мгновенный триггер переспросить дисплей:
+		// под песочницей mce-сигналы не приходят, а блокировка/пробуждение
+		// всегда меняют фокус. Без пинка разблокировка узнавалась бы до
+		// двух секунд (интервал опроса) — плитка лаунчера пустела.
+		if (m_stateWatch != nullptr) {
+			m_stateWatch->RefreshDisplay();
+		}
 	} else if (event.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
 		m_focusLostAt.reset();
 		m_topmostLost = false;
+		if (m_stateWatch != nullptr) {
+			m_stateWatch->RefreshDisplay();
+		}
 	}
 #endif
 

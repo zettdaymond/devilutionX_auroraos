@@ -18,6 +18,11 @@ namespace launcher::aurora {
 
 namespace {
 
+/// Грейс после пробуждения экрана, как у лаунчера (Application): между
+/// «дисплей включился» и «окно получило фокус» идут анимации локскрина —
+/// в этом зазоре рисуем игровой кадр, иначе обложка мелькает в игре.
+constexpr auto kWakeGrace = std::chrono::milliseconds(1500);
+
 struct CoverState {
 	std::unique_ptr<StateWatch> watch; ///< второй экземпляр на время движка
 	std::vector<unsigned char> pixels; ///< запечённый кадр лаунчера, RGB24
@@ -29,7 +34,9 @@ struct CoverState {
 	bool seenTopmost = false;        ///< был ли хоть один видимый кадр движка
 	bool coverActive = false;        ///< для диагностического лога переходов
 	bool inputFocused = true;        ///< SDL-фокус окна (фолбэк при мёртвой шине)
+	bool wasDisplayOn = true;        ///< детект перехода «экран проснулся»
 	std::chrono::steady_clock::time_point focusLostAt {};
+	std::chrono::steady_clock::time_point wakeGraceUntil {};
 };
 
 CoverState &Cover()
@@ -50,6 +57,9 @@ void SetTileOrientation(SDL_Window *window, bool tile)
 
 /// Фолббочное «мы в плитке» по SDL-фокусу окна с дебаунсом 100 мс.
 /// Зовётся раз в кадр из BeginCoverFrame — состояние самообновляется.
+/// Смена фокуса пинает наблюдателя переспросить дисплей немедленно:
+/// события фокуса песочница пропускает, и пробуждение экрана узнаётся
+/// за миллисекунды, а не по двухсекундному опросу.
 bool TiledByFocus(CoverState &s)
 {
 	if (s.window == nullptr) {
@@ -60,12 +70,16 @@ bool TiledByFocus(CoverState &s)
 	    && (flags & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) == 0;
 	const auto now = std::chrono::steady_clock::now();
 	if (focused) {
-		s.inputFocused = true;
+		if (!s.inputFocused) {
+			s.inputFocused = true;
+			s.watch->RefreshDisplay();
+		}
 		return false;
 	}
 	if (s.inputFocused) {
 		s.inputFocused = false;
 		s.focusLostAt = now;
+		s.watch->RefreshDisplay();
 	}
 	return now - s.focusLostAt >= std::chrono::milliseconds(100);
 }
@@ -167,13 +181,22 @@ bool GameCover::BeginCoverFrame(SDL_Renderer *renderer)
 	if (renderer == nullptr || s.watch == nullptr || s.pixels.empty()) {
 		return false;
 	}
+	// Грейс после пробуждения экрана (см. kWakeGrace): в зазоре между
+	// «дисплей включился» и «фокус вернулся» рисуем игровой кадр.
+	const bool displayOn = s.watch->DisplayOn();
+	if (displayOn && !s.wasDisplayOn) {
+		s.wakeGraceUntil = std::chrono::steady_clock::now() + kWakeGrace;
+	}
+	s.wasDisplayOn = displayOn;
+	const bool inWakeGrace = std::chrono::steady_clock::now() < s.wakeGraceUntil;
+
 	// «В плитке» = потеря переднего плана по D-Bus ИЛИ (фолбэк) устойчивая
 	// потеря SDL-фокуса. Фолбэк критичен под песочницей Авроры: иконочный
 	// запуск сидит в firejail, dbus-прокси которого режет сигналы
 	// композитора — TopmostOurs навсегда остаётся в дефолтном true
 	// (консольный запуск идёт мимо песочницы, и dbus там жив).
 	const bool tiled = !s.watch->TopmostOurs() || TiledByFocus(s);
-	if (!tiled) {
+	if (!tiled || inWakeGrace) {
 		s.seenTopmost = true;
 		if (s.coverActive) {
 			s.coverActive = false;

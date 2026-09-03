@@ -49,6 +49,12 @@ public:
 	[[nodiscard]] bool DisplayOn() const { return m_displayOn.load(std::memory_order_relaxed); }
 	[[nodiscard]] bool TkLocked() const { return m_tkLocked.load(std::memory_order_relaxed); }
 
+	/// Немедленно переспросить состояние дисплея в ближайший тик потока
+	/// (≤250 мс). Дёргать при смене SDL-фокуса: события фокуса песочница
+	/// пропускает, и разблокировка экрана тогда узнаётся за миллисекунды,
+	/// а не по двухсекундному опросу.
+	void RefreshDisplay() { m_refreshDisplay.store(true, std::memory_order_relaxed); }
+
 private:
 	/// Тело потока: подключение к шинам и диспетчеризация до остановки.
 	void Run();
@@ -63,6 +69,7 @@ private:
 	std::atomic<bool> m_displayOn { true };
 	std::atomic<bool> m_tkLocked { false };
 	std::atomic<bool> m_topmostOurs { true };
+	std::atomic<bool> m_refreshDisplay { false };
 };
 
 } // namespace launcher::aurora
