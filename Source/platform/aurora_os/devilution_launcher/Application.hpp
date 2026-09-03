@@ -4,6 +4,7 @@
 #include <imgui.h>
 
 #include "core/AppResult.hpp"
+#include "core/CoverMachine.hpp"
 #include "core/LauncherState.hpp"
 #include "services/ServiceFactory.hpp"
 
@@ -75,10 +76,6 @@ public:
 	void Stop();
 	void OnEvent(const SDL_WindowEvent &event);
 
-	/// Правда, если окно сейчас «в плитке»: скрыто/свёрнуто (десктоп) или
-	/// надолго потеряло фокус (Аврора — см. m_focusLostAt).
-	[[nodiscard]] bool IsTiled() const;
-
 private:
 	/// Общий бутстрап SDL/ImGui; false — фатальная ошибка инициализации.
 	bool Setup();
@@ -135,39 +132,29 @@ private:
 	bool m_wasHidden = false;
 	bool m_coverDirty = false;
 
-	/// Дисплей включён и не заблокирован. На Авроре — из сигналов демона
-	/// mce, на десктопе — всегда true. Погашенный/заблокированный экран =
-	/// не рендерить вовсе: композитор окно не показывает, а кадры в тёмную
-	/// матрицу тратят батарею.
-	bool m_displayOn = true;
-	bool m_tkLocked = false;
+	/// Что рисовать в плитке/при блокировке, решает событийная стейтмашина
+	/// (core/CoverMachine): входы — края фокуса окна (антидребезг 100 мс,
+	/// TickFocusDebounce) и края дисплея (ApplyAuroraState). Под песочницей
+	/// иконочного запуска живёт только это; topmost/tklock мертвы и в
+	/// решениях не участвуют.
+	launcher::aurora::CoverMachine m_coverMachine;
+	std::optional<std::chrono::steady_clock::time_point> m_focusLostAt;
+	bool m_focusLostDispatched = true;
+
+	/// Досылает FocusLost машине после антидребезга (шторки/диалоги мигают
+	/// фокусом — машина должна получить одно событие на смену).
+	void TickFocusDebounce();
 
 #ifdef AURORA_OS
-	/// Аврора не шлёт MINIMIZED/HIDDEN при сворачивании в плитку — только
-	/// FOCUS_LOST. «В плитке» = потеря переднего плана: сигнал композитора
-	/// privateTopmostWindowProcessIdChanged действует мгновенно (он
-	/// авторитетен), а SDL-фокус — фолбэк с дебаунсом 100 мс.
-	std::optional<std::chrono::steady_clock::time_point> m_focusLostAt;
-	bool m_topmostLost = false;
-
 	/// Кросс-фейд на входе в плитку (время ImGui; <0 — анимации нет):
 	/// первые доли секунды кадр содержит интерфейс и обложку поверх с
 	/// растущей непрозрачностью, чтобы переход не был скачком.
 	double m_coverFadeStartedAt = -1.0;
 
-	/// Грейс после пробуждения (разблокировка): пару секунд считаем себя
-	/// передним планом — между «экран разблокирован» и «композитор поднял
-	/// окно» проходит анимация локскрина, и обложка в этом зазоре
-	/// мелькает поверх неё. Если мы и правда плитка, topmost за грейс
-	/// не вернётся — тогда обложка. Грейс не нужен, если перед сном мы
-	/// уже были плиткой.
-	std::optional<std::chrono::steady_clock::time_point> m_wakeGraceUntil;
-	bool m_skipWakeGrace = false;
-
 	/// Наблюдатель состояния Авроры (aurora::StateWatch).
 	std::unique_ptr<launcher::aurora::StateWatch> m_stateWatch;
 
-	/// Применяет событие наблюдателя к состоянию цикла.
+	/// Применяет событие наблюдателя к машине обложки (живые входы).
 	void ApplyAuroraState(launcher::aurora::StateEvent what, bool value);
 
 	/// Кросс-фейд на входе в плитку: пока возвращает true, кадр рисует

@@ -41,7 +41,7 @@ const char *CoverMachine::StateName(State state)
 	return "?";
 }
 
-CoverAction CoverMachine::Handle(CoverEvent event)
+void CoverMachine::Handle(CoverEvent event)
 {
 	const State from = m_state;
 	switch (event) {
@@ -52,7 +52,7 @@ CoverAction CoverMachine::Handle(CoverEvent event)
 	case CoverEvent::FocusLost:
 		// Потеря фокуса при горящем экране = плитка (или локскрин —
 		// неотличимо, за локскрином не видно). Starting не трогаем:
-		// подъём окна движка на старте мельком теряет фокус. В
+		// подъём окна на старте мельком теряет фокус. В
 		// GameAwaitingFocus фокуса и так нет.
 		if (m_state == State::Game) {
 			m_state = State::Cover;
@@ -60,9 +60,12 @@ CoverAction CoverMachine::Handle(CoverEvent event)
 		break;
 	case CoverEvent::DisplayOff:
 		// Гашение раньше возврата фокуса — это была блокировка: карточку
-		// не показываем. Ниже для Cover возвращаем RenderGame — один
-		// игровой кадр, заменяющий карточку в буфере до темноты.
+		// не показываем. Если карточка была в буфере, следующий кадр —
+		// игровой (кадр-замена), его заберёт NextAction().
 		m_state = State::Dark;
+		if (from == State::Cover) {
+			m_swapFramePending = true;
+		}
 		break;
 	case CoverEvent::DisplayOn:
 		if (m_state == State::Dark) {
@@ -74,13 +77,17 @@ CoverAction CoverMachine::Handle(CoverEvent event)
 		break;
 	}
 
-	CoverAction action = Action();
-	if (event == CoverEvent::DisplayOff && from == State::Cover) {
-		action = CoverAction::RenderGame;
+	spdlog::info("aurora-cover: {} : {} -> {}{}", NameOf(event), StateName(from), StateName(m_state),
+	    m_swapFramePending ? " (кадр-замена)" : "");
+}
+
+CoverAction CoverMachine::NextAction()
+{
+	if (m_swapFramePending) {
+		m_swapFramePending = false;
+		return CoverAction::RenderGame;
 	}
-	spdlog::info("aurora-cover: {} : {} -> {} ({})", NameOf(event), StateName(from), StateName(m_state),
-	    NameOf(action));
-	return action;
+	return Action();
 }
 
 CoverAction CoverMachine::Action() const

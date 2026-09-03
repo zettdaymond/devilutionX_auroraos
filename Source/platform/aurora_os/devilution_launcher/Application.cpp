@@ -294,6 +294,7 @@ AppResult Application::Run()
 		wake.type = m_wakeEventType;
 		SDL_PushEvent(&wake);
 	});
+	m_coverMachine.Reset();
 #ifdef AURORA_OS
 	m_stateWatch = std::make_unique<launcher::aurora::StateWatch>();
 #endif
@@ -371,6 +372,7 @@ AppResult Application::Run()
 	while (m_running
 	    && (!m_store->State().pendingLaunch.has_value() || !m_view->LaunchIrisDone())) {
 		const auto frameStart = std::chrono::steady_clock::now();
+		TickFocusDebounce();
 		// В фоне (свёрнуто в плитку/скрыто) интерфейс не рендерится: рисуем
 		// один кадр «обложки» для плитки композитора и спим в блокирующем
 		// SDL_WaitEvent — никакого опроса по таймеру. Будят только события
@@ -382,16 +384,22 @@ AppResult Application::Run()
 #else
 		constexpr bool coverFading = false;
 #endif
-		if (IsTiled() && !coverFading) {
+		// Что рисовать, решает стейтмашина (core/CoverMachine): входы —
+		// края фокуса окна и края дисплея, только то, что живёт под
+		// песочницей иконочного запуска. RenderGame — интерфейс (в том
+		// числе за локскрином после пробуждения), RenderCover — плитка,
+		// RenderNothing — экран погашен.
+		using launcher::aurora::CoverAction;
+		const CoverAction action = m_coverMachine.NextAction();
+		const bool hidden = action == CoverAction::RenderNothing
+		    || (action == CoverAction::RenderCover && !coverFading);
+		if (hidden) {
 			// Анимировать закрытое окно не для кого: iris не стартует без
 			// рендера, и цикл выше никогда не увидел бы его завершения.
 			if (m_store->State().pendingLaunch.has_value()) {
 				break;
 			}
-			// Погашенный/заблокированный экран — не рисуем вовсе; обложку
-			// рисуем только на включённый разблокированный экран
-			// (плитка/переключатель задач).
-			if (m_displayOn && !m_tkLocked && (!m_wasHidden || m_coverDirty)) {
+			if (action == CoverAction::RenderCover && (!m_wasHidden || m_coverDirty)) {
 				RenderCoverFrame();
 				m_coverDirty = false;
 			}
@@ -410,9 +418,12 @@ AppResult Application::Run()
 		}
 
 		m_store->Poll();
+		TickFocusDebounce();
 
 		// Обработанные события могли развернуть окно — видим ли мы ещё?
-		if (IsTiled() && !coverFading) {
+		const CoverAction actionNow = m_coverMachine.Action();
+		if (actionNow == CoverAction::RenderNothing
+		    || (actionNow == CoverAction::RenderCover && !coverFading)) {
 			continue;
 		}
 
@@ -425,9 +436,9 @@ AppResult Application::Run()
 		} else {
 			m_view->Render(m_store->State(), dispatch);
 #ifdef AURORA_OS
-			// Кадр кросс-фейда: обложка поверх интерфейса (проверка IsTiled
-			// свежая — событие выше могло успеть развернуть окно).
-			if (coverFading && IsTiled()) {
+			// Кадр кросс-фейда: обложка поверх интерфейса (решение машины
+			// свежее — событие выше могло успеть развернуть окно).
+			if (coverFading && m_coverMachine.Action() == launcher::aurora::CoverAction::RenderCover) {
 				m_view->RenderCover(m_store->State(), coverAlpha);
 			}
 #endif
@@ -516,50 +527,23 @@ void Application::BakeGameCover()
 
 void Application::ApplyAuroraState(launcher::aurora::StateEvent what, bool value)
 {
-	const bool wasAwake = m_displayOn && !m_tkLocked;
+	// Под песочницей иконочного запуска живёт только дисплей: topmost и
+	// tklock dbus-прокси не пропускает, в решениях они не участвуют —
+	// стейтмашину кормят фокус окна и состояние дисплея.
 	switch (what) {
 	case launcher::aurora::StateEvent::DisplayOn:
-		m_displayOn = value;
+		m_coverMachine.Handle(value ? launcher::aurora::CoverEvent::DisplayOn
+		                            : launcher::aurora::CoverEvent::DisplayOff);
 		break;
 	case launcher::aurora::StateEvent::TkLocked:
-		m_tkLocked = value;
-		break;
 	case launcher::aurora::StateEvent::TopmostOurs:
-		// Верхнее окно композитора — авторитетный источник: реагируем
-		// мгновенно, без дебаунса (он нужен только SDL-фокусу-фолбэку).
-		if (value) {
-			m_topmostLost = false;
-			m_focusLostAt.reset();
-		} else {
-			m_topmostLost = true;
-			if (!m_focusLostAt.has_value()) {
-				m_focusLostAt = std::chrono::steady_clock::now();
-			}
-		}
 		break;
-	}
-
-	// Пробуждение: пару секунд считаем себя передним планом и рендерим
-	// интерфейс — между «экран разблокирован» и «окно поднято» идёт
-	// анимация локскрина, и обложка в этом зазоре мелькает. Перед сном
-	// были плиткой — грейс не нужен: после разблокировки сразу остаёмся
-	// обложкой.
-	const bool awake = m_displayOn && !m_tkLocked;
-	if (wasAwake != awake) {
-		if (awake) {
-			if (!m_skipWakeGrace) {
-				m_wakeGraceUntil =
-				    std::chrono::steady_clock::now() + std::chrono::milliseconds(1500);
-			}
-		} else {
-			m_skipWakeGrace = m_wasHidden;
-		}
 	}
 }
 
 bool Application::CoverFadeFrame(float &alpha)
 {
-	if (!IsTiled() || !m_displayOn || m_tkLocked
+	if (m_coverMachine.Action() != launcher::aurora::CoverAction::RenderCover
 	    || m_store->State().pendingLaunch.has_value()) {
 		m_coverFadeStartedAt = -1.0;
 		return false;
@@ -594,9 +578,22 @@ bool Application::CoverFadeFrame(float &alpha)
 
 void Application::OnEvent(const SDL_WindowEvent &event)
 {
+	// Края видимости кормят стейтмашину. На Авроре сворачивание в плитку
+	// шлёт только FOCUS_LOST, на десктопе — MINIMIZED/HIDDEN: обе группы
+	// эквивалентны, повторная подача безвредна (машина игнорирует её).
+	const bool lost = event.event == SDL_WINDOWEVENT_FOCUS_LOST
+	    || event.event == SDL_WINDOWEVENT_MINIMIZED
+	    || event.event == SDL_WINDOWEVENT_HIDDEN;
+	const bool gained = event.event == SDL_WINDOWEVENT_FOCUS_GAINED
+	    || event.event == SDL_WINDOWEVENT_SHOWN
+	    || event.event == SDL_WINDOWEVENT_RESTORED;
+	if (lost) {
+		// Отсчёт антидребезга не перезапускаем (шторки мигают серией).
+		if (!m_focusLostAt.has_value()) {
+			m_focusLostAt = std::chrono::steady_clock::now();
+			m_focusLostDispatched = false;
+		}
 #ifdef AURORA_OS
-	if (event.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-		m_focusLostAt = std::chrono::steady_clock::now();
 		// Смена фокуса — мгновенный триггер переспросить дисплей:
 		// под песочницей mce-сигналы не приходят, а блокировка/пробуждение
 		// всегда меняют фокус. Без пинка разблокировка узнавалась бы до
@@ -604,47 +601,34 @@ void Application::OnEvent(const SDL_WindowEvent &event)
 		if (m_stateWatch != nullptr) {
 			m_stateWatch->RefreshDisplay();
 		}
-	} else if (event.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+#endif
+	} else if (gained) {
 		m_focusLostAt.reset();
-		m_topmostLost = false;
+		m_focusLostDispatched = true;
+		m_coverMachine.Handle(launcher::aurora::CoverEvent::FocusGained);
+#ifdef AURORA_OS
 		if (m_stateWatch != nullptr) {
 			m_stateWatch->RefreshDisplay();
 		}
-	}
 #endif
+	}
 
 	if (event.event == SDL_WINDOWEVENT_CLOSE) {
 		Stop();
 	}
 }
 
-bool Application::IsTiled() const
+void Application::TickFocusDebounce()
 {
-#ifdef AURORA_OS
-	// Погашенный или заблокированный экран: не рендерить ничего, даже если
-	// окно формально в фокусе — кадры в тёмную матрицу тратят батарею, а
-	// на экран блокировки обложке показываться незачем.
-	if (!m_displayOn || m_tkLocked) {
-		return true;
+	if (m_focusLostDispatched || !m_focusLostAt.has_value()) {
+		return;
 	}
-	// Грейс после пробуждения: рендерим интерфейс как передний план.
-	// Просроченный грейс просто проваливается дальше (метод константный,
-	// сбрасывать optional не нужно — следующий пробой его перепишет).
-	if (m_wakeGraceUntil.has_value() && std::chrono::steady_clock::now() < *m_wakeGraceUntil) {
-		return false;
+	// Антидребезг 100 мс — фильтр шума (шторки/диалоги мигают фокусом),
+	// а не решение: после него машина получает ровно одно FocusLost.
+	if (std::chrono::steady_clock::now() - *m_focusLostAt >= std::chrono::milliseconds(100)) {
+		m_focusLostDispatched = true;
+		m_coverMachine.Handle(launcher::aurora::CoverEvent::FocusLost);
 	}
-	if ((SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0) {
-		return true;
-	}
-	// Аврора не шлёт MINIMIZED/HIDDEN при сворачивании в плитку, поэтому
-	// «в плитке» = потеря переднего плана: композитор сказал — мгновенно,
-	// SDL-фокус (фолбэк при мёртой шине) — с дебаунсом от мигания шторками.
-	return m_topmostLost
-	    || (m_focusLostAt.has_value()
-	        && std::chrono::steady_clock::now() - *m_focusLostAt >= std::chrono::milliseconds(100));
-#else
-	return (SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
-#endif
 }
 
 } // namespace App

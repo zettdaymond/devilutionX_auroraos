@@ -13,7 +13,6 @@
 
 #include <chrono>
 #include <memory>
-#include <optional>
 #include <vector>
 
 namespace launcher::aurora {
@@ -54,12 +53,11 @@ void SetTileOrientation(SDL_Window *window, bool tile)
 
 /// Границы фокуса → события машины. Антидребезг 100 мс — единственная
 /// «временная» штука, и это фильтр шума (шторки/диалоги мигают фокусом),
-/// а не решение: машина получает по одному событию на смену. Возврат —
-/// действие события для текущего кадра, если событие случилось.
-std::optional<CoverAction> FeedFocus(CoverState &s)
+/// а не решение: машина получает по одному событию на смену.
+void FeedFocus(CoverState &s)
 {
 	if (s.window == nullptr) {
-		return std::nullopt;
+		return;
 	}
 	const Uint32 flags = SDL_GetWindowFlags(s.window);
 	const bool focused = (flags & SDL_WINDOW_INPUT_FOCUS) != 0
@@ -69,33 +67,32 @@ std::optional<CoverAction> FeedFocus(CoverState &s)
 		if (!s.inputFocused) {
 			s.inputFocused = true;
 			s.watch->RefreshDisplay();
-			return s.machine.Handle(CoverEvent::FocusGained);
+			s.machine.Handle(CoverEvent::FocusGained);
 		}
-		return std::nullopt;
+		return;
 	}
 	if (s.inputFocused) {
 		s.inputFocused = false;
 		s.focusLostAt = now;
 		s.focusLostDispatched = false;
 		s.watch->RefreshDisplay();
-		return std::nullopt;
+		return;
 	}
 	if (!s.focusLostDispatched && now - s.focusLostAt >= std::chrono::milliseconds(100)) {
 		s.focusLostDispatched = true;
-		return s.machine.Handle(CoverEvent::FocusLost);
+		s.machine.Handle(CoverEvent::FocusLost);
 	}
-	return std::nullopt;
 }
 
 /// Границы состояния дисплея → события машины.
-std::optional<CoverAction> FeedDisplay(CoverState &s)
+void FeedDisplay(CoverState &s)
 {
 	const bool on = s.watch->DisplayOn();
 	if (on == s.wasDisplayOn) {
-		return std::nullopt;
+		return;
 	}
 	s.wasDisplayOn = on;
-	return s.machine.Handle(on ? CoverEvent::DisplayOn : CoverEvent::DisplayOff);
+	s.machine.Handle(on ? CoverEvent::DisplayOn : CoverEvent::DisplayOff);
 }
 
 /// (Пере)создать текстуру под текущий рендерер; false — обложки больше нет.
@@ -202,16 +199,12 @@ bool GameCover::BeginCoverFrame(SDL_Renderer *renderer)
 	// Входы машины — только то, что работает под песочницей иконочного
 	// запуска: SDL-фокус окна и состояние дисплея. Topmost/tklock
 	// композитора dbus-прокси не пропускает и в решениях не участвуют.
-	// Действие кадра — от события, если оно случилось в этом кадре
-	// (переходы бывают одноразовыми, вроде игрового кадра вместо
-	// карточки при гашении), иначе стабильное состояние.
-	std::optional<CoverAction> edge = FeedFocus(s);
-	if (!edge.has_value()) {
-		edge = FeedDisplay(s);
-	}
-	const CoverAction action = edge.value_or(s.machine.Action());
+	// NextAction() отдаёт одноразовые действия переходов (кадр-замена
+	// карточки при гашении) ровно одному кадру.
+	FeedFocus(s);
+	FeedDisplay(s);
 
-	switch (action) {
+	switch (s.machine.NextAction()) {
 	case CoverAction::RenderNothing:
 		// Экран погашен: кадр не нужен вовсе.
 		return true;

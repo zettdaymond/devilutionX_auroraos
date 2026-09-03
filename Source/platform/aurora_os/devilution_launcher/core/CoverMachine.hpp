@@ -43,11 +43,16 @@ class CoverMachine final {
 public:
 	CoverMachine() = default;
 
-	/// Принять событие; возврат — действие для текущего кадра. Каждый
-	/// вызов логируется: что пришло, где были, куда перешли, что делаем.
-	[[nodiscard]] CoverAction Handle(CoverEvent event);
+	/// Принять событие и перевести состояние. Каждый вызов логируется:
+	/// что пришло, где были, куда перешли. Одноразовое действие перехода
+	/// (кадр-замена при гашении карточки) забирается следующим NextAction().
+	void Handle(CoverEvent event);
 
-	/// Действие текущего состояния (для кадров без событий).
+	/// Действие для очередного кадра; одноразовые действия переходов
+	/// отдаются ровно один раз (первый вызвавший кадр).
+	[[nodiscard]] CoverAction NextAction();
+
+	/// Стабильное действие текущего состояния, без одноразовых.
 	[[nodiscard]] CoverAction Action() const;
 
 	/// Сброс в начальное состояние (Starting).
@@ -59,6 +64,7 @@ private:
 	[[nodiscard]] static const char *StateName(State state);
 
 	State m_state = State::Starting;
+	bool m_swapFramePending = false;
 };
 
 } // namespace launcher::aurora
