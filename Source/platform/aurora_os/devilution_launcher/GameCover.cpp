@@ -5,6 +5,7 @@
 #include "GameCover.hpp"
 
 #include "AuroraStateWatch.hpp"
+#include "core/CoverMachine.hpp"
 
 #include "../ComposerAdapter.hpp"
 
@@ -18,27 +19,20 @@ namespace launcher::aurora {
 
 namespace {
 
-/// Грейс после пробуждения экрана: между «дисплей включился» и «окно
-/// получило фокус» идут анимации локскрина/разблокировки — в этом зазоре
-/// рисуем игровой кадр, иначе обложка мелькает в игре. По замерам на
-/// устройстве фокус возвращается через ~1.8–2.1 с после пробуждения
-/// (отпечаток); 4 с дают запас. Возврат фокуса снимает грейс мгновенно.
-constexpr auto kWakeGrace = std::chrono::milliseconds(4000);
-
 struct CoverState {
 	std::unique_ptr<StateWatch> watch; ///< второй экземпляр на время движка
+	CoverMachine machine;              ///< событийная стейтмашина кадра
 	std::vector<unsigned char> pixels; ///< запечённый кадр лаунчера, RGB24
 	int width = 0;
 	int height = 0;
 	SDL_Texture *texture = nullptr; ///< ленивая; живёт, пока жив рендерер движка
 	SDL_Window *window = nullptr;   ///< окно движка — для buffer transform
 	bool portraitRotated = false;   ///< режим порта: transform 270 + ротатор
-	bool seenTopmost = false;        ///< был ли хоть один видимый кадр движка
-	bool coverActive = false;        ///< для диагностического лога переходов
-	bool inputFocused = true;        ///< SDL-фокус окна (фолбэк при мёртвой шине)
-	bool wasDisplayOn = true;        ///< детект перехода «экран проснулся»
+	bool coverActive = false;       ///< обложка сейчас в буфере (transform NORMAL)
+	bool inputFocused = true;       ///< SDL-фокус окна (антидребезг ниже)
+	bool focusLostDispatched = true; ///< FocusLost уже отправлен машине
+	bool wasDisplayOn = true;       ///< детект смены состояния дисплея
 	std::chrono::steady_clock::time_point focusLostAt {};
-	std::chrono::steady_clock::time_point wakeGraceUntil {};
 };
 
 CoverState &Cover()
@@ -57,15 +51,13 @@ void SetTileOrientation(SDL_Window *window, bool tile)
 	    window, tile ? SDL_ORIENTATION_PORTRAIT : SDL_ORIENTATION_LANDSCAPE_FLIPPED);
 }
 
-/// Фолббочное «мы в плитке» по SDL-фокусу окна с дебаунсом 100 мс.
-/// Зовётся раз в кадр из BeginCoverFrame — состояние самообновляется.
-/// Смена фокуса пинает наблюдателя переспросить дисплей немедленно:
-/// события фокуса песочница пропускает, и пробуждение экрана узнаётся
-/// за миллисекунды, а не по двухсекундному опросу.
-bool TiledByFocus(CoverState &s)
+/// Границы фокуса → события машины. Антидребезг 100 мс — единственная
+/// «временная» штука, и это фильтр шума (шторки/диалоги мигают фокусом),
+/// а не решение: машина получает по одному событию на смену.
+void FeedFocus(CoverState &s)
 {
 	if (s.window == nullptr) {
-		return false;
+		return;
 	}
 	const Uint32 flags = SDL_GetWindowFlags(s.window);
 	const bool focused = (flags & SDL_WINDOW_INPUT_FOCUS) != 0
@@ -75,15 +67,32 @@ bool TiledByFocus(CoverState &s)
 		if (!s.inputFocused) {
 			s.inputFocused = true;
 			s.watch->RefreshDisplay();
+			s.machine.Handle(CoverEvent::FocusGained);
 		}
-		return false;
+		return;
 	}
 	if (s.inputFocused) {
 		s.inputFocused = false;
 		s.focusLostAt = now;
+		s.focusLostDispatched = false;
 		s.watch->RefreshDisplay();
+		return;
 	}
-	return now - s.focusLostAt >= std::chrono::milliseconds(100);
+	if (!s.focusLostDispatched && now - s.focusLostAt >= std::chrono::milliseconds(100)) {
+		s.focusLostDispatched = true;
+		s.machine.Handle(CoverEvent::FocusLost);
+	}
+}
+
+/// Границы состояния дисплея → события машины.
+void FeedDisplay(CoverState &s)
+{
+	const bool on = s.watch->DisplayOn();
+	if (on == s.wasDisplayOn) {
+		return;
+	}
+	s.wasDisplayOn = on;
+	s.machine.Handle(on ? CoverEvent::DisplayOn : CoverEvent::DisplayOff);
 }
 
 /// (Пере)создать текстуру под текущий рендерер; false — обложки больше нет.
@@ -152,8 +161,11 @@ void GameCover::Init(SDL_Window *window, bool portraitRotated)
 	s.portraitRotated = portraitRotated;
 	if (s.watch == nullptr) {
 		s.watch = std::make_unique<StateWatch>();
-		s.seenTopmost = false;
+		s.machine.Reset();
 		s.coverActive = false;
+		s.inputFocused = true;
+		s.focusLostDispatched = true;
+		s.wasDisplayOn = true;
 		spdlog::info("aurora: GameCover Init (фаза движка, portraitRotated={})", portraitRotated);
 	}
 }
@@ -183,61 +195,39 @@ bool GameCover::BeginCoverFrame(SDL_Renderer *renderer)
 	if (renderer == nullptr || s.watch == nullptr || s.pixels.empty()) {
 		return false;
 	}
-	// Грейс после пробуждения экрана (см. kWakeGrace): в зазоре между
-	// «дисплей включился» и «фокус вернулся» рисуем игровой кадр.
-	const bool displayOn = s.watch->DisplayOn();
-	if (displayOn && !s.wasDisplayOn) {
-		s.wakeGraceUntil = std::chrono::steady_clock::now() + kWakeGrace;
-	}
-	s.wasDisplayOn = displayOn;
-	const bool inWakeGrace = std::chrono::steady_clock::now() < s.wakeGraceUntil;
 
-	// «В плитке» = потеря переднего плана по D-Bus ИЛИ (фолбэк) устойчивая
-	// потеря SDL-фокуса. Фолбэк критичен под песочницей Авроры: иконочный
-	// запуск сидит в firejail, dbus-прокси которого режет сигналы
-	// композитора — TopmostOurs навсегда остаётся в дефолтном true
-	// (консольный запуск идёт мимо песочницы, и dbus там жив).
-	const bool tiled = !s.watch->TopmostOurs() || TiledByFocus(s);
-	if (!tiled || inWakeGrace) {
-		s.seenTopmost = true;
+	// Входы машины — только то, что работает под песочницей иконочного
+	// запуска: SDL-фокус окна и состояние дисплея. Topmost/tklock
+	// композитора dbus-прокси не пропускает и в решениях не участвуют.
+	FeedFocus(s);
+	FeedDisplay(s);
+
+	switch (s.machine.Action()) {
+	case CoverAction::RenderNothing:
+		// Экран погашен: кадр не нужен вовсе.
+		return true;
+	case CoverAction::RenderCover:
+		if (!EnsureTexture(renderer)) {
+			return false;
+		}
+		if (!s.coverActive) {
+			s.coverActive = true;
+			if (s.portraitRotated && s.window != nullptr) {
+				SetTileOrientation(s.window, true);
+			}
+		}
+		DrawCover(renderer);
+		return true;
+	case CoverAction::RenderGame:
 		if (s.coverActive) {
 			s.coverActive = false;
-			// Вернуть ландшафтный transform ДО первого игрового кадра:
-			// ротатор рисует контент предращённым, и без 270 он показался
-			// бы повёрнутым.
 			if (s.portraitRotated && s.window != nullptr) {
 				SetTileOrientation(s.window, false);
 			}
-			spdlog::info("aurora: обложка движка выключена (вернулись в передний план)");
 		}
 		return false;
 	}
-	// На старте окно движка полсекунды не является верхним, пока композитор
-	// его поднимает: в этом зале обложкой кадр не закрываем — пользователь
-	// ждёт первое меню, а не брендинг.
-	if (!s.seenTopmost) {
-		return false;
-	}
-	// Плитка на погашенном/заблокированном экране: рисовать не для кого,
-	// но и игровой кадр в тёмную матрицу гнать незачем.
-	if (!s.watch->DisplayOn() || s.watch->TkLocked()) {
-		return true;
-	}
-	if (!EnsureTexture(renderer)) {
-		return false;
-	}
-	if (!s.coverActive) {
-		s.coverActive = true;
-		// Плитка показывает буфер «как есть»: портретная обложка без
-		// поворота требует NORMAL (до этого на окне висит 270 режима
-		// порта — обложка показывалась бы повёрнутой на 90°).
-		if (s.portraitRotated && s.window != nullptr) {
-			SetTileOrientation(s.window, true);
-		}
-		spdlog::info("aurora: обложка движка включена (свернулись в плитку)");
-	}
-	DrawCover(renderer);
-	return true;
+	return false;
 }
 
 } // namespace launcher::aurora
