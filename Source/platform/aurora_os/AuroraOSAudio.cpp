@@ -5,8 +5,17 @@
 
 #include <SDL2/SDL.h>
 
+#include <atomic>
+#include <mutex>
+#include <thread>
+
 namespace devilution
 {
+
+namespace
+{
+std::mutex audio_resource_mutex;
+}
 
 extern void snd_init();
 extern void snd_deinit();
@@ -41,7 +50,9 @@ std::unique_ptr<AudioResource> AudioResource::Aquire()
     auto impl = std::make_unique<AudioResource::Impl>();
 
     auto audio_resource = audioresource_init(AUDIO_RESOURCE_GAME, on_audio_resource_aquired, impl.get());
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "audioresource: init done");
     audioresource_acquire(audio_resource);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "audioresource: acquire sent");
 
     // Ждём ответа, перебирая дефолтный glib-контекст БЕЗ блокировки:
     // g_main_context_iteration(nullptr, TRUE) уходила в poll() без
@@ -60,12 +71,12 @@ std::unique_ptr<AudioResource> AudioResource::Aquire()
     impl->audio_resource = audio_resource;
 
     if(impl->callback_finished && impl->audio_resource_aquired) {
-        SDL_LogVerbose(SDL_LOG_CATEGORY_APPLICATION, "Audioresource with tag 'GAME' successfully aquired");
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "audioresource: granted");
         return std::unique_ptr<AudioResource>( new AudioResource(std::move(impl)) );
     }
 
     if(impl->callback_finished) {
-        SDL_LogVerbose(SDL_LOG_CATEGORY_APPLICATION, "Could not aquire audioresource with tag 'GAME'");
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "audioresource: refused by policy");
         audioresource_free(audio_resource);
     }
     else {
@@ -91,5 +102,37 @@ AudioResource::~AudioResource()
 AudioResource::AudioResource(std::unique_ptr<Impl> && impl)
     : m_impl(std::move(impl))
 {}
+
+void AcquireAudioResourceAsync()
+{
+    static std::atomic<bool> acquireInFlight { false };
+    if(acquireInFlight.exchange(true)) {
+        return; // запрос уже в полёте
+    }
+
+    std::thread([] {
+        const gint64 startedAt = g_get_monotonic_time();
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "audioresource: async acquire started");
+        auto resource = AudioResource::Aquire();
+        const gint64 tookMs = (g_get_monotonic_time() - startedAt) / 1000;
+        {
+            std::lock_guard lock(audio_resource_mutex);
+            AudioresourceHolder::audio_resource = std::move(resource);
+        }
+        acquireInFlight.store(false);
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "audioresource: async acquire finished in %lld ms (%s)",
+            static_cast<long long>(tookMs),
+            AudioresourceHolder::audio_resource != nullptr ? "acquired" : "not acquired");
+    }).detach();
+}
+
+void ReleaseAudioResource()
+{
+    std::lock_guard lock(audio_resource_mutex);
+    if(AudioresourceHolder::audio_resource != nullptr) {
+        AudioresourceHolder::audio_resource = nullptr;
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "audioresource: released");
+    }
+}
 
 }

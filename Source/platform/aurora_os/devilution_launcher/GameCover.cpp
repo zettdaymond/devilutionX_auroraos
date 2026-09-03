@@ -8,18 +8,12 @@
 
 #include <spdlog/spdlog.h>
 
-#include <algorithm>
-#include <chrono>
 #include <memory>
-#include <optional>
 #include <vector>
 
 namespace launcher::aurora {
 
 namespace {
-
-/// Кросс-фейд на входе в плитку — той же длины, что у лаунчера.
-constexpr auto kCoverFadeDuration = std::chrono::milliseconds(300);
 
 struct CoverState {
 	std::unique_ptr<StateWatch> watch; ///< второй экземпляр на время движка
@@ -27,8 +21,8 @@ struct CoverState {
 	int width = 0;
 	int height = 0;
 	SDL_Texture *texture = nullptr; ///< ленивая; живёт, пока жив рендерер движка
-	std::optional<std::chrono::steady_clock::time_point> fadeStartedAt;
-	bool wasTiled = false;
+	bool seenTopmost = false;        ///< был ли хоть один видимый кадр движка
+	bool coverActive = false;        ///< для диагностического лога переходов
 };
 
 CoverState &Cover()
@@ -60,7 +54,8 @@ bool EnsureTexture(SDL_Renderer *renderer)
 	return true;
 }
 
-/// Полный кадр обложки: один блит на весь вывод.
+/// Полный кадр обложки: один блит на весь вывод. В таком кадре нет сырого
+/// GL (ротатор не запускался) — только вызовы SDL_Renderer.
 void DrawCover(SDL_Renderer *renderer)
 {
 	CoverState &s = Cover();
@@ -100,8 +95,9 @@ void GameCover::Init()
 	CoverState &s = Cover();
 	if (s.watch == nullptr) {
 		s.watch = std::make_unique<StateWatch>();
-		s.wasTiled = false;
-		s.fadeStartedAt.reset();
+		s.seenTopmost = false;
+		s.coverActive = false;
+		spdlog::info("aurora: GameCover Init (фаза движка)");
 	}
 }
 
@@ -113,6 +109,7 @@ void GameCover::Shutdown()
 		s.texture = nullptr;
 	}
 	s.watch.reset();
+	spdlog::info("aurora: GameCover Shutdown");
 }
 
 void GameCover::ResetTexture()
@@ -130,67 +127,34 @@ bool GameCover::BeginCoverFrame(SDL_Renderer *renderer)
 		return false;
 	}
 	const bool tiled = !s.watch->TopmostOurs();
-	const bool screenVisible = s.watch->DisplayOn() && !s.watch->TkLocked();
-	if (tiled && !s.wasTiled && screenVisible) {
-		// Фейд живёт только на переходе «видимое → плитка»: будить его
-		// повторно (просыпание уже в плитке) нельзя — иначе под обложкой
-		// снова мелькал бы интерфейс.
-		s.fadeStartedAt = std::chrono::steady_clock::now();
-	}
-	s.wasTiled = tiled;
-
-	if (s.fadeStartedAt.has_value()
-	    && std::chrono::steady_clock::now() - *s.fadeStartedAt >= kCoverFadeDuration) {
-		s.fadeStartedAt.reset();
-	}
-
 	if (!tiled) {
-		s.fadeStartedAt.reset();
+		s.seenTopmost = true;
+		if (s.coverActive) {
+			s.coverActive = false;
+			spdlog::info("aurora: обложка движка выключена (вернулись в передний план)");
+		}
 		return false;
 	}
-	if (!screenVisible) {
-		// Плитка на погашенном/заблокированном экране: рисовать не для
-		// кого, но и игровой кадр в тёмную матрицу гнать незачем.
+	// На старте окно движка полсекунды не является верхним, пока композитор
+	// его поднимает: в этом зале обложкой кадр не закрываем — пользователь
+	// ждёт первое меню, а не брендинг.
+	if (!s.seenTopmost) {
+		return false;
+	}
+	// Плитка на погашенном/заблокированном экране: рисовать не для кого,
+	// но и игровой кадр в тёмную матрицу гнать незачем.
+	if (!s.watch->DisplayOn() || s.watch->TkLocked()) {
 		return true;
-	}
-	if (s.fadeStartedAt.has_value()) {
-		// Идёт кросс-фейд: игровой кадр рисуется как обычно, обложка
-		// подмешается поверх в OverlayCoverFade.
-		return false;
 	}
 	if (!EnsureTexture(renderer)) {
 		return false;
+	}
+	if (!s.coverActive) {
+		s.coverActive = true;
+		spdlog::info("aurora: обложка движка включена (свернулись в плитку)");
 	}
 	DrawCover(renderer);
 	return true;
-}
-
-void GameCover::OverlayCoverFade(SDL_Renderer *renderer)
-{
-	CoverState &s = Cover();
-	if (renderer == nullptr || !s.fadeStartedAt.has_value()) {
-		return;
-	}
-	const auto elapsed = std::chrono::steady_clock::now() - *s.fadeStartedAt;
-	if (elapsed >= kCoverFadeDuration) {
-		s.fadeStartedAt.reset();
-		return;
-	}
-	if (!EnsureTexture(renderer)) {
-		s.fadeStartedAt.reset();
-		return;
-	}
-	const float progress = std::clamp(
-	    std::chrono::duration<float>(elapsed).count()
-	        / std::chrono::duration<float>(kCoverFadeDuration).count(),
-	    0.0F, 1.0F);
-	// smoothstep: линейный фейд воспринимается резким вначале.
-	const float alpha = progress * progress * (3.0F - 2.0F * progress);
-	SDL_SetTextureBlendMode(s.texture, SDL_BLENDMODE_BLEND);
-	SDL_SetTextureAlphaMod(s.texture, static_cast<unsigned char>(alpha * 255.0F));
-	if (SDL_RenderCopy(renderer, s.texture, nullptr, nullptr) < 0) {
-		spdlog::warn("aurora: SDL_RenderCopy(фейд обложки) не удался: {}", SDL_GetError());
-	}
 }
 
 } // namespace launcher::aurora

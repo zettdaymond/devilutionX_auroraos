@@ -31,4 +31,13 @@ struct AudioresourceHolder
     static inline std::unique_ptr<AudioResource> audio_resource = nullptr;
 };
 
+/// Запросить аудиоресурс в фоновом потоке. Вызов не блокируется: раньше
+/// Aquire() шёл прямо из SDL-фильтра событий (InputAdapter на FOCUS_GAINED),
+/// то есть изнутри SDL_PollEvent, и зависание в libdbus намертво
+/// замораживало первый кадр движка (чёрный экран).
+void AcquireAudioResourceAsync();
+
+/// Освободить аудиоресурс (потокобезопасно относительно AcquireAsync).
+void ReleaseAudioResource();
+
 }

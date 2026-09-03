@@ -65,22 +65,20 @@ static SDL_EventFilter rotate_and_fit_filter = [](void *userdata, SDL_Event * ev
 
         // Minimizing on Aurora os
         if(event->window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "input filter: FOCUS_LOST");
             DisplayBlankerController::SetPreventDisplayBlanking(false);
-
-            //release audio lock
-            if(AudioresourceHolder::audio_resource) {
-                AudioresourceHolder::audio_resource = nullptr;
-            }
+            ReleaseAudioResource();
         }
 
         //Maximizing
         if(event->window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "input filter: FOCUS_GAINED");
             DisplayBlankerController::SetPreventDisplayBlanking(true);
 
-            //aquire audio lock
-            if(!AudioresourceHolder::audio_resource) {
-                AudioresourceHolder::audio_resource = AudioResource::Aquire();
-            }
+            // Запрос аудиоресурса неблокирующийся: фильтр работает внутри
+            // SDL_PollEvent, и зависание в libdbus здесь замораживало
+            // первый кадр движка (чёрный экран, сентябрь 2026).
+            AcquireAudioResourceAsync();
         }
     }
 

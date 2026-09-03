@@ -337,11 +337,6 @@ void RenderPresent()
             RenderVirtualGamepad(renderer);
         }
 #endif
-#ifdef AURORA_OS
-		// Soften the switch into the tile: cover over the game frame at
-		// growing alpha for the first moments of the transition.
-		launcher::aurora::GameCover::OverlayCoverFade(renderer);
-#endif
 		SDL_RenderPresent(renderer);
 
 		if (!*sgOptions.Graphics.vSync) {

@@ -70,7 +70,11 @@ void StateWatch::Run()
 
 	DBusError error;
 	dbus_error_init(&error);
-	DBusConnection *system = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
+	// Приватная (не разделяемая) коннекция: цикл ниже выгребает ВСЕ
+	// сообщения шины, и на общей коннекции он съедал бы чужие ответы
+	// (Hello/методы других клиентов процесса — так зависал запрос
+	// аудиоресурса в фазе движка).
+	DBusConnection *system = dbus_bus_get_private(DBUS_BUS_SYSTEM, &error);
 	if (system == nullptr) {
 		spdlog::warn("aurora: системная шина недоступна ({})",
 		    error.message != nullptr ? error.message : "?");
@@ -173,6 +177,9 @@ void StateWatch::Run()
 		}
 		drain(system);
 	}
+	// Приватную коннекцию нужно явно закрыть (разделяемая закрывается
+	// сама при обнулении ссылок).
+	dbus_connection_close(system);
 	dbus_connection_unref(system);
 }
 
