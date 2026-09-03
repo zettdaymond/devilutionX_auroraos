@@ -89,10 +89,17 @@ void play_movie(const char *pszMovie, bool userCanClose)
 			// вхолостую (звук глушится diablo_focus_pause по потере
 			// фокуса), время видео стоит до возврата фокуса. RenderPresent
 			// кормит машину обложки краями фокуса/дисплея и держит
-			// кадр-карточку в плитке.
+			// кадр-карточку. Спим до события (смена фокуса/дисплея всегда
+			// приходит событием); событие возвращаем в очередь — его
+			// обработает насос наверху цикла.
 			if (launcher::aurora::GameCover::IsHidden()) {
-				SDL_Delay(50);
 				RenderPresent();
+				SDL_Event wait {};
+				if (SDL_WaitEvent(&wait) == 1) {
+					SDL_PushEvent(&wait);
+				} else {
+					SDL_Delay(100);
+				}
 				continue;
 			}
 #endif

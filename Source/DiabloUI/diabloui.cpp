@@ -792,12 +792,18 @@ void UiPollAndRender(std::optional<tl::function_ref<bool(SDL_Event &)>> eventHan
 	}
 #ifdef AURORA_OS
 	// Плитка/гашение экрана: честная пауза меню — софтверный рендер не
-	// гоняем, кадр окна всё равно заменяет обложка. События прокачаны
-	// выше; RenderPresent кормит машину обложки краями фокуса/дисплея
-	// и держит кадр-карточку.
+	// гоняем, кадр окна всё равно заменяет обложку. RenderPresent кормит
+	// машину обложки краями фокуса/дисплея и держит кадр-карточку; спим
+	// до события (смена фокуса/дисплея всегда приходит событием) и
+	// возвращаем его в очередь — обработает насос следующего прохода.
 	if (launcher::aurora::GameCover::IsHidden()) {
-		SDL_Delay(50);
 		RenderPresent();
+		SDL_Event wait {};
+		if (SDL_WaitEvent(&wait) == 1) {
+			SDL_PushEvent(&wait);
+		} else {
+			SDL_Delay(100);
+		}
 		return;
 	}
 #endif
