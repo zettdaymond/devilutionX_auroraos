@@ -6,6 +6,8 @@
 
 #include "AuroraStateWatch.hpp"
 
+#include "../ComposerAdapter.hpp"
+
 #include <spdlog/spdlog.h>
 
 #include <memory>
@@ -21,6 +23,8 @@ struct CoverState {
 	int width = 0;
 	int height = 0;
 	SDL_Texture *texture = nullptr; ///< ленивая; живёт, пока жив рендерер движка
+	SDL_Window *window = nullptr;   ///< окно движка — для buffer transform
+	bool portraitRotated = false;   ///< режим порта: transform 270 + ротатор
 	bool seenTopmost = false;        ///< был ли хоть один видимый кадр движка
 	bool coverActive = false;        ///< для диагностического лога переходов
 };
@@ -29,6 +33,16 @@ CoverState &Cover()
 {
 	static CoverState state;
 	return state;
+}
+
+/// В плитке буфер окна показывается «как есть» — портретная карточка,
+/// как у лаунчера; в игре — ландшафтный режим порта (transform 270,
+/// контент предращает ротатор). NORMAL соответствует всем ориентациям
+/// кроме LANDSCAPE/LANDSCAPE_FLIPPED (см. WaylandComposerAdapter).
+void SetTileOrientation(SDL_Window *window, bool tile)
+{
+	devilution::WaylandComposerAdapter::SetWindowOrientation(
+	    window, tile ? SDL_ORIENTATION_PORTRAIT : SDL_ORIENTATION_LANDSCAPE_FLIPPED);
 }
 
 /// (Пере)создать текстуру под текущий рендерер; false — обложки больше нет.
@@ -90,14 +104,16 @@ void GameCover::CaptureFromBackbuffer(SDL_Renderer *renderer)
 	spdlog::info("aurora: обложка для фазы движка запечена ({}x{})", width, height);
 }
 
-void GameCover::Init()
+void GameCover::Init(SDL_Window *window, bool portraitRotated)
 {
 	CoverState &s = Cover();
+	s.window = window;
+	s.portraitRotated = portraitRotated;
 	if (s.watch == nullptr) {
 		s.watch = std::make_unique<StateWatch>();
 		s.seenTopmost = false;
 		s.coverActive = false;
-		spdlog::info("aurora: GameCover Init (фаза движка)");
+		spdlog::info("aurora: GameCover Init (фаза движка, portraitRotated={})", portraitRotated);
 	}
 }
 
@@ -131,6 +147,12 @@ bool GameCover::BeginCoverFrame(SDL_Renderer *renderer)
 		s.seenTopmost = true;
 		if (s.coverActive) {
 			s.coverActive = false;
+			// Вернуть ландшафтный transform ДО первого игрового кадра:
+			// ротатор рисует контент предращённым, и без 270 он показался
+			// бы повёрнутым.
+			if (s.portraitRotated && s.window != nullptr) {
+				SetTileOrientation(s.window, false);
+			}
 			spdlog::info("aurora: обложка движка выключена (вернулись в передний план)");
 		}
 		return false;
@@ -151,6 +173,12 @@ bool GameCover::BeginCoverFrame(SDL_Renderer *renderer)
 	}
 	if (!s.coverActive) {
 		s.coverActive = true;
+		// Плитка показывает буфер «как есть»: портретная обложка без
+		// поворота требует NORMAL (до этого на окне висит 270 режима
+		// порта — обложка показывалась бы повёрнутой на 90°).
+		if (s.portraitRotated && s.window != nullptr) {
+			SetTileOrientation(s.window, true);
+		}
 		spdlog::info("aurora: обложка движка включена (свернулись в плитку)");
 	}
 	DrawCover(renderer);

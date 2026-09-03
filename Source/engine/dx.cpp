@@ -104,7 +104,9 @@ void dx_init()
 #ifdef AURORA_OS
 	// Second StateWatch instance for the engine phase (the launcher's own
 	// watcher died with the launcher window) - powers the tile cover below.
-	launcher::aurora::GameCover::Init();
+	// The window handle feeds the tile-time buffer-transform switch; the
+	// rotator flag says whether the port runs in rotated mode at all.
+	launcher::aurora::GameCover::Init(ghMainWnd, rotator != nullptr);
 #endif
 
 	palette_init();
