@@ -15,6 +15,10 @@
 #include "doom.h"
 #include "engine/backbuffer_state.hpp"
 #include "engine/dx.h"
+
+#ifdef AURORA_OS
+#include "GameCover.hpp"
+#endif
 #include "engine/render/clx_render.hpp"
 #include "engine/render/dun_render.hpp"
 #include "engine/render/text_render.hpp"
@@ -1327,6 +1331,14 @@ void DrawMain(const Surface &out, int dwHgt, bool drawDesc, bool drawHp, bool dr
 	if (!gbActive || RenderDirectlyToOutputSurface) {
 		return;
 	}
+#ifdef AURORA_OS
+	// Аврора не гасит gbActive при сворачивании в плитку: свёрнутое или
+	// пригашенное состояние знает стейтмашина обложки — игровой кадр
+	// в софтверном рендере не молотим (честная пауза, батарея).
+	if (launcher::aurora::GameCover::IsHidden()) {
+		return;
+	}
+#endif
 
 	assert(dwHgt >= 0 && dwHgt <= gnScreenHeight);
 

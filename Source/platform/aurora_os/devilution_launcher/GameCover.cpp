@@ -232,6 +232,11 @@ bool GameCover::BeginCoverFrame(SDL_Renderer *renderer)
 	return false;
 }
 
+bool GameCover::IsHidden()
+{
+	return Cover().machine.Action() != CoverAction::RenderGame;
+}
+
 } // namespace launcher::aurora
 
 #endif

@@ -17,6 +17,11 @@
 #include "storm/storm_svid.h"
 #include "utils/display.h"
 
+#ifdef AURORA_OS
+#include "GameCover.hpp"
+#include "engine/dx.h"
+#endif
+
 namespace devilution {
 
 /** Should the movie continue playing. */
@@ -79,6 +84,18 @@ void play_movie(const char *pszMovie, bool userCanClose)
 					diablo_quit(0);
 				}
 			}
+#ifdef AURORA_OS
+			// Плитка/гашение экрана: честная пауза видео — не декодируем
+			// вхолостую (звук глушится diablo_focus_pause по потере
+			// фокуса), время видео стоит до возврата фокуса. RenderPresent
+			// кормит машину обложки краями фокуса/дисплея и держит
+			// кадр-карточку в плитке.
+			if (launcher::aurora::GameCover::IsHidden()) {
+				SDL_Delay(50);
+				RenderPresent();
+				continue;
+			}
+#endif
 			if (!SVidPlayContinue())
 				break;
 		}

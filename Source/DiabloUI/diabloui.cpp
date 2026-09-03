@@ -21,6 +21,10 @@
 #include "hwcursor.hpp"
 #include "utils/display.h"
 #include "utils/language.h"
+
+#ifdef AURORA_OS
+#include "GameCover.hpp"
+#endif
 #include "utils/log.hpp"
 #include "utils/pcx_to_clx.hpp"
 #include "utils/sdl_compat.h"
@@ -786,6 +790,17 @@ void UiPollAndRender(std::optional<tl::function_ref<bool(SDL_Event &)>> eventHan
 		UiFocusNavigation(&event);
 		UiHandleEvents(&event);
 	}
+#ifdef AURORA_OS
+	// Плитка/гашение экрана: честная пауза меню — софтверный рендер не
+	// гоняем, кадр окна всё равно заменяет обложка. События прокачаны
+	// выше; RenderPresent кормит машину обложки краями фокуса/дисплея
+	// и держит кадр-карточку.
+	if (launcher::aurora::GameCover::IsHidden()) {
+		SDL_Delay(50);
+		RenderPresent();
+		return;
+	}
+#endif
 	HandleMenuAction(GetMenuHeldUpDownAction());
 	UiRenderListItems();
 	DrawMouse();
