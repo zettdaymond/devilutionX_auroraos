@@ -18,8 +18,6 @@ constexpr static inline auto kMceRequestIf = "com.nokia.mce.request";
 constexpr static auto kMcePreventBlankReq = "req_display_blanking_pause";
 constexpr static auto kMceCancelPreventBlankReq = "req_display_cancel_blanking_pause";
 
-constexpr static auto kDbusTypeInvalid = ((int) '\0');
-
 constexpr static auto kRequestBlankingPauseIntervalMs = 60 * 1000;
 
 static std::mutex sync_mutex;
@@ -29,7 +27,7 @@ static SDL_TimerCallback kSDLTimerCallback = [](Uint32 interval, void *param) ->
     // SDL timer invoke callback from another thread
     std::lock_guard lock(sync_mutex);
 
-    DBus::CallVoidMethod(kMceService, kMceRequestPath, kMceRequestIf, kMcePreventBlankReq, kDbusTypeInvalid);
+    DBus::CallVoidMethod(kMceService, kMceRequestPath, kMceRequestIf, kMcePreventBlankReq);
     return interval;
 };
 
@@ -72,7 +70,7 @@ void DisplayBlankerController::SetPreventDisplayBlanking(bool value)
     assert(m_impl != nullptr);
 
     if(value && !m_impl->m_timer) {
-        auto result = DBus::CallVoidMethod(kMceService, kMceRequestPath, kMceRequestIf, kMcePreventBlankReq, kDbusTypeInvalid);
+        auto result = DBus::CallVoidMethod(kMceService, kMceRequestPath, kMceRequestIf, kMcePreventBlankReq);
 
         if(!result) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Could not send DBus MCE Request for preventing screen blank");
@@ -86,7 +84,7 @@ void DisplayBlankerController::SetPreventDisplayBlanking(bool value)
         SDL_RemoveTimer(m_impl->m_timer.value());
         m_impl->m_timer = std::nullopt;
 
-        auto result = DBus::CallVoidMethod(kMceService, kMceRequestPath, kMceRequestIf, kMceCancelPreventBlankReq, kDbusTypeInvalid);
+        auto result = DBus::CallVoidMethod(kMceService, kMceRequestPath, kMceRequestIf, kMceCancelPreventBlankReq);
         if(!result) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Could not send Dbbus MCE Request for cancel preventing screen blank");
         }

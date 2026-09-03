@@ -142,7 +142,7 @@ std::optional<vec2> WaylandComposerAdapter::GetScreenDpi(SDL_Window *window)
 
         wl_output_destroy(out->output);
         wl_list_remove(&out->link);
-        free(out);
+        delete out;
     }
 
     wl_registry_destroy(registry);
