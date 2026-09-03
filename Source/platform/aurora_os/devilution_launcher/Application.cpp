@@ -36,6 +36,7 @@
 
 #ifdef AURORA_OS
 #	include "AuroraStateWatch.hpp"
+#	include "GameCover.hpp"
 #endif
 
 CMRC_DECLARE(assets);
@@ -453,6 +454,11 @@ AppResult Application::Run()
 	}
 
 #ifdef AURORA_OS
+	// Уходим в движок — запечатываем обложку, пока жив наш рендерер:
+	// движок в плитке будет показывать её вместо игрового кадра.
+	if (m_store->State().pendingLaunch.has_value()) {
+		BakeGameCover();
+	}
 	m_stateWatch.reset();
 #endif
 
@@ -487,6 +493,26 @@ void Application::RenderCoverFrame()
 }
 
 #ifdef AURORA_OS
+
+void Application::BakeGameCover()
+{
+	// Тот же кадр, что рисует плитка лаунчера (RenderCover), — движковая
+	// обложка не отличается от нашей. Пиксели снимаются ДО Present:
+	// при двойной буферизации после обмена читался бы уже не тот буфер.
+	ImGui_ImplSDLRenderer2_NewFrame();
+	ImGui_ImplSDL2_NewFrame();
+	ImGui::NewFrame();
+
+	m_view->RenderCover(m_store->State());
+
+	ImGui::Render();
+
+	SDL_SetRenderDrawColor(m_renderer, 10, 7, 5, 255);
+	SDL_RenderClear(m_renderer);
+	ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+	launcher::aurora::GameCover::CaptureFromBackbuffer(m_renderer);
+	SDL_RenderPresent(m_renderer);
+}
 
 void Application::ApplyAuroraState(launcher::aurora::StateEvent what, bool value)
 {

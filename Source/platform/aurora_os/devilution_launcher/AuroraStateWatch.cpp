@@ -45,6 +45,17 @@ StateWatch::~StateWatch()
 
 void StateWatch::Push(StateEvent what, bool value)
 {
+	switch (what) {
+	case StateEvent::DisplayOn:
+		m_displayOn.store(value, std::memory_order_relaxed);
+		break;
+	case StateEvent::TkLocked:
+		m_tkLocked.store(value, std::memory_order_relaxed);
+		break;
+	case StateEvent::TopmostOurs:
+		m_topmostOurs.store(value, std::memory_order_relaxed);
+		break;
+	}
 	spdlog::info("aurora: {} = {}", NameOf(what), value ? 1 : 0);
 	SDL_Event event {};
 	event.type = m_eventType;

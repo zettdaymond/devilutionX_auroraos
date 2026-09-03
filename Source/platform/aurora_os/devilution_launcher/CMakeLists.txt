@@ -214,8 +214,9 @@ else()
   # (CMake/Dependencies.cmake -> 3rdParty/simpleini).
   target_link_libraries(launcher_core PUBLIC spdlog::spdlog zoe::zoe simpleini)
 
-  # AuroraStateWatch.cpp — наблюдатель D-Bus (только Aurora-сборка).
-  add_devilutionx_object_library(devilution_launcher ${LAUNCHER_UI_SOURCES} AuroraStateWatch.cpp)
+  # AuroraStateWatch.cpp — наблюдатель D-Bus, GameCover.cpp — обложка
+  # плитки на время игры (только Aurora-сборка).
+  add_devilutionx_object_library(devilution_launcher ${LAUNCHER_UI_SOURCES} AuroraStateWatch.cpp GameCover.cpp)
   target_include_directories(devilution_launcher PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
   # Наблюдателю нужны заголовки D-Bus: те же пути инклюдов, что у
   # соседней libdevilutionx_aurora_os.

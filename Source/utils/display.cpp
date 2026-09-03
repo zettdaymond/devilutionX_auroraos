@@ -46,6 +46,7 @@
 #include "Utilities.hpp"
 #include "ComposerAdapter.hpp"
 #include "InputAdapter.hpp"
+#include "GameCover.hpp"
 #endif
 namespace devilution {
 
@@ -124,6 +125,12 @@ void FreeRenderer()
 #endif
 
 	if (renderer != nullptr) {
+#ifdef AURORA_OS
+        // The tile-cover texture belongs to the renderer - free it before
+        // the renderer dies (unlike rotator/padRenderer above, which hold
+        // no renderer-owned objects).
+        launcher::aurora::GameCover::ResetTexture();
+#endif
 		SDL_DestroyRenderer(renderer);
 		renderer = nullptr;
 #ifdef AURORA_OS

@@ -26,6 +26,7 @@
 #ifdef AURORA_OS
 #include "TextureRotatorGLES.hpp"
 #include "VirtualPadSDLRender.hpp"
+#include "GameCover.hpp"
 #endif
 
 namespace devilution {
@@ -100,6 +101,12 @@ void dx_init()
 	SDL_ShowWindow(ghMainWnd);
 #endif
 
+#ifdef AURORA_OS
+	// Second StateWatch instance for the engine phase (the launcher's own
+	// watcher died with the launcher window) - powers the tile cover below.
+	launcher::aurora::GameCover::Init();
+#endif
+
 	palette_init();
 	CreateBackBuffer();
 	pal_surface_palette_version = 1;
@@ -112,6 +119,12 @@ Surface GlobalBackBuffer()
 
 void dx_cleanup()
 {
+#ifdef AURORA_OS
+	// The cover texture lives in the renderer and the watcher owns a
+	// thread - release both before the renderer/window die.
+	launcher::aurora::GameCover::Shutdown();
+#endif
+
 #ifndef USE_SDL1
 	if (ghMainWnd != nullptr)
 		SDL_HideWindow(ghMainWnd);
@@ -232,6 +245,19 @@ void RenderPresent()
 	if (HeadlessMode)
 		return;
 
+#ifdef AURORA_OS
+	// Minimized into an Aurora tile: present the branded cover frame
+	// baked by the launcher instead of the game frame. Must run before
+	// the gbActive check - Aurora never sends HIDDEN/MINIMIZED, so the
+	// game keeps presenting while tiled.
+	if (launcher::aurora::GameCover::BeginCoverFrame(renderer)) {
+		if (!*sgOptions.Graphics.vSync) {
+			LimitFrameRate();
+		}
+		return;
+	}
+#endif
+
 	SDL_Surface *surface = GetOutputSurface();
 
 	if (!gbActive) {
@@ -310,6 +336,11 @@ void RenderPresent()
         if (ControlMode == ControlTypes::VirtualGamepad) {
             RenderVirtualGamepad(renderer);
         }
+#endif
+#ifdef AURORA_OS
+		// Soften the switch into the tile: cover over the game frame at
+		// growing alpha for the first moments of the transition.
+		launcher::aurora::GameCover::OverlayCoverFade(renderer);
 #endif
 		SDL_RenderPresent(renderer);
 

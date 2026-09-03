@@ -41,6 +41,14 @@ public:
 	/// Тип пользовательского SDL-события, по которому приходят состояния.
 	[[nodiscard]] Uint32 EventType() const { return m_eventType; }
 
+	/// Текущие состояния без ожидания событий. Нужны фазе движка:
+	/// его цикл не слушает наши события (выбрасывает их как чужие),
+	/// а опрашивает перед каждым Present'ом. До первых сигналов
+	/// считаем себя передним планом на включённом экране.
+	[[nodiscard]] bool TopmostOurs() const { return m_topmostOurs.load(std::memory_order_relaxed); }
+	[[nodiscard]] bool DisplayOn() const { return m_displayOn.load(std::memory_order_relaxed); }
+	[[nodiscard]] bool TkLocked() const { return m_tkLocked.load(std::memory_order_relaxed); }
+
 private:
 	/// Тело потока: подключение к шинам и диспетчеризация до остановки.
 	void Run();
@@ -51,6 +59,10 @@ private:
 	const Uint32 m_eventType;
 	std::thread m_thread;
 	std::atomic<bool> m_stop { false };
+
+	std::atomic<bool> m_displayOn { true };
+	std::atomic<bool> m_tkLocked { false };
+	std::atomic<bool> m_topmostOurs { true };
 };
 
 } // namespace launcher::aurora
