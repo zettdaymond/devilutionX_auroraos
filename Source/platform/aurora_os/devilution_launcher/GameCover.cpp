@@ -10,6 +10,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <chrono>
 #include <memory>
 #include <vector>
 
@@ -27,6 +28,8 @@ struct CoverState {
 	bool portraitRotated = false;   ///< режим порта: transform 270 + ротатор
 	bool seenTopmost = false;        ///< был ли хоть один видимый кадр движка
 	bool coverActive = false;        ///< для диагностического лога переходов
+	bool inputFocused = true;        ///< SDL-фокус окна (фолбэк при мёртвой шине)
+	std::chrono::steady_clock::time_point focusLostAt {};
 };
 
 CoverState &Cover()
@@ -43,6 +46,28 @@ void SetTileOrientation(SDL_Window *window, bool tile)
 {
 	devilution::WaylandComposerAdapter::SetWindowOrientation(
 	    window, tile ? SDL_ORIENTATION_PORTRAIT : SDL_ORIENTATION_LANDSCAPE_FLIPPED);
+}
+
+/// Фолббочное «мы в плитке» по SDL-фокусу окна с дебаунсом 100 мс.
+/// Зовётся раз в кадр из BeginCoverFrame — состояние самообновляется.
+bool TiledByFocus(CoverState &s)
+{
+	if (s.window == nullptr) {
+		return false;
+	}
+	const Uint32 flags = SDL_GetWindowFlags(s.window);
+	const bool focused = (flags & SDL_WINDOW_INPUT_FOCUS) != 0
+	    && (flags & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) == 0;
+	const auto now = std::chrono::steady_clock::now();
+	if (focused) {
+		s.inputFocused = true;
+		return false;
+	}
+	if (s.inputFocused) {
+		s.inputFocused = false;
+		s.focusLostAt = now;
+	}
+	return now - s.focusLostAt >= std::chrono::milliseconds(100);
 }
 
 /// (Пере)создать текстуру под текущий рендерер; false — обложки больше нет.
@@ -142,7 +167,12 @@ bool GameCover::BeginCoverFrame(SDL_Renderer *renderer)
 	if (renderer == nullptr || s.watch == nullptr || s.pixels.empty()) {
 		return false;
 	}
-	const bool tiled = !s.watch->TopmostOurs();
+	// «В плитке» = потеря переднего плана по D-Bus ИЛИ (фолбэк) устойчивая
+	// потеря SDL-фокуса. Фолбэк критичен под песочницей Авроры: иконочный
+	// запуск сидит в firejail, dbus-прокси которого режет сигналы
+	// композитора — TopmostOurs навсегда остаётся в дефолтном true
+	// (консольный запуск идёт мимо песочницы, и dbus там жив).
+	const bool tiled = !s.watch->TopmostOurs() || TiledByFocus(s);
 	if (!tiled) {
 		s.seenTopmost = true;
 		if (s.coverActive) {

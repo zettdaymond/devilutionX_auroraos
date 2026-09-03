@@ -129,11 +129,17 @@ void StateWatch::Run()
 			return status;
 		};
 		const std::string display = queryMceString("get_display_status");
-		if (!display.empty()) {
+		if (display.empty()) {
+			// Пустой ответ = таймаут/отказ: под песочницей Авроры (иконочный
+			// запуск) dbus-прокси молча режет часть методов mce.
+			spdlog::warn("aurora: get_display_status без ответа (песочница?)");
+		} else {
 			Push(StateEvent::DisplayOn, display != "off");
 		}
 		const std::string lock = queryMceString("get_tklock_mode");
-		if (!lock.empty()) {
+		if (lock.empty()) {
+			spdlog::warn("aurora: get_tklock_mode без ответа (песочница?)");
+		} else {
 			Push(StateEvent::TkLocked, lock == "locked");
 		}
 	}
