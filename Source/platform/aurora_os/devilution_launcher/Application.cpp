@@ -324,6 +324,11 @@ AppResult Application::Run()
 	}
 
 	m_store->Init();
+#ifdef AURORA_OS
+	// Обложка для фазы движка запекается офскрин уже здесь: к моменту
+	// «Играть» пиксели готовы, из пути выхода рендер убран совсем.
+	BakeGameCover();
+#endif
 	if (m_initialScreen.has_value()) {
 		m_store->Dispatch(launcher::intent::UiNavigate { *m_initialScreen });
 	}
@@ -465,11 +470,6 @@ AppResult Application::Run()
 	}
 
 #ifdef AURORA_OS
-	// Уходим в движок — запечатываем обложку, пока жив наш рендерер:
-	// движок в плитке будет показывать её вместо игрового кадра.
-	if (m_store->State().pendingLaunch.has_value()) {
-		BakeGameCover();
-	}
 	m_stateWatch.reset();
 #endif
 
@@ -507,9 +507,25 @@ void Application::RenderCoverFrame()
 
 void Application::BakeGameCover()
 {
-	// Тот же кадр, что рисует плитка лаунчера (RenderCover), — движковая
-	// обложка не отличается от нашей. Пиксели снимаются ДО Present:
-	// при двойной буферизации после обмена читался бы уже не тот буфер.
+	// Кадр тот же, что рисует плитка лаунчера (RenderCover), но рендерим
+	// его офскрин — в текстуру-таргет: кадр не касается буферов окна
+	// (прежняя запечка на выходе.present'илась в окно, и обложка мигала
+	// перед стартом игры). Пиксели снимаются сразу и переживают смерть
+	// окна лаунчера.
+	int width = 0;
+	int height = 0;
+	if (SDL_GetRendererOutputSize(m_renderer, &width, &height) != 0 || width <= 0 || height <= 0) {
+		return;
+	}
+	SDL_Texture *target = SDL_CreateTexture(
+	    m_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width, height);
+	if (target == nullptr) {
+		spdlog::warn("aurora: SDL_CreateTexture(таргет запечки) не удалась: {}", SDL_GetError());
+		return;
+	}
+	SDL_Texture *previousTarget = SDL_GetRenderTarget(m_renderer);
+	SDL_SetRenderTarget(m_renderer, target);
+
 	ImGui_ImplSDLRenderer2_NewFrame();
 	ImGui_ImplSDL2_NewFrame();
 	ImGui::NewFrame();
@@ -521,8 +537,11 @@ void Application::BakeGameCover()
 	SDL_SetRenderDrawColor(m_renderer, 10, 7, 5, 255);
 	SDL_RenderClear(m_renderer);
 	ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+	// ReadPixels читает текущий таргет — снимаем офскрин-кадр.
 	launcher::aurora::GameCover::CaptureFromBackbuffer(m_renderer);
-	SDL_RenderPresent(m_renderer);
+
+	SDL_SetRenderTarget(m_renderer, previousTarget);
+	SDL_DestroyTexture(target);
 }
 
 void Application::ApplyAuroraState(launcher::aurora::StateEvent what, bool value)
