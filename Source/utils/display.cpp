@@ -45,6 +45,7 @@
 #if defined(AURORA_OS)
 #include "Utilities.hpp"
 #include "ComposerAdapter.hpp"
+#include "ScreenOrientation.hpp"
 #include "InputAdapter.hpp"
 #include "GameCover.hpp"
 #endif
@@ -401,13 +402,12 @@ bool SpawnWindow(const char *lpWindowName)
 
     const bool fbNativePortrait = (rtW < rtH);
 
-    if(fbNativePortrait) {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Display orientation changed to %i", (int)SDL_ORIENTATION_LANDSCAPE_FLIPPED);
-        WaylandComposerAdapter::SetWindowOrientation(ghMainWnd, SDL_ORIENTATION_LANDSCAPE_FLIPPED);
-    }
-    else {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Display orientation do not touched");
-    }
+    // Начальный ландшафт — по текущему положению телефона: если игру
+    // запустили, держа устройство перевёрнутым на 180°, картинка сразу
+    // ложится правильно, без ожидания события поворота.
+    AuroraSetNativePortrait(fbNativePortrait);
+    AuroraApplyOrientation(SDL_GetDisplayOrientation(SDL_GetWindowDisplayIndex(ghMainWnd)));
+    AuroraApplyWindowTransform(ghMainWnd);
 #endif
 
 	return ghMainWnd != nullptr;

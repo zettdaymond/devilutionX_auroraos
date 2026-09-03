@@ -26,6 +26,6 @@ vec2 rotateUV( const vec2& uv, float rotation );
 
 vec2 scaleToAspectFit( const vec2& uv, const vec2& inputSize, const vec2& outputSize );
 
-ivec2 ApplyMouseFixes( const ivec2& originalMouse, const ivec2& sourceSize, const ivec2& destanationSize );
+ivec2 ApplyMouseFixes( const ivec2& originalMouse, const ivec2& sourceSize, const ivec2& destanationSize, float rotationRadians );
 
 } // namespace devilution

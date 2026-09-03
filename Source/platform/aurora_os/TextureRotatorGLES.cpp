@@ -10,6 +10,7 @@
 
 #include "GLFunctions.hpp"
 #include "GLUtils.hpp"
+#include "ScreenOrientation.hpp"
 
 namespace devilution
 {
@@ -108,6 +109,11 @@ uniform sampler2D iTexture0;
 uniform ivec2 OutputSize;
 uniform ivec2 InputSize;
 
+// Угол поворота кадра (радианы, 90 или 270): каким боком ландшафт
+// ложится в портретный фреймбуфер — зависит от того, как пользователь
+// держит телефон (см. AuroraRotatorAngleDegrees).
+uniform highp float Rotation;
+
 vec2 rotateUV(vec2 uv, float rotation)
 {
     float mid = 0.5;
@@ -130,7 +136,7 @@ vec2 scaleToAspectFit(vec2 uv, bool swap)
 void main()
 {
     highp vec2 reflected_uv = vec2(uv.x, 1.0 - uv.y);
-    highp vec2 rotated_uv = rotateUV(reflected_uv, radians(90.0));
+    highp vec2 rotated_uv = rotateUV(reflected_uv, Rotation);
     highp vec2 scaled_uv = scaleToAspectFit(rotated_uv, true);
 
     gl_FragColor = texture2D(iTexture0, scaled_uv).bgra;
@@ -155,6 +161,7 @@ struct AuroraOsTextureAdapter::Impl
     Impl(const ivec2& _output_size,
          ShaderProgramGLES&& _sp,
          std::uint32_t _sampler_location,
+         std::uint32_t _rotation_uniform_location,
          std::uint32_t _output_size_uniform_location,
          std::uint32_t _intput_size_uniform_location,
          std::uint32_t _pos_atrib_location,
@@ -163,6 +170,7 @@ struct AuroraOsTextureAdapter::Impl
         :  output_size(_output_size)
         ,  shader_program( std::move(_sp))
         ,  sampler_location(_sampler_location)
+        ,  rotation_uniform_location(_rotation_uniform_location)
         ,  output_size_uniform_location(_output_size_uniform_location)
         ,  intput_size_uniform_location(_intput_size_uniform_location)
         ,  pos_atrib_location(_pos_atrib_location)
@@ -177,6 +185,7 @@ struct AuroraOsTextureAdapter::Impl
 
     std::uint32_t sampler_location;
 
+    std::uint32_t rotation_uniform_location;
     std::uint32_t output_size_uniform_location;
     std::uint32_t intput_size_uniform_location;
 
@@ -204,6 +213,7 @@ std::unique_ptr< AuroraOsTextureAdapter > devilution::AuroraOsTextureAdapter::Cr
 
     auto sampler_location = gl::glGetUniformLocation( shader_program->id, "iTexture0" );
 
+    auto rotation_uniform_location = gl::glGetUniformLocation( shader_program->id, "Rotation" );
     auto output_size_uniform_location = gl::glGetUniformLocation( shader_program->id, "OutputSize" );
     auto intput_size_uniform_location = gl::glGetUniformLocation( shader_program->id, "InputSize" );
 
@@ -213,8 +223,8 @@ std::unique_ptr< AuroraOsTextureAdapter > devilution::AuroraOsTextureAdapter::Cr
     auto vertex_buffer = MakeArrayBuffer(std::cbegin(squareVertices), sizeof(squareVertices));
 
     auto impl =
-       std::make_unique< Impl >( output_size, std::move( shader_program.value() ), sampler_location, output_size_uniform_location,
-                                 intput_size_uniform_location, pos_atrib_location, uv_atrib_location, std::move(vertex_buffer) );
+       std::make_unique< Impl >( output_size, std::move( shader_program.value() ), sampler_location, rotation_uniform_location,
+                                 output_size_uniform_location, intput_size_uniform_location, pos_atrib_location, uv_atrib_location, std::move(vertex_buffer) );
 
     return std::unique_ptr< AuroraOsTextureAdapter >( new AuroraOsTextureAdapter( std::move( impl ) ) );
 }
@@ -237,6 +247,10 @@ void AuroraOsTextureAdapter::Draw( ivec2 const& tex_size, bool with_blend )
 
         gl::glUniform2i( m_impl->output_size_uniform_location, m_impl->output_size.x, m_impl->output_size.y );
     }
+
+    // Угол поворота — текущий ландшафт (пользователь мог перевернуть
+    // телефон на 180° прямо во время игры).
+    gl::glUniform1f( m_impl->rotation_uniform_location, degreesToRadians( AuroraRotatorAngleDegrees() ) );
 
     // Set original texture parameters
     {

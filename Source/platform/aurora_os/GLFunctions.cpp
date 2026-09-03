@@ -29,6 +29,7 @@ void gl::LoadSymbols()
     LOAD_GL_FUNC(glCreateProgram);
     LOAD_GL_FUNC(glGetShaderInfoLog);
     LOAD_GL_FUNC(glUniform2i);
+    LOAD_GL_FUNC(glUniform1f);
     LOAD_GL_FUNC(glGetIntegerv);
     LOAD_GL_FUNC(glEnable);
     LOAD_GL_FUNC(glDisable);
@@ -54,7 +55,7 @@ bool gl::IsSymbolsLoaded()
             && gl::glGetShaderiv && gl::glDrawArrays && gl::glEnableVertexAttribArray &&  gl::glVertexAttribPointer
             && gl::glUniform1i && gl::glActiveTexture && gl::glUseProgram && gl::glGetAttribLocation
             && gl::glGetUniformLocation && gl::glGetProgramInfoLog && gl::glGetProgramiv && gl::glLinkProgram
-            && gl::glAttachShader && gl::glCreateProgram && gl::glGetShaderInfoLog && gl::glUniform2i
+            && gl::glAttachShader && gl::glCreateProgram && gl::glGetShaderInfoLog && gl::glUniform2i && gl::glUniform1f
             && gl::glGetIntegerv && gl::glEnable && gl::glDisable && gl::glBlendFuncSeparate
             && gl::glClearColor && gl::glClear && gl::glIsEnabled && gl::glViewport && gl::glBindFramebuffer && gl::glGetError
             && gl::glDebugMessageCallback && gl::glGenBuffers && gl::glBindBuffer && gl::glBufferData;

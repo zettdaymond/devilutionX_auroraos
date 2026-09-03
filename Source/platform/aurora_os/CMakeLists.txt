@@ -18,6 +18,7 @@ add_devilutionx_object_library(libdevilutionx_aurora_os
     GLUtils.cpp
     GLFunctions.cpp
     ComposerAdapter.cpp
+    ScreenOrientation.cpp
     InputAdapter.cpp
     StandartPaths.cpp
     DisplayBlankerController.cpp

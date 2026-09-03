@@ -273,6 +273,18 @@ void Application::AttachFileLog()
 		spdlog::flush_on(spdlog::level::debug);
 		spdlog::flush_every(std::chrono::seconds(1));
 		spdlog::info("File log: {}", logPath.string());
+
+		// SDL-логи движка (Log(), SDL_LogInfo платформы) при иконочном
+		// запуске иначе теряются вместе с stderr — мостим в spdlog.
+		// Фаза движка работает в том же процессе, мост действует и на неё.
+		SDL_LogSetOutputFunction(
+		    [](void *, int category, SDL_LogPriority priority, const char *message) {
+			    const spdlog::level::level_enum level = priority >= SDL_LOG_PRIORITY_ERROR ? spdlog::level::err
+			        : priority == SDL_LOG_PRIORITY_WARN                    ? spdlog::level::warn
+			                                                                    : spdlog::level::info;
+			    spdlog::log(level, "[sdl/cat{}] {}", category, message != nullptr ? message : "");
+		    },
+		    nullptr);
 	} catch (const std::exception &err) {
 		spdlog::warn("File log unavailable: {}", err.what());
 	}

@@ -32,6 +32,7 @@ public:
     static inline PFNGLATTACHSHADERPROC glAttachShader = nullptr;
     static inline PFNGLCREATEPROGRAMPROC glCreateProgram = nullptr;
     static inline PFNGLGETSHADERINFOLOGPROC glGetShaderInfoLog = nullptr;
+    static inline PFNGLUNIFORM1FPROC glUniform1f = nullptr;
     static inline PFNGLUNIFORM2IPROC glUniform2i = nullptr;
     static inline PFNGLGETINTEGERVPROC glGetIntegerv = nullptr;
     static inline PFNGLENABLEPROC glEnable = nullptr;

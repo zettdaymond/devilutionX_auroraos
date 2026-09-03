@@ -35,7 +35,7 @@ float degreesToRadians( float degrees )
     return degrees * ( kPi / 180.0 );
 }
 
-ivec2 ApplyMouseFixes( const ivec2& originalMouse, const ivec2& sourceSize, const ivec2& destanationSize )
+ivec2 ApplyMouseFixes( const ivec2& originalMouse, const ivec2& sourceSize, const ivec2& destanationSize, float rotationRadians )
 {
     using namespace devilution;
 
@@ -44,7 +44,7 @@ ivec2 ApplyMouseFixes( const ivec2& originalMouse, const ivec2& sourceSize, cons
 
     y = 1.0f - y;
 
-    vec2 rotated = rotateUV( vec2( x, y ), degreesToRadians( -90.0 ) );
+    vec2 rotated = rotateUV( vec2( x, y ), rotationRadians );
     vec2 rescaled =
        scaleToAspectFit( rotated, vec2( sourceSize.x, sourceSize.y ), vec2( destanationSize.x, destanationSize.y ) );
 
