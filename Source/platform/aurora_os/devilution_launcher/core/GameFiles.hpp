@@ -40,8 +40,8 @@ inline constexpr std::array<FileSpec, kKnownFileCount> kFileCatalog { {
 	{ KnownFile::HfMonk, "hfmonk.mpq", "hfmonk.mpq", 0, false },
 	{ KnownFile::HfMusic, "hfmusic.mpq", "hfmusic.mpq", 0, false },
 	{ KnownFile::HfVoice, "hfvoice.mpq", "hfvoice.mpq", 0, false },
-	{ KnownFile::Spawn, "spawn.mpq", "spawn.mpq (демо-версия)", 52 * 1024 * 1024, true },
-	{ KnownFile::RuVoice, "ru.mpq", "ru.mpq (русская озвучка)", 150 * 1024 * 1024, true },
+	{ KnownFile::Spawn, "spawn.mpq", "spawn.mpq (демо-версия)", 25'448'219, true },
+	{ KnownFile::RuVoice, "ru.mpq", "ru.mpq (русская озвучка)", 34'710'143, true },
 } };
 
 constexpr const FileSpec &FileSpecOf(KnownFile file)

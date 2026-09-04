@@ -253,9 +253,7 @@ void RenderPresent()
 	// the gbActive check - Aurora never sends HIDDEN/MINIMIZED, so the
 	// game keeps presenting while tiled.
 	if (launcher::aurora::GameCover::BeginCoverFrame(renderer)) {
-		if (!*sgOptions.Graphics.vSync) {
-			LimitFrameRate();
-		}
+		LimitFrameRate();
 		return;
 	}
 #endif

@@ -27,9 +27,9 @@ std::string_view DownloadUrl(KnownFile file)
 {
 	switch (file) {
 	case KnownFile::Spawn:
-		return "https://github.com/diasurgical/devilutionx-assets/releases/download/v4/spawn.mpq";
+		return "https://github.com/diasurgical/devilutionx-assets/releases/download/v5/spawn.mpq";
 	case KnownFile::RuVoice:
-		return "https://github.com/diasurgical/devilutionx-assets/releases/download/v4/ru.mpq";
+		return "https://github.com/diasurgical/devilutionx-assets/releases/download/v5/ru.mpq";
 	default:
 		return {};
 	}
