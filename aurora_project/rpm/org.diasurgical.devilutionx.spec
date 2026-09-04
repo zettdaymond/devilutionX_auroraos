@@ -84,8 +84,8 @@ BuildRequires: libcurl-devel
 %autosetup
 
 %build
-CXXFLAGS=-O0 %cmake
-CXXFLAGS=-O0 %ninja_build
+%cmake
+%ninja_build
 
 %install
 %ninja_install
