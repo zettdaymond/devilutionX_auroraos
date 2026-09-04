@@ -688,6 +688,7 @@ void About(const LauncherState &, const Dispatcher &dispatch)
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 	ImGui::TextWrapped(
+	    "Порт предоставляется «как есть», без каких-либо гарантий. "
 	    "Лицензия: Sustainable Use License — использование в некоммерческих целях. "
 	    "Diablo, Blizzard Entertainment — товарные знаки Blizzard Entertainment, Inc. "
 	    "Порт не связан с Blizzard и не одобрен ею.");

@@ -77,6 +77,9 @@ BuildRequires: libcurl-devel
 Без файлов оригинальной игры доступна демонстрационная часть (shareware-версия от Blizzard);
 полную версию можно купить на GoG.com.
 
+Порт предоставляется «как есть», без каких-либо гарантий. Diablo, Blizzard Entertainment —
+товарные знаки Blizzard Entertainment, Inc.; порт не связан с Blizzard и не одобрен ею.
+
 %prep
 %autosetup
 
