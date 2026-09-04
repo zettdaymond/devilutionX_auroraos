@@ -543,9 +543,13 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 			return fromState ? stateOptions[static_cast<size_t>(index)]
 			                 : spec.optionValues[static_cast<size_t>(index)];
 		};
+		// Список разрешений — по УБЫВАНИЮ (зеркало движка), обычные циклы
+		// — по возрастанию значений. Чтобы стрелка вправо везде означала
+		// «больше», для разрешения направление обхода инвертируется.
+		const int stepRight = fromState ? -1 : 1;
 		widgets::GhostButton(icons::ChevronLeft, "", ImVec2(stepper.button, stepper.button),
-		    [&dispatch, id = spec.id, count, currentIndex, valueOfIndex] {
-			    dispatch(intent::SettingChanged { id, valueOfIndex((currentIndex + count - 1) % count) });
+		    [&dispatch, id = spec.id, count, currentIndex, valueOfIndex, stepRight] {
+			    dispatch(intent::SettingChanged { id, valueOfIndex(((currentIndex - stepRight) % count + count) % count) });
 		    });
 		ImGui::SameLine(0, stepper.gap);
 		ImGui::Dummy(ImVec2(stepper.cellWidth, stepper.button));
@@ -553,8 +557,8 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 		const ImVec2 cellMax = ImGui::GetItemRectMax();
 		ImGui::SameLine(0, stepper.gap);
 		widgets::GhostButton(icons::ChevronRight, "", ImVec2(stepper.button, stepper.button),
-		    [&dispatch, id = spec.id, count, currentIndex, valueOfIndex] {
-			    dispatch(intent::SettingChanged { id, valueOfIndex((currentIndex + 1) % count) });
+		    [&dispatch, id = spec.id, count, currentIndex, valueOfIndex, stepRight] {
+			    dispatch(intent::SettingChanged { id, valueOfIndex(((currentIndex + stepRight) % count + count) % count) });
 		    });
 
 		const std::string current = fromState
