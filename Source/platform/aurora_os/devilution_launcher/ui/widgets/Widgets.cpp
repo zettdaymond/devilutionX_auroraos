@@ -124,12 +124,20 @@ void HeroPanel(const char *eyebrow, const char *title, const char *status, const
 
 	// Сначала измеряем блок текста — он не нарастёт на кнопки.
 	const float eyebrowH = Scale::Px(0.95F);
-	const float titleSize = FitFontSize(Theme::Font(FontRole::Heading), Scale::Px(2.7F), title, textMaxWidth,
-	    Scale::Px(1.2F));
 	const float statusH = (status != nullptr) ? statusLines * statusSize * 1.3F : 0.0F;
+	// Титул получает БЮДЖЕТ ВЫСОТЫ: в ландшафте панель низкая (первый
+	// старт, 3 строки статуса), и без бюджета блок вылезал выше рамки —
+	// eyebrow прижимался к краю, угловая скобка наезжала на текст.
+	float titleSize = FitFontSize(Theme::Font(FontRole::Heading), Scale::Px(2.7F), title, textMaxWidth,
+	    Scale::Px(1.2F));
+	const float titleBudget = size.y - pad * 2.0F - actionsHeight - eyebrowH - statusH - Scale::Px(0.3F);
+	if (titleSize > titleBudget) {
+		titleSize = std::max(Scale::Px(1.2F), titleBudget);
+	}
 	const float blockHeight = eyebrowH + titleSize + Scale::Px(0.15F) + statusH;
 
-	float textY = max.y - pad - actionsHeight - blockHeight;
+	// Страховка: блок не поднимается выше рамки панели.
+	float textY = std::max(max.y - pad - actionsHeight - blockHeight, min.y + Scale::Px(0.45F));
 
 	draw->AddText(Theme::Font(FontRole::BodyBold), Scale::Px(0.75F), ImVec2(min.x + pad, textY),
 	    Theme::ColorU32(ColorRole::GoldBright), eyebrow);
