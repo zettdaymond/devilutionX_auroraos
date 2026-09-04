@@ -10,9 +10,6 @@ Requires: libdbus-1.so.3
 Requires: libglib-2.0.so.0
 Requires: libaudioresource.so.1
 Requires: libwayland-client.so.0
-# xkbcommon невидима для авто-зависимостей: SDL грузит её dlopen'ом
-# (soname запечён при сборке через prebuilt-shim), а не через DT_NEEDED.
-Requires: libxkbcommon.so.0
 Requires: libz.so.1
 Requires: libbz2.so.1
 

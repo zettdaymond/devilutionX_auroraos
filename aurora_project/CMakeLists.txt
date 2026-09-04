@@ -95,24 +95,26 @@ if(EXISTS "${DEVILUTIONX_XKB_PKGCONFIG}/xkbcommon.pc")
     set(DEVILUTIONX_XKB_LIB_SHIM "${DEVILUTIONX_XKB_PC_GENERATED}/lib")
     file(MAKE_DIRECTORY "${DEVILUTIONX_XKB_LIB_SHIM}")
 
-    # Shim: ТОЛЬКО копии с версионным именем .so.0. У prebuilt файл
-    # libxkbcommon.so — реальный, без суффикса: если find_library SDL
-    # найдёт его, realpath даст имя без версии и SDL запечёт
-    # dlopen-имя "libxkbcommon.so" — такого файла на устройствах нет
-    # (сигном Wayland_VideoInit на старте). Версионного файла find_library
-    # по имени "xkbcommon" не видит вовсе — SDL берёт ветку статической
-    # линковки: линкер получает -l:libxkbcommon.so.0 и записывает в
-    # DT_NEEDED честный внутренний SONAME (проверен readelf). Копии, а
-    # не симлинки: build-дерево живёт на NTFS-биндмаунте, симлинки из
-    # контейнеров там ненадёжны.
+    # Shim-симлинки .so и .so.0 → реальный .so.0.0.0. Файлы prebuilt —
+    # реальные копии (артефакт conan): без shim у find_library SDL
+    # realpath от libxkbcommon.so даёт имя БЕЗ версии, и SDL запекает
+    # dlopen-имя "libxkbcommon.so" — такого файла на устройствах нет,
+    # Wayland_VideoInit зовёт NULL-указатель (сигном на старте).
+    # Симлинк резолвится в версионное имя → dlopen "libxkbcommon.so.0"
+    # — зависимость невидима для rpm (валидатор стора не пускает явный
+    # Requires на xkbcommon), библиотека есть в базовом образе.
+    # Симлинки создаются ВНУТРИ контейнера и резолвятся там же (с
+    # Windows-стороны биндмаунта выглядят битыми — это нормально).
     foreach(DEVILUTIONX_XKB_LIB xkbcommon xkbregistry)
         set(DEVILUTIONX_XKB_REAL
             "${DEVILUTIONX_XKB_ROOT}/lib/lib${DEVILUTIONX_XKB_LIB}.so.0.0.0")
         if(EXISTS "${DEVILUTIONX_XKB_REAL}")
-            set(DEVILUTIONX_XKB_SHIM_LIB "${DEVILUTIONX_XKB_LIB_SHIM}/lib${DEVILUTIONX_XKB_LIB}.so.0")
-            if(NOT EXISTS "${DEVILUTIONX_XKB_SHIM_LIB}")
-                file(COPY_FILE "${DEVILUTIONX_XKB_REAL}" "${DEVILUTIONX_XKB_SHIM_LIB}")
-            endif()
+            foreach(DEVILUTIONX_XKB_NAME .so .so.0)
+                if(NOT EXISTS "${DEVILUTIONX_XKB_LIB_SHIM}/lib${DEVILUTIONX_XKB_LIB}${DEVILUTIONX_XKB_NAME}")
+                    file(CREATE_LINK "${DEVILUTIONX_XKB_REAL}"
+                        "${DEVILUTIONX_XKB_LIB_SHIM}/lib${DEVILUTIONX_XKB_LIB}${DEVILUTIONX_XKB_NAME}" SYMBOLIC)
+                endif()
+            endforeach()
         endif()
     endforeach()
 
@@ -134,7 +136,7 @@ includedir=\${prefix}/include
 Name: ${DEVILUTIONX_XKB_PC}
 Description: ${DEVILUTIONX_XKB_PC} (Aurora conan prebuilt 1.5.0, versioned shim)
 Version: 1.5.0
-Libs: -L\${libdir} -l:lib${DEVILUTIONX_XKB_PC}.so.0
+Libs: -L\${libdir} -l${DEVILUTIONX_XKB_PC}
 Cflags: -I\${includedir}
 ")
     endforeach()
