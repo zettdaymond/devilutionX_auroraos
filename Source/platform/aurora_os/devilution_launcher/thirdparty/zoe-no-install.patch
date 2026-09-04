@@ -1,0 +1,47 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -89,22 +89,24 @@
+ 	else()
+ 		target_link_libraries(zoe PUBLIC Ws2_32.lib Crypt32.lib)
+ 	endif()
++# zoe встроен через FetchContent: install-правила не нужны — иначе ninja
++# install тянет библиотеку в пакет (rpm-BT: "unpackaged files").
+ endif()
+ 
+-install(TARGETS zoe
+-        EXPORT zoeConfig
+-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-        OBJECTS DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-)
+-
+-install(DIRECTORY ../include/zoe DESTINATION include)
+-
+-install(EXPORT zoeConfig
+-    NAMESPACE zoe::
+-    DESTINATION share/zoe
+-)
++#install(TARGETS zoe
++#        EXPORT zoeConfig
++#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
++#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
++#        OBJECTS DESTINATION ${CMAKE_INSTALL_LIBDIR}
++#)
++#
++#install(DIRECTORY ../include/zoe DESTINATION include)
++#
++#install(EXPORT zoeConfig
++#    NAMESPACE zoe::
++#    DESTINATION share/zoe
++#)
+ 
+ include(CMakePackageConfigHelpers)
+ write_basic_package_version_file(
+@@ -112,4 +114,4 @@
+     VERSION ${PROJECT_VERSION}
+     COMPATIBILITY AnyNewerVersion
+ )
+-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/zoeConfigVersion.cmake DESTINATION share/zoe)
++#install(FILES ${CMAKE_CURRENT_BINARY_DIR}/zoeConfigVersion.cmake DESTINATION share/zoe)
