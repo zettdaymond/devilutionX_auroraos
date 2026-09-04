@@ -101,6 +101,14 @@ int main(int argc, char **argv)
 {
 	const Args args = ParseArgs(argc, argv);
 
+	// Без этого SDL не декларирует DPI-awareness (WIN_InitDPIAwareness
+	// без хинта — no-op), процесс остаётся DPI-unaware, и Windows
+	// виртуализирует координаты: на мониторе 3840x2160 со масштабом
+	// 175% SDL_GetDesktopDisplayMode отдаёт 2194x1234 — лестница
+	// разрешений теряла ступени выше «1234p». Хинт действует только
+	// на Windows; на Aurora (wayland-сборка) игнорируется.
+	SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+
 	SDL_SetMainReady();
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
 		spdlog::error("SDL_Init failed: {}", SDL_GetError());
