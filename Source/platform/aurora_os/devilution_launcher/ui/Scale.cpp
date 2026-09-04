@@ -17,6 +17,12 @@ float g_minSide = 540.0F;
 void Scale::BeginFrame(float dpiScale)
 {
 	const ImVec2 size = ImGui::GetMainViewport()->WorkSize;
+	// Свёрнутое окно рапортует 0x0 (десктопный MINIMIZED): обновлять
+	// масштабы нулем нельзя — шрифты с размером 0 роняют assert
+	// imgui_draw. Держим последние валидные значения.
+	if (size.x <= 0.0F || size.y <= 0.0F) {
+		return;
+	}
 	const float diagonal = std::sqrt(size.x * size.x + size.y * size.y);
 
 	g_rem = std::clamp(diagonal / 44.0F, 12.0F * dpiScale, 26.0F * dpiScale);

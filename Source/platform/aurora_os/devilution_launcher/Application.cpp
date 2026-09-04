@@ -427,6 +427,12 @@ AppResult Application::Run()
 				processEvent(wait);
 			}
 		} else {
+			if (m_wasHidden) {
+				// Возврат из плитки: кадры обложки без ImGui-окон убили
+				// попап активного диалога (например, прогресса загрузки)
+				// — переоткроем его на первом видимом кадре.
+				m_view->NotifyShown();
+			}
 			m_wasHidden = false;
 		}
 

@@ -284,6 +284,14 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	}
 }
 
+void LauncherView::NotifyShown()
+{
+	// RenderDialogs открывает ImGui-попап только на СМЕНЕ state.dialog.
+	// За кадры обложки попап умер — сбрасываем кэш, и первый видимый
+	// кадр переоткроет активный диалог (с коротким fade).
+	m_lastDialog = Dialog::None;
+}
+
 bool LauncherView::LaunchIrisDone() const
 {
 	if (m_irisStartedAt < 0.0) {
@@ -416,6 +424,11 @@ void LauncherView::RenderLaunchIris(const LauncherState &state)
 void LauncherView::RenderCover(const LauncherState &state, float coverAlpha)
 {
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
+	// Дегенеративный вьюпорт (свёрнутое окно) — рисовать нечего, а
+	// нулевые размеры дальше дают шрифт 0 (assert imgui_draw).
+	if (viewport->WorkSize.x <= 0.0F || viewport->WorkSize.y <= 0.0F) {
+		return;
+	}
 	// Текст на background-списке в этой паре ImGui/SDL_Renderer не
 	// рендерится (картинки — рендерятся, глифы — нет), поэтому вся
 	// обложка рисуется в foreground-списке: в кадре обложки больше
