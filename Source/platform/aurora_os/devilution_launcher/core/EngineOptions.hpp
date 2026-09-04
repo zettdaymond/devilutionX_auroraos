@@ -31,6 +31,7 @@ enum class SettingId : uint8_t {
 	AutoElixirPickup,
 	AutoOilPickup,
 	AutoPickupInTown,
+	ItemPickupSound,
 	AutoRefillBelt,
 	HealPotionPickup,
 	FullHealPotionPickup,
@@ -43,6 +44,7 @@ enum class SettingId : uint8_t {
 	AutoEquipHelms,
 	AutoEquipShields,
 	AutoEquipJewelry,
+	AutoEquipSound,
 	RandomizeQuests,
 	TheoQuest,
 	CowQuest,
@@ -71,8 +73,6 @@ enum class SettingId : uint8_t {
 	SoundVolume,
 	MusicVolume,
 	WalkingSound,
-	AutoEquipSound,
-	ItemPickupSound,
 
 	Count
 };
@@ -173,6 +173,9 @@ inline constexpr std::array<SettingSpec, kSettingCount> kSettingCatalog { {
 	{ SettingId::AutoPickupInTown, SettingGroup::Gameplay, SettingKind::Toggle, "Game", "Auto Pickup in Town",
 		0, 0, 1, {}, {}, 0, "Автоподбор в городе",
 		"Автоподбор золота и эликсиров работает и в городе." },
+	{ SettingId::ItemPickupSound, SettingGroup::Gameplay, SettingKind::Toggle, "Audio", "Item Pickup Sound",
+		0, 0, 1, {}, {}, 0, "Звук подбора предметов",
+		"Поднятие предмета с земли издаёт характерный звук." },
 	{ SettingId::AutoRefillBelt, SettingGroup::Gameplay, SettingKind::Toggle, "Game", "Auto Refill Belt",
 		0, 0, 1, {}, {}, 0, "Автопополнение пояса",
 		"Выпитое зелье автоматически заменяется таким же из сумки." },
@@ -221,6 +224,9 @@ inline constexpr std::array<SettingSpec, kSettingCount> kSettingCatalog { {
 	{ SettingId::AutoEquipJewelry, SettingGroup::Gameplay, SettingKind::Toggle, "Game", "Auto Equip Jewelry",
 		0, 0, 1, {}, {}, 0, "Автоэкипировка украшений",
 		"Кольца и амулеты надеваются сами при подборе или покупке." },
+	{ SettingId::AutoEquipSound, SettingGroup::Gameplay, SettingKind::Toggle, "Audio", "Auto Equip Sound",
+		0, 0, 1, {}, {}, 0, "Звук автоэкипировки",
+		"Автоматическое надевание предмета при подборе звучит как обычная экипировка." },
 	{ SettingId::RandomizeQuests, SettingGroup::Gameplay, SettingKind::Toggle, "Game", "Randomize Quests",
 		1, 0, 1, {}, {}, 0, "Случайные квесты",
 		"Каждая новая игра выбирает случайный набор квестов, как заведено в оригинале." },
@@ -303,12 +309,6 @@ inline constexpr std::array<SettingSpec, kSettingCount> kSettingCatalog { {
 	{ SettingId::WalkingSound, SettingGroup::Audio, SettingKind::Toggle, "Audio", "Walking Sound",
 		1, 0, 1, {}, {}, 0, "Звук шагов",
 		"Персонаж слышен при ходьбе." },
-	{ SettingId::AutoEquipSound, SettingGroup::Audio, SettingKind::Toggle, "Audio", "Auto Equip Sound",
-		0, 0, 1, {}, {}, 0, "Звук автоэкипировки",
-		"Автоматическое надевание предмета при подборе звучит как обычная экипировка." },
-	{ SettingId::ItemPickupSound, SettingGroup::Audio, SettingKind::Toggle, "Audio", "Item Pickup Sound",
-		0, 0, 1, {}, {}, 0, "Звук подбора предметов",
-		"Поднятие предмета с земли издаёт характерный звук." },
 } };
 
 /// Спецификация настройки по её идентификатору.
