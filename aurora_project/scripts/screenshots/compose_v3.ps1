@@ -18,7 +18,7 @@ param(
 Add-Type -AssemblyName System.Drawing
 $repo = "D:\pr\Aurora\devilutionX_auroraos"
 $assets = "$repo\Source\platform\aurora_os\devilution_launcher\assets"
-$bgPath = if ($Bg) { $Bg } else { "$repo\.screenshots\store_bg.png" }
+$bgPath = if ($Bg) { $Bg } elseif (Test-Path "$repo\aurora_project\store_v3\store_bg.png") { "$repo\aurora_project\store_v3\store_bg.png" } else { "$repo\.screenshots\store_bg.png" }
 
 $W = 1080
 $H = 1920
