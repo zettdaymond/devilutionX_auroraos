@@ -156,7 +156,6 @@ void InitMonster(Monster &monster, Direction rd, size_t typeIndex, Point positio
 	monster.rndItemSeed = AdvanceRndSeed();
 	monster.aiSeed = AdvanceRndSeed();
 	monster.whoHit = 0;
-	monster.toHit = monster.data().toHit;
 	monster.minDamage = monster.data().minDamage;
 	monster.maxDamage = monster.data().maxDamage;
 	monster.minDamageSpecial = monster.data().minDamageSpecial;
@@ -182,7 +181,6 @@ void InitMonster(Monster &monster, Direction rd, size_t typeIndex, Point positio
 		else
 			monster.maxHitPoints += 100 << 6;
 		monster.hitPoints = monster.maxHitPoints;
-		monster.toHit += NightmareToHitBonus;
 		monster.minDamage = 2 * (monster.minDamage + 2);
 		monster.maxDamage = 2 * (monster.maxDamage + 2);
 		monster.minDamageSpecial = 2 * (monster.minDamageSpecial + 2);
@@ -195,7 +193,6 @@ void InitMonster(Monster &monster, Direction rd, size_t typeIndex, Point positio
 		else
 			monster.maxHitPoints += 200 << 6;
 		monster.hitPoints = monster.maxHitPoints;
-		monster.toHit += HellToHitBonus;
 		monster.minDamage = 4 * monster.minDamage + 6;
 		monster.maxDamage = 4 * monster.maxDamage + 6;
 		monster.minDamageSpecial = 4 * monster.minDamageSpecial + 6;
@@ -313,14 +310,57 @@ size_t GetMonsterTypeIndex(_monster_id type)
 	return LevelMonsterTypeCount;
 }
 
-void PlaceUniqueMonst(UniqueMonsterType uniqindex, size_t minionType, int bosspacksize)
+Point GetUniqueMonstPosition(UniqueMonsterType uniqindex)
 {
-	auto &monster = Monsters[ActiveMonsterCount];
-	const auto &uniqueMonsterData = UniqueMonstersData[static_cast<size_t>(uniqindex)];
+	if (setlevel) {
+		switch (uniqindex) {
+		case UniqueMonsterType::Lazarus:
+			return { 32, 46 };
+		case UniqueMonsterType::RedVex:
+			return { 40, 45 };
+		case UniqueMonsterType::BlackJade:
+			return { 38, 49 };
+		case UniqueMonsterType::SkeletonKing:
+			return { 35, 47 };
+		default:
+			break;
+		}
+	}
 
-	int count = 0;
+	switch (uniqindex) {
+	case UniqueMonsterType::SnotSpill:
+		return SetPiece.position.megaToWorld() + Displacement { 8, 12 };
+	case UniqueMonsterType::WarlordOfBlood:
+		return SetPiece.position.megaToWorld() + Displacement { 6, 7 };
+	case UniqueMonsterType::Zhar:
+		for (int i = 0; i < themeCount; i++) {
+			if (i == zharlib) {
+				return themeLoc[i].room.position.megaToWorld() + Displacement { 4, 4 };
+			}
+		}
+		break;
+	case UniqueMonsterType::Lazarus:
+		return SetPiece.position.megaToWorld() + Displacement { 3, 6 };
+	case UniqueMonsterType::RedVex:
+		return SetPiece.position.megaToWorld() + Displacement { 5, 3 };
+	case UniqueMonsterType::BlackJade:
+		return SetPiece.position.megaToWorld() + Displacement { 5, 9 };
+	case UniqueMonsterType::Butcher:
+		return SetPiece.position.megaToWorld() + Displacement { 4, 4 };
+	case UniqueMonsterType::NaKrul:
+		if (UberRow == 0 || UberCol == 0) {
+			UberDiabloMonsterIndex = -1;
+			break;
+		}
+		UberDiabloMonsterIndex = static_cast<int>(ActiveMonsterCount);
+		return { UberRow - 2, UberCol };
+	default:
+		break;
+	}
+
 	Point position;
-	while (true) {
+	int count = 0;
+	do {
 		position = Point { GenerateRnd(80), GenerateRnd(80) } + Displacement { 16, 16 };
 		int count2 = 0;
 		for (int x = position.x - 3; x < position.x + 3; x++) {
@@ -337,66 +377,20 @@ void PlaceUniqueMonst(UniqueMonsterType uniqindex, size_t minionType, int bosspa
 				continue;
 			}
 		}
+	} while (!CanPlaceMonster(position));
 
-		if (CanPlaceMonster(position)) {
-			break;
-		}
-	}
+	return position;
+}
 
-	if (uniqindex == UniqueMonsterType::SnotSpill) {
-		position = SetPiece.position.megaToWorld() + Displacement { 8, 12 };
-	}
-	if (uniqindex == UniqueMonsterType::WarlordOfBlood) {
-		position = SetPiece.position.megaToWorld() + Displacement { 6, 7 };
-	}
-	if (uniqindex == UniqueMonsterType::Zhar) {
-		for (int i = 0; i < themeCount; i++) {
-			if (i == zharlib) {
-				position = themeLoc[i].room.position.megaToWorld() + Displacement { 4, 4 };
-				break;
-			}
-		}
-	}
-	if (setlevel) {
-		if (uniqindex == UniqueMonsterType::Lazarus) {
-			position = { 32, 46 };
-		}
-		if (uniqindex == UniqueMonsterType::RedVex) {
-			position = { 40, 45 };
-		}
-		if (uniqindex == UniqueMonsterType::BlackJade) {
-			position = { 38, 49 };
-		}
-		if (uniqindex == UniqueMonsterType::SkeletonKing) {
-			position = { 35, 47 };
-		}
-	} else {
-		if (uniqindex == UniqueMonsterType::Lazarus) {
-			position = SetPiece.position.megaToWorld() + Displacement { 3, 6 };
-		}
-		if (uniqindex == UniqueMonsterType::RedVex) {
-			position = SetPiece.position.megaToWorld() + Displacement { 5, 3 };
-		}
-		if (uniqindex == UniqueMonsterType::BlackJade) {
-			position = SetPiece.position.megaToWorld() + Displacement { 5, 9 };
-		}
-	}
-	if (uniqindex == UniqueMonsterType::Butcher) {
-		position = SetPiece.position.megaToWorld() + Displacement { 4, 4 };
-	}
-
-	if (uniqindex == UniqueMonsterType::NaKrul) {
-		if (UberRow == 0 || UberCol == 0) {
-			UberDiabloMonsterIndex = -1;
-			return;
-		}
-		position = { UberRow - 2, UberCol };
-		UberDiabloMonsterIndex = static_cast<int>(ActiveMonsterCount);
-	}
+void PlaceUniqueMonst(UniqueMonsterType uniqindex, size_t minionType, int bosspacksize)
+{
+	const auto &uniqueMonsterData = UniqueMonstersData[static_cast<size_t>(uniqindex)];
 	const size_t typeIndex = GetMonsterTypeIndex(uniqueMonsterData.mtype);
+	const Point position = GetUniqueMonstPosition(uniqindex);
 	PlaceMonster(ActiveMonsterCount, typeIndex, position);
-	ActiveMonsterCount++;
 
+	Monster &monster = Monsters[ActiveMonsterCount];
+	ActiveMonsterCount++;
 	PrepareUniqueMonst(monster, uniqindex, minionType, bosspacksize, uniqueMonsterData);
 }
 
@@ -547,6 +541,13 @@ void PlaceQuestMonsters()
 		}
 	} else if (setlvlnum == SL_SKELKING) {
 		PlaceUniqueMonst(UniqueMonsterType::SkeletonKing, 0, 0);
+	} else if (setlvlnum == SL_VILEBETRAYER) {
+		AddMonsterType(UniqueMonsterType::Lazarus, PLACE_UNIQUE);
+		AddMonsterType(UniqueMonsterType::RedVex, PLACE_UNIQUE);
+		AddMonsterType(UniqueMonsterType::BlackJade, PLACE_UNIQUE);
+		PlaceUniqueMonst(UniqueMonsterType::Lazarus, 0, 0);
+		PlaceUniqueMonst(UniqueMonsterType::RedVex, 0, 0);
+		PlaceUniqueMonst(UniqueMonsterType::BlackJade, 0, 0);
 	}
 }
 
@@ -1249,17 +1250,17 @@ void MonsterAttackEnemy(Monster &monster, int hit, int minDam, int maxDam)
 bool MonsterAttack(Monster &monster)
 {
 	if (monster.animInfo.currentFrame == monster.data().animFrameNum - 1) {
-		MonsterAttackEnemy(monster, monster.toHit, monster.minDamage, monster.maxDamage);
+		MonsterAttackEnemy(monster, monster.toHit(sgGameInitInfo.nDifficulty), monster.minDamage, monster.maxDamage);
 		if (monster.ai != MonsterAIID::Snake)
 			PlayEffect(monster, MonsterSound::Attack);
 	}
 	if (IsAnyOf(monster.type().type, MT_NMAGMA, MT_YMAGMA, MT_BMAGMA, MT_WMAGMA) && monster.animInfo.currentFrame == 8) {
-		MonsterAttackEnemy(monster, monster.toHit + 10, monster.minDamage - 2, monster.maxDamage - 2);
+		MonsterAttackEnemy(monster, monster.toHit(sgGameInitInfo.nDifficulty) + 10, monster.minDamage - 2, monster.maxDamage - 2);
 
 		PlayEffect(monster, MonsterSound::Attack);
 	}
 	if (IsAnyOf(monster.type().type, MT_STORM, MT_RSTORM, MT_STORML, MT_MAEL) && monster.animInfo.currentFrame == 12) {
-		MonsterAttackEnemy(monster, monster.toHit - 20, monster.minDamage + 4, monster.maxDamage + 4);
+		MonsterAttackEnemy(monster, monster.toHit(sgGameInitInfo.nDifficulty) - 20, monster.minDamage + 4, monster.maxDamage + 4);
 
 		PlayEffect(monster, MonsterSound::Attack);
 	}
@@ -1582,11 +1583,17 @@ void FollowTheLeader(Monster &monster)
 	if (leader == nullptr)
 		return;
 
-	if (monster.activeForTicks >= leader->activeForTicks)
-		return;
+	if (leader->activeForTicks > monster.activeForTicks) {
+		monster.position.last = leader->position.tile;
+		monster.activeForTicks = leader->activeForTicks - 1;
+	}
 
-	monster.position.last = leader->position.tile;
-	monster.activeForTicks = leader->activeForTicks - 1;
+	if (monster.ai != MonsterAIID::Gargoyle || (monster.flags & MFLAG_ALLOW_SPECIAL) == 0)
+		return;
+	if (leader->mode == MonsterMode::SpecialMeleeAttack)
+		return;
+	monster.flags &= ~MFLAG_ALLOW_SPECIAL;
+	monster.mode = MonsterMode::SpecialMeleeAttack;
 }
 
 void GroupUnity(Monster &monster)
@@ -3171,15 +3178,6 @@ void PrepareUniqueMonst(Monster &monster, UniqueMonsterType monsterType, size_t 
 	InitTRNForUniqueMonster(monster);
 	monster.uniqTrans = uniquetrans++;
 
-	if (uniqueMonsterData.customToHit != 0) {
-		monster.toHit = uniqueMonsterData.customToHit;
-
-		if (sgGameInitInfo.nDifficulty == DIFF_NIGHTMARE) {
-			monster.toHit += NightmareToHitBonus;
-		} else if (sgGameInitInfo.nDifficulty == DIFF_HELL) {
-			monster.toHit += HellToHitBonus;
-		}
-	}
 	if (uniqueMonsterData.customArmorClass != 0) {
 		monster.armorClass = uniqueMonsterData.customArmorClass;
 
@@ -3537,15 +3535,6 @@ void SetMapMonsters(const uint16_t *dunData, Point startPosition)
 	if (setlevel)
 		for (int i = 0; i < MAX_PLRS; i++)
 			AddMonster(GolemHoldingCell, Direction::South, 0, false);
-
-	if (setlevel && setlvlnum == SL_VILEBETRAYER) {
-		AddMonsterType(UniqueMonsterType::Lazarus, PLACE_UNIQUE);
-		AddMonsterType(UniqueMonsterType::RedVex, PLACE_UNIQUE);
-		AddMonsterType(UniqueMonsterType::BlackJade, PLACE_UNIQUE);
-		PlaceUniqueMonst(UniqueMonsterType::Lazarus, 0, 0);
-		PlaceUniqueMonst(UniqueMonsterType::RedVex, 0, 0);
-		PlaceUniqueMonst(UniqueMonsterType::BlackJade, 0, 0);
-	}
 
 	int width = SDL_SwapLE16(dunData[0]);
 	int height = SDL_SwapLE16(dunData[1]);
@@ -4570,7 +4559,7 @@ void SpawnGolem(Player &player, Monster &golem, Point position, Missile &missile
 	golem.maxHitPoints = 2 * (320 * missile._mispllvl + player._pMaxMana / 3);
 	golem.hitPoints = golem.maxHitPoints;
 	golem.armorClass = 25;
-	golem.toHit = 5 * (missile._mispllvl + 8) + 2 * player._pLevel;
+	golem.golemToHit = 5 * (missile._mispllvl + 8) + 2 * player._pLevel;
 	golem.minDamage = 2 * (missile._mispllvl + 4);
 	golem.maxDamage = 2 * (missile._mispllvl + 8);
 	golem.flags |= MFLAG_GOLEM;
@@ -4708,7 +4697,7 @@ bool Monster::isPossibleToHit() const
 	return !(hitPoints >> 6 <= 0
 	    || talkMsg != TEXT_NONE
 	    || (type().type == MT_ILLWEAV && goal == MonsterGoal::Retreat)
-	    || mode == MonsterMode::Charge
+	    || (IsAnyOf(mode, MonsterMode::Charge, MonsterMode::Death))
 	    || (IsAnyOf(type().type, MT_COUNSLR, MT_MAGISTR, MT_CABALIST, MT_ADVOCATE) && goal != MonsterGoal::Normal));
 }
 
@@ -4739,6 +4728,25 @@ MonsterMode Monster::getVisualMonsterMode() const
 		}
 	}
 	return MonsterMode::Petrified;
+}
+
+unsigned int Monster::toHit(_difficulty difficulty) const
+{
+	if (isPlayerMinion())
+		return golemToHit;
+
+	unsigned int baseToHit = data().toHit;
+	if (isUnique() && UniqueMonstersData[static_cast<size_t>(uniqueType)].customToHit != 0) {
+		baseToHit = UniqueMonstersData[static_cast<size_t>(uniqueType)].customToHit;
+	}
+
+	if (difficulty == DIFF_NIGHTMARE) {
+		baseToHit += NightmareToHitBonus;
+	} else if (difficulty == DIFF_HELL) {
+		baseToHit += HellToHitBonus;
+	}
+
+	return baseToHit;
 }
 
 unsigned int Monster::toHitSpecial(_difficulty difficulty) const

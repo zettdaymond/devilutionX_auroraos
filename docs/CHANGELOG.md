@@ -5,6 +5,143 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+## DevilutionX 1.5.4
+
+### Features
+
+#### Multiplayer
+
+- Make invalid items unusable
+
+#### Controls
+
+- Better support for various gamepads
+- Gamepad: Improve navigation of the stash
+- Improve keymapper options
+
+#### Platforms
+
+- Added support for macOS 10.4 PowerPC
+- Added support for Windows XP
+- Android: Avoid game lagging on devices that can switch refresh rates
+- Correct networking support on big-endian systems
+- iOS: High refresh rate support
+- Xbox One/Series: Include translations
+
+#### Translations
+
+- Improve rendering of Turkish texts
+- Update Italian translation
+- Update Russian translation
+- Update Ukrainian translation
+
+#### Stability / Performance / System
+
+- Fix crashes on device hot-plugging
+- Fix game crash
+- Hide Upscale option in the Settings menu to avoid stability issues
+- Looser validation in Single Player games
+- Make file sync services less likely to corrupt saves
+- Make it clearer how to switch between Hellfire and Diablo
+- Use available screen space in the Settings menu
+
+### Bug Fixes
+
+#### Gameplay
+
+- Fix being able to repair equipped items for free
+- Fix game freezing when loading Lazarus lair from a save game
+- Unique drops now reset on a new game
+- Wake up the whole pack of Gargoyles when disturbed
+
+#### Platforms
+
+- Android: Fix performance and audio issues on recent versions
+- Android: Fix full immersive mode in Android 9 and higher
+- Incorrect menu graphics on DirectFB devices
+- PS4/Switch/Vita/Xbox One/Series: Correct controller mapping
+
+#### Multiplayer
+
+- Correct some item validation
+- Fix items being lost when held in the cursor during lag spikes
+
+### Bug Fixes for Original Diablo Bugs
+
+#### Gameplay
+
+- Fix non-solid fences in the caves
+
+### Bug Fixes for Original Hellfire Bugs
+
+#### Gameplay
+
+- Fix incorrectly solid tile next to crypt stairs down
+
+#### Multiplayer
+
+- Fix runes not being seen as a player spell in PvP
+
+## DevilutionX 1.5.3
+
+### Bug Fixes
+
+#### Multiplayer
+
+- Resolved validation multiplayer errors.
+
+#### Translations
+
+- Added Hungarian translation.
+- Added Turkish translation.
+
+#### Stability / Performance / System
+
+- Fixed issue where a line is repeated in the info panel.
+- Fixed errors when converting Hellfire saved games.
+- Miyoo Mini: Update integration.
+- Android: Update integration (now requires Android 5.0).
+- Android: Improved the data import dialog.
+- Android: Game now runs full screen on devices with a notch.
+- Windows: Fix non-English TCP error messages.
+
+### Bugfixes for original Diablo bugs
+
+#### Gameplay
+
+- Fixed item repairs with multiple gold piles.
+
+#### Known Issues
+
+- Some builds (like Amiga) are not ready yet and will be uploaded over the next couple of days
+
+## DevilutionX 1.5.2
+
+### Bug Fixes
+
+#### Multiplayer
+
+- Unable to join game due to invalid player data
+
+#### Translations
+
+- Improve rendering of Chinese/Japanese/Korean texts
+
+#### Gameplay
+
+- Hellfire items not saving their identified state
+
+#### Stability / Performance / System
+
+- Amiga: Incorrect rendering of things behind transparent elements
+- Android: Game locking up when switching sound output
+- Linux: Statically link BZIP2 and libsodium on x86_64
+- Stash corrupting when converting a hero between Diablo and Hellfire
+- Xbox: Game crashing unexpectedly
+- Xbox: Improve performance
+
 ## DevilutionX 1.5.1
 
 ### Features

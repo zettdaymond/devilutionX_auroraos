@@ -1,11 +1,14 @@
 #include "utils/paths.h"
 
+#include <string>
+
 #include <SDL.h>
 
 #include "appfat.h"
 #include "utils/file_util.h"
 #include "utils/log.hpp"
 #include "utils/sdl_ptrs.h"
+#include "utils/stdcompat/optional.hpp"
 
 #ifdef __IPHONEOS__
 #include "platform/ios/ios_paths.h"
@@ -136,6 +139,23 @@ const std::string &AssetsPath()
 		assetsPath.emplace("romfs:/");
 #elif defined(AURORA_OS)
         assetsPath.emplace( AuroraOsStandartPaths::GetBundledAssetsPath() );
+#elif defined(__APPLE__) && defined(USE_SDL1)
+		// In `Info.plist` we have
+		//
+		//    <key>SDL_FILESYSTEM_BASE_DIR_TYPE</key>
+		//    <string>resource</string>
+		//
+		// This means `SDL_GetBasePath()` returns exedir for non-bundled
+		// and the `app_dir.app/Resources/` for bundles.
+		//
+		// Our built-in resources are directly in the `devilutionx.app/Resources` directory
+		// and are normally looked up via a relative lookup in `FindAsset`.
+		// In SDL2, this is implemented by calling `SDL_OpenFPFromBundleOrFallback`
+		// from `SDL_RWFromFile` but SDL1 doesn't do it, so we set the directory explicitly.
+		//
+		// Note that SDL3 reverts to SDL1 behaviour!
+		// https://github.com/libsdl-org/SDL/blob/962268ca21ed10b9cee31198c22681099293f20a/docs/README-migration.md?plain=1#L1623
+		assetsPath.emplace(FromSDL(SDL_GetBasePath()));
 #else
         assetsPath.emplace(FromSDL(SDL_GetBasePath()) + ("assets" DIRECTORY_SEPARATOR_STR));
 #endif

@@ -23,8 +23,8 @@ if(DEVILUTIONX_AURORA_OS)
 	)
 else()
 	FetchContent_Declare(SDL2
-	    URL https://github.com/libsdl-org/SDL/releases/download/release-2.30.5/SDL2-2.30.5.tar.gz
-	    URL_HASH SHA256=f374f3fa29c37dfcc20822d4a7d7dc57e58924d1a5f2ad511bfab4c8193de63b
+	    URL https://github.com/libsdl-org/SDL/releases/download/release-2.32.0/SDL2-2.32.0.tar.gz
+	    URL_HASH SHA256=f5c2b52498785858f3de1e2996eba3c1b805d08fe168a47ea527c7fc339072d0
 	)
 endif()
 

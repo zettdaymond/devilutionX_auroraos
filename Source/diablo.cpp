@@ -19,6 +19,7 @@
 #include "debug.h"
 #endif
 #include "DiabloUI/diabloui.h"
+#include "controls/devices/kbcontroller.h"
 #include "controls/plrctrls.h"
 #include "controls/remap_keyboard.h"
 #include "diablo.h"
@@ -33,6 +34,7 @@
 #include "engine/load_cel.hpp"
 #include "engine/load_file.hpp"
 #include "engine/random.hpp"
+#include "engine/render/clx_render.hpp"
 #include "engine/sound.h"
 #include "error.h"
 #include "gamemenu.h"
@@ -359,7 +361,7 @@ void LeftMouseDown(uint16_t modState)
 			} else if (chrflag && GetLeftPanel().contains(MousePosition)) {
 				CheckChrBtns();
 			} else if (invflag && GetRightPanel().contains(MousePosition)) {
-				if (!dropGoldFlag)
+				if (!DropGoldFlag)
 					CheckInvItem(isShiftHeld, isCtrlHeld);
 			} else if (IsStashOpen && GetLeftPanel().contains(MousePosition)) {
 				if (!IsWithdrawGoldOpen)
@@ -383,7 +385,7 @@ void LeftMouseDown(uint16_t modState)
 			}
 		}
 	} else {
-		if (!talkflag && !dropGoldFlag && !IsWithdrawGoldOpen && !gmenu_is_active())
+		if (!talkflag && !DropGoldFlag && !IsWithdrawGoldOpen && !gmenu_is_active())
 			CheckInvScrn(isShiftHeld, isCtrlHeld);
 		DoPanBtn();
 		CheckStashButtonPress(MousePosition);
@@ -478,10 +480,6 @@ void PressKey(SDL_Keycode vkey, uint16_t modState)
 	if (vkey == SDLK_UNKNOWN)
 		return;
 
-	if (vkey == SDLK_PAUSE) {
-		diablo_pause_game();
-		return;
-	}
 	if (gmenu_presskeys(vkey) || control_presskeys(vkey)) {
 		return;
 	}
@@ -492,10 +490,13 @@ void PressKey(SDL_Keycode vkey, uint16_t modState)
 		}
 		sgOptions.Keymapper.KeyPressed(vkey);
 		if (vkey == SDLK_RETURN || vkey == SDLK_KP_ENTER) {
+#if HAS_KBCTRL == 0
 			if ((modState & KMOD_ALT) != 0) {
 				sgOptions.Graphics.fullscreen.SetValue(!IsFullScreen());
 				SaveOptions();
-			} else {
+			} else
+#endif
+			{
 				control_type_message();
 			}
 		}
@@ -511,7 +512,7 @@ void PressKey(SDL_Keycode vkey, uint16_t modState)
 		return;
 	}
 
-	if (dropGoldFlag) {
+	if (DropGoldFlag) {
 		control_drop_gold(vkey);
 		return;
 	}
@@ -527,10 +528,12 @@ void PressKey(SDL_Keycode vkey, uint16_t modState)
 	sgOptions.Keymapper.KeyPressed(vkey);
 
 	if (PauseMode == 2) {
+#if HAS_KBCTRL == 0
 		if ((vkey == SDLK_RETURN || vkey == SDLK_KP_ENTER) && (modState & KMOD_ALT) != 0) {
 			sgOptions.Graphics.fullscreen.SetValue(!IsFullScreen());
 			SaveOptions();
 		}
+#endif
 		return;
 	}
 
@@ -566,8 +569,10 @@ void PressKey(SDL_Keycode vkey, uint16_t modState)
 	case SDLK_RETURN:
 	case SDLK_KP_ENTER:
 		if ((modState & KMOD_ALT) != 0) {
+#if HAS_KBCTRL == 0
 			sgOptions.Graphics.fullscreen.SetValue(!IsFullScreen());
 			SaveOptions();
+#endif
 		} else if (stextflag != TalkID::None) {
 			StoreEnter();
 		} else if (QuestLogIsOpen) {
@@ -675,23 +680,6 @@ void HandleMouseButtonUp(Uint8 button, uint16_t modState)
 	}
 }
 
-bool HandleTextInput(string_view text)
-{
-	if (IsTalkActive()) {
-		control_new_text(text);
-		return true;
-	}
-	if (dropGoldFlag) {
-		GoldDropNewText(text);
-		return true;
-	}
-	if (IsWithdrawGoldOpen) {
-		GoldWithdrawNewText(text);
-		return true;
-	}
-	return false;
-}
-
 [[maybe_unused]] void LogUnhandledEvent(const char *name, int value)
 {
 	LogVerbose("Unhandled SDL event: {} {}", name, value);
@@ -721,34 +709,24 @@ void GameEventHandler(const SDL_Event &event, uint16_t modState)
 		return;
 	}
 
+	if (IsTalkActive() && HandleTalkTextInputEvent(event)) {
+		return;
+	}
+	if (DropGoldFlag && HandleGoldDropTextInputEvent(event)) {
+		return;
+	}
+	if (IsWithdrawGoldOpen && HandleGoldWithdrawTextInputEvent(event)) {
+		return;
+	}
+
 	switch (event.type) {
 	case SDL_KEYDOWN: {
-#ifdef USE_SDL1
-		// SDL1 does not support TEXTINPUT events, so we emulate them here.
-		const Uint16 bmpCodePoint = event.key.keysym.unicode;
-		if (bmpCodePoint >= ' ') {
-			std::string utf8;
-			AppendUtf8(bmpCodePoint, utf8);
-			if (HandleTextInput(utf8)) {
-				return;
-			}
-		}
-#endif
 		PressKey(event.key.keysym.sym, modState);
 		return;
 	}
 	case SDL_KEYUP:
 		ReleaseKey(event.key.keysym.sym);
 		return;
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-	case SDL_TEXTEDITING:
-		return;
-	case SDL_TEXTINPUT:
-		if (!HandleTextInput(event.text.text)) {
-			LogUnhandledEvent("SDL_TEXTINPUT", event.text.windowID);
-		}
-		return;
-#endif
 	case SDL_MOUSEMOTION:
 		if (ControlMode == ControlTypes::KeyboardAndMouse && invflag)
 			InvalidateInventorySlot();
@@ -763,6 +741,51 @@ void GameEventHandler(const SDL_Event &event, uint16_t modState)
 		MousePosition = { event.button.x, event.button.y };
 		HandleMouseButtonUp(event.button.button, modState);
 		return;
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	case SDL_MOUSEWHEEL:
+		if (event.wheel.y > 0) { // Up
+			if (stextflag != TalkID::None) {
+				StoreUp();
+			} else if (QuestLogIsOpen) {
+				QuestlogUp();
+			} else if (HelpFlag) {
+				HelpScrollUp();
+			} else if (ChatLogFlag) {
+				ChatLogScrollUp();
+			} else if (IsStashOpen) {
+				Stash.PreviousPage();
+			} else if (SDL_GetModState() & KMOD_CTRL) {
+				if (AutomapActive) {
+					AutomapZoomIn();
+				}
+			} else {
+				sgOptions.Keymapper.KeyPressed(MouseScrollUpButton);
+			}
+		} else if (event.wheel.y < 0) { // down
+			if (stextflag != TalkID::None) {
+				StoreDown();
+			} else if (QuestLogIsOpen) {
+				QuestlogDown();
+			} else if (HelpFlag) {
+				HelpScrollDown();
+			} else if (ChatLogFlag) {
+				ChatLogScrollDown();
+			} else if (IsStashOpen) {
+				Stash.NextPage();
+			} else if (SDL_GetModState() & KMOD_CTRL) {
+				if (AutomapActive) {
+					AutomapZoomOut();
+				}
+			} else {
+				sgOptions.Keymapper.KeyPressed(MouseScrollDownButton);
+			}
+		} else if (event.wheel.x > 0) { // left
+			sgOptions.Keymapper.KeyPressed(MouseScrollLeftButton);
+		} else if (event.wheel.x < 0) { // right
+			sgOptions.Keymapper.KeyPressed(MouseScrollRightButton);
+		}
+		break;
+#endif
 	default:
 		if (IsCustomEvent(event.type)) {
 			if (gbIsMultiplayer)
@@ -1156,9 +1179,9 @@ void ApplicationInit()
 
 void DiabloInit()
 {
-	if (forceSpawn || *sgOptions.StartUp.shareware)
+	if (forceSpawn || *sgOptions.GameMode.shareware)
 		gbIsSpawn = true;
-	if (forceDiablo || *sgOptions.StartUp.gameMode == StartUpGameMode::Diablo)
+	if (forceDiablo || *sgOptions.GameMode.gameMode == StartUpGameMode::Diablo)
 		gbIsHellfire = false;
 	if (forceHellfire)
 		gbIsHellfire = true;
@@ -1179,7 +1202,7 @@ void DiabloInit()
 	UiInitialize();
 	was_ui_init = true;
 
-	if (gbIsHellfire && !forceHellfire && *sgOptions.StartUp.gameMode == StartUpGameMode::Ask) {
+	if (gbIsHellfire && !forceHellfire && *sgOptions.GameMode.gameMode == StartUpGameMode::Ask) {
 		UiSelStartUpGameOption();
 		if (!gbIsHellfire) {
 			// Reinitialize the UI Elements cause we changed the game
@@ -1805,6 +1828,12 @@ void InitKeymapActions()
 	    N_("Pause Game"),
 	    N_("Pauses the game."),
 	    'P',
+	    diablo_pause_game);
+	sgOptions.Keymapper.AddAction(
+	    "Pause Game (Alternate)",
+	    N_("Pause Game (Alternate)"),
+	    N_("Pauses the game."),
+	    SDLK_PAUSE,
 	    diablo_pause_game);
 	sgOptions.Keymapper.AddAction(
 	    "DecreaseGamma",
@@ -2539,17 +2568,16 @@ bool TryIconCurs()
 	if (pcurs == CURSOR_TELEPORT) {
 		const SpellID spellID = myPlayer.inventorySpell;
 		const SpellType spellType = SpellType::Scroll;
-		const int spellLevel = myPlayer.GetSpellLevel(spellID);
 		const int spellFrom = myPlayer.spellFrom;
 		if (IsWallSpell(spellID)) {
 			Direction sd = GetDirection(myPlayer.position.tile, cursPosition);
-			NetSendCmdLocParam5(true, CMD_SPELLXYD, cursPosition, static_cast<int8_t>(spellID), static_cast<uint8_t>(spellType), static_cast<uint16_t>(sd), spellLevel, spellFrom);
+			NetSendCmdLocParam4(true, CMD_SPELLXYD, cursPosition, static_cast<int8_t>(spellID), static_cast<uint8_t>(spellType), static_cast<uint16_t>(sd), spellFrom);
 		} else if (pcursmonst != -1) {
-			NetSendCmdParam5(true, CMD_SPELLID, pcursmonst, static_cast<int8_t>(spellID), static_cast<uint8_t>(spellType), spellLevel, spellFrom);
+			NetSendCmdParam4(true, CMD_SPELLID, pcursmonst, static_cast<int8_t>(spellID), static_cast<uint8_t>(spellType), spellFrom);
 		} else if (pcursplr != -1 && !myPlayer.friendlyMode) {
-			NetSendCmdParam5(true, CMD_SPELLPID, pcursplr, static_cast<int8_t>(spellID), static_cast<uint8_t>(spellType), spellLevel, spellFrom);
+			NetSendCmdParam4(true, CMD_SPELLPID, pcursplr, static_cast<int8_t>(spellID), static_cast<uint8_t>(spellType), spellFrom);
 		} else {
-			NetSendCmdLocParam4(true, CMD_SPELLXY, cursPosition, static_cast<int8_t>(spellID), static_cast<uint8_t>(spellType), spellLevel, spellFrom);
+			NetSendCmdLocParam3(true, CMD_SPELLXY, cursPosition, static_cast<int8_t>(spellID), static_cast<uint8_t>(spellType), spellFrom);
 		}
 		NewCursor(CURSOR_HAND);
 		return true;
@@ -2664,7 +2692,7 @@ bool PressEscKey()
 		rv = true;
 	}
 
-	if (dropGoldFlag) {
+	if (DropGoldFlag) {
 		control_drop_gold(SDLK_ESCAPE);
 		rv = true;
 	}
@@ -2728,6 +2756,7 @@ void LoadGameLevel(bool firstflag, lvl_entry lvldir)
 	IncProgress();
 	MakeLightTable();
 	SetDungeonMicros();
+	ClearClxDrawCache();
 	LoadLvlGFX();
 	IncProgress();
 
@@ -2736,6 +2765,7 @@ void LoadGameLevel(bool firstflag, lvl_entry lvldir)
 		qtextflag = false;
 		if (!HeadlessMode) {
 			InitInv();
+			ClearUniqueItemFlags();
 			InitQuestText();
 			InitInfoBoxGfx();
 			InitHelp();

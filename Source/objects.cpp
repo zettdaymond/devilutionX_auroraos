@@ -3091,9 +3091,8 @@ void OperateShrine(Player &player, Object &shrine, _sfx_id sType)
 	if (shrine._oSelFlag == 0)
 		return;
 
-	if (dropGoldFlag) {
+	if (DropGoldFlag) {
 		CloseGoldDrop();
-		dropGoldValue = 0;
 	}
 
 	SetRndSeed(shrine._oRndSeed);
@@ -3736,7 +3735,7 @@ bool Object::IsDisabled() const
 	if (!IsShrine()) {
 		return false;
 	}
-	return IsAnyOf(static_cast<shrine_type>(_oVar1), shrine_type::ShrineFascinating, shrine_type::ShrineOrnate, shrine_type::ShrineSacred);
+	return IsAnyOf(static_cast<shrine_type>(_oVar1), shrine_type::ShrineFascinating, shrine_type::ShrineOrnate, shrine_type::ShrineSacred, shrine_type::ShrineMurphys);
 }
 
 Object *FindObjectAtPosition(Point position, bool considerLargeObjects)

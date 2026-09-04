@@ -36,7 +36,7 @@
 #include <unistd.h>
 #endif
 
-#ifdef __APPLE__
+#if defined(__APPLE__) && DARWIN_MAJOR_VERSION >= 9
 #include <copyfile.h>
 #endif
 
@@ -94,9 +94,9 @@ bool FileExists(const char *path)
 			::SetLastError(ERROR_SUCCESS);
 		} else {
 #if defined(NXDK)
-			LogError("GetFileAttributesA: error code {}", ::GetLastError());
+			LogError("GetFileAttributesA({}): error code {}", path, ::GetLastError());
 #else
-			LogError("PathFileExistsW: error code {}", ::GetLastError());
+			LogError("PathFileExistsW({}): error code {}", path, ::GetLastError());
 #endif
 		}
 		return false;
@@ -346,7 +346,7 @@ void CopyFileOverwrite(const char *from, const char *to)
 	if (!::CopyFileW(&fromUtf16[0], &toUtf16[0], /*bFailIfExists=*/false)) {
 		LogError("Failed to copy {} to {}", from, to);
 	}
-#elif defined(__APPLE__)
+#elif defined(__APPLE__) && DARWIN_MAJOR_VERSION >= 9
 	::copyfile(from, to, nullptr, COPYFILE_ALL);
 #elif defined(DVL_HAS_FILESYSTEM)
 	std::error_code error;

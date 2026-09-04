@@ -116,12 +116,10 @@ void FreeRenderer()
 {
 #if defined(_WIN32) && !defined(NXDK)
 	bool wasD3D9 = false;
-	bool wasD3D11 = false;
 	if (renderer != nullptr) {
 		SDL_RendererInfo previousRendererInfo;
 		SDL_GetRendererInfo(renderer, &previousRendererInfo);
-		wasD3D9 = (std::string_view(previousRendererInfo.name) == "direct3d");
-		wasD3D11 = (std::string_view(previousRendererInfo.name) == "direct3d11");
+		wasD3D9 = (string_view(previousRendererInfo.name) == "direct3d");
 	}
 #endif
 
@@ -140,10 +138,9 @@ void FreeRenderer()
 #endif
 	}
 
-#if defined(_WIN32) && !defined(NXDK)
+#if defined(_WIN32) && !defined(NXDK) && !defined(USE_SDL1)
 	// On Windows 11 the directx9 VSYNC timer doesn't get recreated properly, see https://github.com/libsdl-org/SDL/issues/5099
-	// Furthermore, the direct3d11 driver "poisons" the window so it can't be used by another renderer
-	if ((wasD3D9 && *sgOptions.Graphics.upscale && *sgOptions.Graphics.vSync) || (wasD3D11 && !*sgOptions.Graphics.upscale)) {
+	if (wasD3D9 && *sgOptions.Graphics.upscale && *sgOptions.Graphics.frameRateControl != FrameRateControl::VerticalSync) {
 		std::string title = SDL_GetWindowTitle(ghMainWnd);
 		Uint32 flags = SDL_GetWindowFlags(ghMainWnd);
 		Rectangle dimensions;
@@ -425,7 +422,7 @@ void ReinitializeTexture()
 	auto quality = StrCat(static_cast<int>(*sgOptions.Graphics.scaleQuality));
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, quality.c_str());
 
-	texture = SDLWrap::CreateTexture(renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING, gnScreenWidth, gnScreenHeight);
+	texture = SDLWrap::CreateTexture(renderer, DEVILUTIONX_DISPLAY_TEXTURE_FORMAT, SDL_TEXTUREACCESS_STREAMING, gnScreenWidth, gnScreenHeight);
 }
 
 void ReinitializeIntegerScale()
@@ -459,7 +456,7 @@ void ReinitializeRenderer()
 	if (*sgOptions.Graphics.upscale) {
 		Uint32 rendererFlags = 0;
 
-		if (*sgOptions.Graphics.vSync) {
+		if (*sgOptions.Graphics.frameRateControl == FrameRateControl::VerticalSync) {
 			rendererFlags |= SDL_RENDERER_PRESENTVSYNC;
 		}
 

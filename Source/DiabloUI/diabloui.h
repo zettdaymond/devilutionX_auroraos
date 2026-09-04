@@ -17,7 +17,10 @@
 namespace devilution {
 
 extern std::size_t SelectedItem;
-extern bool textInputActive;
+bool IsTextInputActive();
+
+extern const string_view BannedNames[];
+extern const size_t BannedNamesCount;
 
 enum _artFocus : uint8_t {
 	FOCUS_SMALL,
@@ -102,7 +105,7 @@ void UiLoadDefaultPalette();
 bool UiLoadBlackBackground();
 void LoadBackgroundArt(const char *pszFile, int frames = 1);
 void UiAddBackground(std::vector<std::unique_ptr<UiItemBase>> *vecDialog);
-void UiAddLogo(std::vector<std::unique_ptr<UiItemBase>> *vecDialog);
+void UiAddLogo(std::vector<std::unique_ptr<UiItemBase>> *vecDialog, int y = GetUIRectangle().position.y);
 void UiFocusNavigationSelect();
 void UiFocusNavigationEsc();
 void UiFocusNavigationYesNo();

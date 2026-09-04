@@ -25,10 +25,10 @@ jobs:
     # well on Windows or Mac.  You can convert this to a matrix build if you need
     # cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-    runs-on: macos-latest
+    runs-on: macos-13
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -36,8 +36,8 @@ jobs:
       uses: actions/cache@v3
       with:
         path: build
-        key: ${{ github.workflow }}-v2-${{ github.sha }}
-        restore-keys: ${{ github.workflow }}-v2-
+        key: ${{ github.workflow }}-v1.5-2-${{ github.sha }}
+        restore-keys: ${{ github.workflow }}-v1.5-2-
 
     - name: Configure CMake
       # Use a bash shell so we can use the same syntax for environment variable
@@ -58,7 +58,7 @@ jobs:
 
     - name: Upload-Package
       if: ${{ !env.ACT }}
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v5
       with:
         name: devilutionx-iOS.ipa
         path: build/devilutionx-iOS.ipa

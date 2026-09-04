@@ -48,6 +48,14 @@ enum class ScalingQuality : uint8_t {
 	AnisotropicFiltering,
 };
 
+enum class FrameRateControl : uint8_t {
+	None = 0,
+#ifndef USE_SDL1
+	VerticalSync = 1,
+#endif
+	CPUSleep = 2,
+};
+
 enum class Resampler : uint8_t {
 #ifdef DEVILUTIONX_RESAMPLER_SPEEX
 	Speex = 0,
@@ -411,12 +419,18 @@ protected:
 	const char *description;
 };
 
-struct StartUpOptions : OptionCategoryBase {
-	StartUpOptions();
+struct GameModeOptions : OptionCategoryBase {
+	GameModeOptions();
 	std::vector<OptionEntryBase *> GetEntries() override;
 
 	OptionEntryEnum<StartUpGameMode> gameMode;
 	OptionEntryBoolean shareware;
+};
+
+struct StartUpOptions : OptionCategoryBase {
+	StartUpOptions();
+	std::vector<OptionEntryBase *> GetEntries() override;
+
 	/** @brief Play game intro video on diablo startup. */
 	OptionEntryEnum<StartUpIntro> diabloIntro;
 	/** @brief Play game intro video on hellfire startup. */
@@ -493,9 +507,9 @@ struct GraphicsOptions : OptionCategoryBase {
 	OptionEntryEnum<ScalingQuality> scaleQuality;
 	/** @brief Only scale by values divisible by the width and height. */
 	OptionEntryBoolean integerScaling;
-	/** @brief Enable vsync on the output. */
-	OptionEntryBoolean vSync;
 #endif
+	/** @brief Limit frame rate either for vsync or CPU load. */
+	OptionEntryEnum<FrameRateControl> frameRateControl;
 	/** @brief Gamma correction level. */
 	OptionEntryInt<int> gammaCorrection;
 	/** @brief Zoom on start. */
@@ -512,8 +526,6 @@ struct GraphicsOptions : OptionCategoryBase {
 	/** @brief Maximum width / height for the hardware cursor. Larger cursors fall back to software. */
 	OptionEntryInt<int> hardwareCursorMaxSize;
 #endif
-	/** @brief Enable FPS Limiter. */
-	OptionEntryBoolean limitFPS;
 	/** @brief Show FPS, even without the -f command line flag. */
 	OptionEntryBoolean showFPS;
 };
@@ -642,6 +654,10 @@ struct LanguageOptions : OptionCategoryBase {
 };
 
 constexpr uint32_t KeymapperMouseButtonMask = 1 << 31;
+constexpr uint32_t MouseScrollUpButton = 65536 | KeymapperMouseButtonMask;
+constexpr uint32_t MouseScrollDownButton = 65537 | KeymapperMouseButtonMask;
+constexpr uint32_t MouseScrollLeftButton = 65538 | KeymapperMouseButtonMask;
+constexpr uint32_t MouseScrollRightButton = 65539 | KeymapperMouseButtonMask;
 
 /** The Keymapper maps keys to actions. */
 struct KeymapperOptions : OptionCategoryBase {
@@ -784,6 +800,7 @@ private:
 };
 
 struct Options {
+	GameModeOptions GameMode;
 	StartUpOptions StartUp;
 	DiabloOptions Diablo;
 	HellfireOptions Hellfire;
@@ -801,6 +818,7 @@ struct Options {
 	{
 		return {
 			&Language,
+			&GameMode,
 			&StartUp,
 			&Graphics,
 			&Audio,

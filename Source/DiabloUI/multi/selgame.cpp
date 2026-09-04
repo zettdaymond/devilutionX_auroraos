@@ -246,13 +246,13 @@ void selgame_GameSelection_Focus(int value)
 			case 20:
 				AppendStrView(infoString, _("Speed: Normal"));
 				break;
-			case 30:
+			case 25:
 				AppendStrView(infoString, _("Speed: Fast"));
 				break;
-			case 40:
+			case 30:
 				AppendStrView(infoString, _("Speed: Faster"));
 				break;
-			case 50:
+			case 35:
 				AppendStrView(infoString, _("Speed: Fastest"));
 				break;
 			default:
@@ -660,7 +660,9 @@ void selgame_Password_Select(int /*value*/)
 	m_game_data->bTheoQuest = *sgOptions.Gameplay.theoQuest ? 1 : 0;
 	m_game_data->bCowQuest = *sgOptions.Gameplay.cowQuest ? 1 : 0;
 
-	if (SNetCreateGame(nullptr, gamePassword, (char *)m_game_data, sizeof(*m_game_data), gdwPlayerId)) {
+	GameData gameInitInfo = *m_game_data;
+	gameInitInfo.swapLE();
+	if (SNetCreateGame(nullptr, gamePassword, reinterpret_cast<char *>(&gameInitInfo), sizeof(gameInitInfo), gdwPlayerId)) {
 		UiInitList_clear();
 		selgame_endMenu = true;
 	} else {

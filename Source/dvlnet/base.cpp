@@ -401,7 +401,7 @@ bool base::SNetRegisterEventHandler(event_type evtype, SEVTHANDLER func)
 bool base::SNetLeaveGame(int type)
 {
 	auto pkt = pktfty->make_packet<PT_DISCONNECT>(plr_self, PLR_BROADCAST,
-	    plr_self, type);
+	    plr_self, static_cast<leaveinfo_t>(type));
 	send(*pkt);
 	plr_self = PLR_BROADCAST;
 	return true;
@@ -409,10 +409,14 @@ bool base::SNetLeaveGame(int type)
 
 bool base::SNetDropPlayer(int playerid, uint32_t flags)
 {
+	const plr_t plr = static_cast<plr_t>(playerid);
 	auto pkt = pktfty->make_packet<PT_DISCONNECT>(plr_self,
 	    PLR_BROADCAST,
-	    (plr_t)playerid,
-	    (leaveinfo_t)flags);
+	    plr,
+	    static_cast<leaveinfo_t>(flags));
+	// Disconnect at the network layer first so we
+	// don't send players their own disconnect packet
+	DisconnectNet(plr);
 	send(*pkt);
 	RecvLocal(*pkt);
 	return true;

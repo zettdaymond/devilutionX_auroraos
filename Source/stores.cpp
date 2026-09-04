@@ -16,6 +16,7 @@
 #include "engine/load_cel.hpp"
 #include "engine/random.hpp"
 #include "engine/render/clx_render.hpp"
+#include "engine/render/primitive_render.hpp"
 #include "engine/render/text_render.hpp"
 #include "engine/trn.hpp"
 #include "init.h"
@@ -1553,6 +1554,7 @@ void SmithRepairItem(int price)
 			myPlayer.InvBody[INVLOC_HAND_LEFT]._iDurability = myPlayer.InvBody[INVLOC_HAND_LEFT]._iMaxDur;
 		if (i == -4)
 			myPlayer.InvBody[INVLOC_HAND_RIGHT]._iDurability = myPlayer.InvBody[INVLOC_HAND_RIGHT]._iMaxDur;
+		TakePlrsMoney(price);
 		return;
 	}
 
@@ -1757,11 +1759,11 @@ void BoyEnter()
 	StartStore(TalkID::Gossip);
 }
 
-void BoyBuyItem(Item &item)
+void BoyBuyItem(Item &item, int itemPrice)
 {
-	TakePlrsMoney(item._iIvalue);
+	TakePlrsMoney(itemPrice);
 	StoreAutoPlace(item, true);
-	boyitem.clear();
+	item.clear();
 	stextshold = TalkID::Boy;
 	CalcPlrInv(*MyPlayer, true);
 	stextlhold = 12;
@@ -1885,7 +1887,7 @@ void ConfirmEnter(Item &item)
 			WitchRechargeItem(item._iIvalue);
 			break;
 		case TalkID::BoyBuy:
-			BoyBuyItem(item);
+			BoyBuyItem(boyitem, item._iIvalue);
 			break;
 		case TalkID::HealerBuy:
 			HealerBuyItem(item);
@@ -2252,13 +2254,13 @@ void PrintSString(const Surface &out, int margin, int line, string_view text, Ui
 
 	if (*sgOptions.Gameplay.showItemGraphicsInStores && cursIndent) {
 		const Rectangle textRect { { rect.position.x + HalfCursWidth + 8, rect.position.y }, { rect.size.width - HalfCursWidth + 8, rect.size.height } };
-		DrawString(out, text, textRect, flags);
+		DrawString(out, text, textRect, { flags });
 	} else {
-		DrawString(out, text, rect, flags);
+		DrawString(out, text, rect, { flags });
 	}
 
 	if (price > 0)
-		DrawString(out, FormatInteger(price), rect, flags | UiFlags::AlignRight);
+		DrawString(out, FormatInteger(price), rect, { flags | UiFlags::AlignRight });
 
 	if (stextsel == line) {
 		DrawSelector(out, rect, text, flags);
