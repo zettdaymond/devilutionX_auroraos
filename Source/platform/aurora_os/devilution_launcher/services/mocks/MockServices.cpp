@@ -14,7 +14,10 @@ FileScanResult MockGameFilesService::Scan(const std::vector<std::filesystem::pat
 	FileScanResult result;
 	result.sizes = snapshot.files;
 	if (!folders.empty()) {
-		result.folders.fill(folders.front());
+		// Путь идёт только в UI: реальный temp-путь Windows (с именем
+		// пользователя машины) в моках не показываем — как на устройстве.
+		constexpr const char *kMockDisplayDir = "/home/defaultuser/.local/share/org.diasurgical.devilutionx";
+		result.folders.fill(std::filesystem::path(kMockDisplayDir));
 	}
 	return result;
 }
