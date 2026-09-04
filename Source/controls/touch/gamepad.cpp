@@ -6,7 +6,9 @@
 #include "utils/display.h"
 #include "utils/ui_fwd.h"
 
+#ifdef AURORA_OS
 #include "ComposerAdapter.hpp"
+#endif
 
 namespace devilution {
 

@@ -36,9 +36,11 @@ else()
   if(DEVILUTIONX_SYSTEM_SDL2)
     find_package(SDL2 REQUIRED)
     if(TARGET SDL2::SDL2)
-#      if(TARGET SDL2::SDL2main)
-#        set(SDL2_MAIN SDL2::SDL2main)
-#      endif()
+      # SDL2main не нужен Авроре (свой main в aurora_project), но без
+      # него WIN32-сборка на host не находит WinMain.
+      if(TARGET SDL2::SDL2main AND NOT DEVILUTIONX_AURORA_OS)
+        set(SDL2_MAIN SDL2::SDL2main)
+      endif()
     elseif(TARGET SDL2::SDL2-static)
       # On some distros, such as vitasdk, only the SDL2::SDL2-static target is available.
       # Alias to SDL2::SDL2 because some finder scripts may refer to SDL2::SDL2.

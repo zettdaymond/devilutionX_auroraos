@@ -20,39 +20,40 @@ include(functions/FetchContent_MakeAvailableExcludeFromAll)
 include(FetchContent)
 
 if(DEVILUTIONX_AURORA_OS)
+  # Аврора: свежий SDL_image с штатной целью SDL2_image — ручные шимы
+  # апстрима под релиз 2.0.5 здесь не нужны (и ломают конфигурацию).
   FetchContent_Declare(SDL_image
     GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
     GIT_TAG        release-2.8.2
     GIT_SHALLOW    1
     GIT_SUBMODULES ""
   )
+  set(BUILD_SHARED_LIBS OFF)
+  FetchContent_MakeAvailableExcludeFromAll(SDL_image)
+
+  add_library(SDL2::SDL2_image ALIAS SDL2_image)
 else()
   FetchContent_Declare(SDL_image
     URL https://github.com/libsdl-org/SDL_image/archive/refs/tags/release-2.0.5.tar.gz
     URL_HASH MD5=3446ed7ee3c700065dcb33426a9b0c6e
   )
+  FetchContent_MakeAvailableExcludeFromAll(SDL_image)
+
+  if(DEVILUTIONX_STATIC_SDL_IMAGE)
+    add_library(SDL_image STATIC ${CMAKE_CURRENT_LIST_DIR}/IMG.c ${sdl_image_SOURCE_DIR}/IMG_png.c)
+  else()
+    add_library(SDL_image SHARED ${CMAKE_CURRENT_LIST_DIR}/IMG.c ${sdl_image_SOURCE_DIR}/IMG_png.c)
+  endif()
+
+  target_include_directories(SDL_image PRIVATE ${sdl_image_SOURCE_DIR})
+  target_compile_definitions(SDL_image PRIVATE LOAD_PNG SDL_IMAGE_USE_COMMON_BACKEND)
+  target_link_libraries(SDL_image PNG::PNG)
+
+  if(TARGET SDL2::SDL2)
+    target_link_libraries(SDL_image SDL2::SDL2)
+    add_library(SDL2::SDL2_image ALIAS SDL_image)
+  elseif(TARGET SDL2::SDL2-static)
+    target_link_libraries(SDL_image SDL2::SDL2-static)
+    add_library(SDL2::SDL2_image ALIAS SDL_image)
+  endif()
 endif()
-
-set(BUILD_SHARED_LIBS OFF)
-
-FetchContent_MakeAvailableExcludeFromAll(SDL_image)
-
-add_library(SDL2::SDL2_image ALIAS SDL2_image)
-
-#if(DEVILUTIONX_STATIC_SDL_IMAGE)
-#  add_library(SDL_image STATIC ${CMAKE_CURRENT_LIST_DIR}/IMG.c ${sdl_image_SOURCE_DIR}/IMG_png.c)
-#else()
-#  add_library(SDL_image SHARED ${CMAKE_CURRENT_LIST_DIR}/IMG.c ${sdl_image_SOURCE_DIR}/IMG_png.c)
-#endif()
-
-#target_include_directories(SDL_image PRIVATE ${sdl_image_SOURCE_DIR})
-#target_compile_definitions(SDL_image PRIVATE LOAD_PNG SDL_IMAGE_USE_COMMON_BACKEND)
-#target_link_libraries(SDL_image PNG::PNG)
-
-#if(TARGET SDL2::SDL2)
-#  target_link_libraries(SDL_image SDL2::SDL2)
-#  add_library(SDL2::SDL2_image ALIAS SDL_image)
-#elseif(TARGET SDL2::SDL2-static)
-#  target_link_libraries(SDL_image SDL2::SDL2-static)
-#  add_library(SDL2::SDL2_image ALIAS SDL_image)
-#endif()
