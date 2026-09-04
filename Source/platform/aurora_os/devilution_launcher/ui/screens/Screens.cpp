@@ -153,7 +153,10 @@ struct ShelfItem {
 	const GameStyle *style;
 };
 
-/// Выбирает featured-режим: первый запускаемый, иначе Hellfire «требуются файлы».
+/// Выбирает featured-режим: первый запускаемый. Если не запускается
+/// ничего — главный экран вообще показывает first-run (Home), сюда
+/// такой случай не доходит; непровоцируемый Hellfire-замок убран:
+/// он дублировался карточкой+плиткой и ломал полку третьим блоком.
 auto MakeFeatured(const LauncherState &state) -> Featured
 {
 	if (state.diablo.available) {
@@ -164,12 +167,8 @@ auto MakeFeatured(const LauncherState &state) -> Featured
 		return { ExitAction::LaunchHellfire, "HELLFIRE", "ГОТОВО К ЗАПУСКУ", "Официальное дополнение", true,
 			&kHellfireStyle };
 	}
-	if (state.demo.available) {
-		return { ExitAction::LaunchDemo, "DEMO", "ДЕМО-ВЕРСИЯ", "Бесплатная shareware-версия Diablo", true,
-			&kDemoStyle };
-	}
-	return { ExitAction::LaunchHellfire, "HELLFIRE", "ТРЕБУЮТСЯ ФАЙЛЫ",
-		"Не хватает: " + PluralFiles(state.hellfire.missingFiles.size()), false, &kHellfireStyle };
+	return { ExitAction::LaunchDemo, "DEMO", "ДЕМО-ВЕРСИЯ", "Бесплатная shareware-версия Diablo", true,
+		&kDemoStyle };
 }
 
 /// Описания плиток всех трёх режимов (featured-режим с полки уберётся).
@@ -265,7 +264,10 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 
 void Home(const LauncherState &state, const Dispatcher &dispatch, const ArtSet &art)
 {
-	if (!state.HasAnyFiles()) {
+	// First-run показываем, пока НЕ ЗАПУСКАЕТСЯ ни один режим: один
+	// скачанный ru.mpq — это всё ещё «файлов нет» (HasAnyFiles считал
+	// бы его и уводил на замок «Hellfire: требуются файлы»).
+	if (!state.HasPlayableMode()) {
 		RenderFirstRun(state, dispatch, art);
 		return;
 	}

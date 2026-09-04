@@ -543,6 +543,12 @@ void Application::BakeGameCover()
 	ImGui_ImplSDL2_NewFrame();
 	ImGui::NewFrame();
 
+	// Вьюха обновляет масштаб только в живом кадре UI; без этого
+	// офскрин-кадр запечки брал дефолтный MinSide=540 и обложка игры
+	// запекалась со старыми мелкими шрифтами (плитка лаунчера при этом
+	// рисовала уже увеличенные).
+	launcher::ui::Scale::BeginFrame(DPIHandler::GetScale());
+
 	m_view->RenderCover(m_store->State());
 
 	ImGui::Render();

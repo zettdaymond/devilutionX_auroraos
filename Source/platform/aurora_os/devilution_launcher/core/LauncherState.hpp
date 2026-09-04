@@ -98,6 +98,15 @@ struct LauncherState {
 		return false;
 	}
 
+	/// Запускается ли хоть один режим. Только ru.mpq (или частичные
+	/// файлы Hellfire) — НЕ повод уводить главный экран с first-run:
+	/// там пользователь видит предложение скачать демо или указать
+	/// папку, а не замок «Hellfire: требуются файлы».
+	[[nodiscard]] bool HasPlayableMode() const
+	{
+		return diablo.available || hellfire.available || demo.available;
+	}
+
 	[[nodiscard]] bool DownloadInProgress() const { return download.has_value() && download->active; }
 };
 
