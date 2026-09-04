@@ -43,12 +43,5 @@ TEST(EngineLaunchTest, DemoForcesSharewareWithoutDataDir)
 	EXPECT_EQ(args[0], "--spawn");
 }
 
-TEST(EngineLaunchTest, UserMpqPathOnlyForFullGames)
-{
-	EXPECT_TRUE(WantsUserMpqPath(ExitAction::LaunchDiablo));
-	EXPECT_TRUE(WantsUserMpqPath(ExitAction::LaunchHellfire));
-	EXPECT_FALSE(WantsUserMpqPath(ExitAction::LaunchDemo));
-}
-
 } // namespace
 } // namespace launcher

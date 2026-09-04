@@ -27,9 +27,4 @@ std::vector<std::string> EngineArgsFor(ExitAction action, const std::filesystem:
 	return args;
 }
 
-bool WantsUserMpqPath(ExitAction action)
-{
-	return action == ExitAction::LaunchDiablo || action == ExitAction::LaunchHellfire;
-}
-
 } // namespace launcher

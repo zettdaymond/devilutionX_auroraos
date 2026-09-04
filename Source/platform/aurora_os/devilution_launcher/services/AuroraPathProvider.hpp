@@ -4,8 +4,7 @@
 
 namespace launcher {
 
-/// Пути для Aurora OS. Оборачивает AuroraOsStandartPaths (он на Qt),
-/// чтобы остальной лаунчер жил без Qt:
+/// Пути для Aurora OS. Оборачивает AuroraOsStandartPaths (SDL, без Qt):
 /// - папка настроек — базовая, переданная снаружи (на устройстве это
 ///   путь SDL); папка загрузок — дополнительный путь поиска MPQ
 ///   движка (~/.local/share/org.diasurgical/devilutionx), чтобы игра

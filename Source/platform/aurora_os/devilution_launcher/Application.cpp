@@ -160,8 +160,9 @@ Application::Application(SDL_Window *window, const std::string &companyNamespace
 	SDL_free(prefPath);
 
 	// diablo.ini живёт в конфиг-каталоге движка, а он не совпадает с
-	// базовой папкой лаунчера: на Aurora движок ходит через Qt StandartPaths,
-	// на десктопе — в собственный SDL_GetPrefPath("diasurgical", "devilution").
+	// базовой папкой лаунчера: на Aurora движок ходит через собственный
+	// SDL_GetPrefPath("org.diasurgical", "devilutionx"), на десктопе —
+	// SDL_GetPrefPath("diasurgical", "devilution").
 	std::filesystem::path engineIni;
 #ifdef AURORA_OS
 	engineIni = std::filesystem::path(devilution::AuroraOsStandartPaths::GetWritableDataPath()) / "diablo.ini";

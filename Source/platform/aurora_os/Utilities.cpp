@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <math.h>
 
-#include <QGuiApplication>
-
 namespace devilution
 {
 

@@ -1,10 +1,5 @@
 include(functions/devilutionx_library)
 
-find_package(Qt5 COMPONENTS Core Gui REQUIRED)
-
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-
 include(FindPkgConfig)
 pkg_search_module(WAYLAND wayland-client )
 pkg_search_module(DBUS REQUIRED dbus-1)
@@ -44,8 +39,7 @@ target_link_libraries(libdevilutionx_aurora_os
         SDL2::SDL2
         SDL2::SDL2_image
     PRIVATE
-        Qt5::Core
-        Qt5::Gui
+        simpleini
         ${AUDIORESOURCE_LIBRARIES}
         ${GLIB_LIBRARIES}
         ${WAYLAND_LIBRARIES}

@@ -1,77 +1,70 @@
 #include "StandartPaths.hpp"
 
-#include <array>
-
-#include <QSettings>
-#include <QStandardPaths>
-#include <QtGui/QGuiApplication>
-
-#include <SDL2/SDL.h>
+#include <SimpleIni.h>
+#include <SDL2/SDL_filesystem.h>
 
 namespace devilution {
 
-struct AppContextImpl : public AuroraOsStandartPaths::AppContext {
-    ~AppContextImpl() override
-    {}
+namespace {
 
-    std::unique_ptr<QGuiApplication> app;
-    std::unique_ptr<QSettings> settings;
-};
+// SDL_GetPrefPath создаёт каталог и аллоцирует строку — результат
+// кэшируется на первый вызов (путь за жизнь процесса не меняется).
+// Совпадает с прежним QStandardPaths::AppLocalDataLocation:
+// ~/.local/share/org.diasurgical/devilutionx/
+std::string PrefPathOnce()
+{
+    static const std::string path = [] {
+        char *pref = SDL_GetPrefPath("org.diasurgical", "devilutionx");
+        std::string result = pref != nullptr ? pref : "";
+        SDL_free(pref);
+        return result;
+    }();
+    return path;
+}
+
+constexpr const char *kBundledAssetsPath = "/usr/share/org.diasurgical.devilutionx/assets/";
+
+} // namespace
 
 std::string AuroraOsStandartPaths::GetWritableDataPath()
 {
-    auto str = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation).toStdString() + "/";
-    return str;
+    return PrefPathOnce();
 }
 
 std::string AuroraOsStandartPaths::GetConfigPath()
 {
-    return GetWritableDataPath();
+    return PrefPathOnce();
 }
 
 std::string AuroraOsStandartPaths::GetBundledAssetsPath()
 {
-    return std::string("/usr/share/org.diasurgical.devilutionx/assets/");
+    return kBundledAssetsPath;
 }
 
 std::string AuroraOsStandartPaths::GetAdditionalMPQSearchPath()
 {
-    return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation).toStdString() + "/";
+    return PrefPathOnce();
 }
 
 std::optional<std::string> AuroraOsStandartPaths::GetUserDefinedMPQSearchPath()
 {
-    QSettings s(QStringLiteral("org.diasurgical"), QStringLiteral("devilutionx"));
+    // Папку выбирает пользователь на экране «Данные»; лаунчер хранит её
+    // в своём launcher.ini — движок читает тот же файл. Флаги формата
+    // как у ConfigService лаунчера (SetSpaces(false) влияет только на
+    // запись и для чтения не важна).
+    const std::string iniPath = PrefPathOnce() + "launcher.ini";
 
-    auto dir = s.value("userDataDirectory");
-
-    if (dir.isNull()) {
+    CSimpleIniA ini;
+    ini.SetMultiKey();
+    if (ini.LoadFile(iniPath.c_str()) < SI_OK) {
         return {};
     }
 
-    return dir.toString().toStdString();
+    const char *folder = ini.GetValue("Storage", "DataFolder");
+    if (folder == nullptr || folder[0] == '\0') {
+        return {};
+    }
+    return std::string(folder);
 }
-
-void AuroraOsStandartPaths::SetUserDefinedMPQSearchPath(const std::string &path)
-{
-    QSettings s(QStringLiteral("org.diasurgical"), QStringLiteral("devilutionx"));
-
-    s.setValue("userDataDirectory", QString::fromStdString(path));
-}
-
-std::unique_ptr<AuroraOsStandartPaths::AppContext> AuroraOsStandartPaths::MakeAppContext(int argc, char** argv)
-{
-    auto context = std::make_unique<AppContextImpl>();
-
-    QGuiApplication::setOrganizationName(QStringLiteral("org.diasurgical"));
-    QGuiApplication::setApplicationName(QStringLiteral("devilutionx"));
-
-    context->app = std::unique_ptr<QGuiApplication>(nullptr);
-
-    return context;
-}
-
-AuroraOsStandartPaths::AppContext::~AppContext()
-{}
 
 } // namespace devilution

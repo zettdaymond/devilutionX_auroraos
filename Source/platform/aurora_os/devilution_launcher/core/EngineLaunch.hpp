@@ -19,14 +19,9 @@ namespace launcher {
 ///
 /// Для полных версий выбранная папка передаётся ещё и как
 /// `--data-dir <путь>`: движок ставит её первой в порядок поиска MPQ,
-/// поэтому DIABDAT.MPQ находится гарантированно, без обхода настроек
-/// QSettings (и без риска незаметно подменить игру
-/// скачанной демо-версией).
+/// поэтому DIABDAT.MPQ находится гарантированно (и без риска незаметно
+/// подменить игру скачанной демо-версией). Папка переживает перезапуск —
+/// движок читает её из launcher.ini (см. AuroraOsStandartPaths).
 [[nodiscard]] std::vector<std::string> EngineArgsFor(ExitAction action, const std::filesystem::path &dataPath = {});
-
-/// Должен ли результат лаунчера ещё и запомнить `dataPath` как
-/// пользовательский путь поиска MPQ (QSettings на Aurora OS), чтобы
-/// папка сохранилась и на следующий запуск.
-[[nodiscard]] bool WantsUserMpqPath(ExitAction action);
 
 } // namespace launcher

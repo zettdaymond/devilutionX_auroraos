@@ -72,8 +72,6 @@ FUNC_EXPORT(int argc, char **argv)
 #endif
 
 #ifdef AURORA_OS
-    auto context = devilution::AuroraOsStandartPaths::MakeAppContext(argc, argv);
-
     devilution::DisplayBlankerController::Init();
     devilution::DisplayBlankerController::SetPreventDisplayBlanking(true);
 
@@ -100,10 +98,8 @@ FUNC_EXPORT(int argc, char **argv)
         return 0;
     }
 
-    if (launcher::WantsUserMpqPath(launcherResult.action) && !launcherResult.dataPath.empty()) {
-        devilution::AuroraOsStandartPaths::SetUserDefinedMPQSearchPath(launcherResult.dataPath.string());
-    }
-
+    // Папку с MPQ движок получает аргументом --data-dir и, независимо
+    // от запуска, читает её же из launcher.ini (StandartPaths).
     engineArgs = launcher::EngineArgsFor(launcherResult.action, launcherResult.dataPath);
     if (!engineArgs.empty()) {
         engineArgv.push_back(argv[0]);
