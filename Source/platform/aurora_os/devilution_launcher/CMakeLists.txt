@@ -61,12 +61,13 @@ FetchContent_Declare(
   EXCLUDE_FROM_ALL
   # zoe несёт install-правила: ninja install тянет её заголовки/статик-либу
   # и cmake-конфиги в staging, и rpm-BT падает на "unpackaged files".
-  # Патч гасит правила. Шаг идемпотентен: окружения (SDK mb2/BT) делят одно
-  # build-дерево через bind-mount, штампи FetchContent переживают mtime-скачки
-  # и патч может попытаться примениться повторно — тогда reverse-check
-  # подтверждает, что он уже лежит, и шаг завершается успехом.
-  # --ignore-whitespace: дерево может быть CRLF (локальный autocrlf) или LF.
-  PATCH_COMMAND sh -c "git apply --ignore-whitespace ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/zoe-no-install.patch || git apply --ignore-whitespace --reverse --check ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/zoe-no-install.patch"
+  # Патч гасит правила. Шаг идемпотентен (окружения SDK mb2/BT делят одно
+  # build-дерево, патч может попытаться примениться повторно — скрипт это
+  # распознаёт) и выполняется через cmake -P: единственный интерпретатор,
+  # доступный и в Linux-контейнерах, и в cmd.exe Qt Creator (там нет sh).
+  PATCH_COMMAND ${CMAKE_COMMAND} -P
+      ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/zoe-patch.cmake
+      ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/zoe-no-install.patch
 )
 FetchContent_MakeAvailable(zoe)
 # zoe's own CMakeLists points at ${CMAKE_SOURCE_DIR}/include, which is
