@@ -30,7 +30,6 @@ constexpr float kFirstRunHeroMaxRem = 17.0F;
 constexpr float kPortraitHeroMaxRem = 14.0F;
 constexpr float kLandscapeHeroRem = 11.0F;
 constexpr float kTileHeightRem = 4.2F;
-constexpr float kVoiceBannerHeightRem = 2.4F;
 
 /// Визуальная идентичность режима: акцентный цвет (альфа — сила тинта
 /// hero-панели) и запасной кроп общего фона, когда нет своего арта.
@@ -172,47 +171,6 @@ auto MakeShelfItems(const LauncherState &state, const ArtSet &art) -> std::array
 	};
 }
 
-/// Тонкий баннер предложения русской озвучки; появляется при готовом Diablo.
-void RenderVoiceBanner(const LauncherState &state, const Dispatcher &dispatch, float width)
-{
-	ImGui::Dummy(ImVec2(0, Scale::Px(0.6F)));
-	const ImVec2 bannerSize(width, Scale::Px(kVoiceBannerHeightRem));
-	if (ImGui::InvisibleButton("ruvoice", bannerSize)) {
-		dispatch(intent::UiOpenDialog { Dialog::ConfirmDownloadRu });
-	}
-	ImDrawList *draw = ImGui::GetWindowDrawList();
-	const ImVec2 min = ImGui::GetItemRectMin();
-	const ImVec2 max = ImGui::GetItemRectMax();
-	const bool hovered = ImGui::IsItemHovered();
-	draw->AddRectFilled(min, max,
-	    Theme::ColorU32(hovered ? ColorRole::PanelHover : ColorRole::Panel), Scale::Px(0.35F));
-	draw->AddRect(min, max, Theme::ColorU32(ColorRole::GoldDim), Scale::Px(0.35F), 0, Scale::Px(0.06F));
-
-	// Иконки рисуем в меру плашки: у IconBig-шрифта нативный кегль крупнее
-	// тонкого баннера и торчит за его границы.
-	ImFont *bannerIconFont = Theme::Font(FontRole::IconBig);
-	const float iconSize = bannerSize.y * 0.55F;
-	const float iconWidth = bannerIconFont != nullptr
-	    ? bannerIconFont->CalcTextSizeA(iconSize, FLT_MAX, 0.0F, icons::Music).x
-	    : iconSize;
-	draw->AddText(bannerIconFont, iconSize,
-	    ImVec2(min.x + Scale::Px(0.8F), min.y + (bannerSize.y - iconSize) * 0.5F),
-	    Theme::ColorU32(ColorRole::GoldBright), icons::Music);
-
-	draw->AddText(Theme::Font(FontRole::Body), Scale::Px(0.95F),
-	    ImVec2(min.x + Scale::Px(0.8F) + iconWidth + Scale::Px(0.7F), min.y + (bannerSize.y - Scale::Px(1.1F)) * 0.5F),
-	    Theme::ColorU32(ColorRole::TextBody),
-	    "Русская озвучка и тексты · ru.mpq");
-
-	const float chevronSize = bannerSize.y * 0.45F;
-	const float chevronWidth = bannerIconFont != nullptr
-	    ? bannerIconFont->CalcTextSizeA(chevronSize, FLT_MAX, 0.0F, icons::Play).x
-	    : chevronSize;
-	draw->AddText(bannerIconFont, chevronSize,
-	    ImVec2(max.x - chevronWidth - Scale::Px(0.7F), min.y + (bannerSize.y - chevronSize) * 0.5F),
-	    Theme::ColorU32(ColorRole::GoldBright), icons::Play);
-}
-
 void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, const ArtSet &art)
 {
 	const float fullWidth = ImGui::GetContentRegionAvail().x;
@@ -276,10 +234,6 @@ void RenderHeroAndShelf(const LauncherState &state, const Dispatcher &dispatch, 
 				ImGui::SameLine(0, Scale::Px(0.5F));
 			}
 		}
-	}
-
-	if (state.diablo.available && !state.russianVoiceInstalled) {
-		RenderVoiceBanner(state, dispatch, width);
 	}
 
 	if (sidePad > 0.0F) {
@@ -684,6 +638,18 @@ void About(const LauncherState &, const Dispatcher &dispatch)
 	ImGui::TextUnformatted("Версия");
 	ImGui::PopFont();
 	ImGui::Text("DevilutionX %s (порт для Aurora OS)", LAUNCHER_APP_VERSION);
+
+	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
+	ImGui::PushFont(Theme::Font(FontRole::BodyBold));
+	ImGui::TextUnformatted("Данные и сохранения");
+	ImGui::PopFont();
+	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
+	ImGui::TextWrapped("Файлы игры ищутся в ~/Documents/devilutionx/ и в папке,"
+	                   " выбранной на экране «Данные».");
+	ImGui::TextWrapped("Сохранения и настройки хранятся в"
+	                   " ~/.local/share/org.diasurgical/devilutionx/ и переживают"
+	                   " обновление приложения.");
+	ImGui::PopStyleColor();
 
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
 	ImGui::PushFont(Theme::Font(FontRole::BodyBold));
