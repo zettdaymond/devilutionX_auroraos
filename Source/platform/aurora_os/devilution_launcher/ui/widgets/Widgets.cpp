@@ -595,13 +595,17 @@ void ScreenHeader(const char *title, const std::function<void()> &onBack)
 	}
 	Theme::PopButtonStyle();
 
-	ImGui::SameLine(0, Scale::Px(0.5F));
-	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + buttonSize * 0.22F);
-	Theme::PushFont(FontRole::BodyBold);
-	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextHeading));
-	ImGui::TextUnformatted(title);
-	ImGui::PopStyleColor();
-	Theme::PopFont();
+	// Заголовок рисуем draw-list'ом: кегль крупнее базового BodyBold и
+	// точное вертикальное центрирование по кнопке «назад» — прежний
+	// сдвиг курсора на 0.22 кнопки опускал текст ниже центра.
+	ImFont *font = Theme::Font(FontRole::BodyBold);
+	const float fontSize = Scale::Px(1.2F);
+	const ImVec2 buttonMin = ImGui::GetItemRectMin();
+	const ImVec2 buttonMax = ImGui::GetItemRectMax();
+	const ImVec2 textSize = font != nullptr ? font->CalcTextSizeA(fontSize, FLT_MAX, 0.0F, title) : ImVec2(fontSize, fontSize);
+	ImGui::GetWindowDrawList()->AddText(font, fontSize,
+	    ImVec2(buttonMax.x + Scale::Px(0.6F), (buttonMin.y + buttonMax.y - textSize.y) * 0.5F),
+	    Theme::ColorU32(ColorRole::TextHeading), title);
 
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.35F)));
 	Theme::DrawDivider(ImGui::GetCursorScreenPos(), ImGui::GetCursorScreenPos() + ImVec2(width, 0), 0.6F);
