@@ -19,14 +19,12 @@ public:
 	/// Аспект экрана в ЛАНДШАФТНОЙ ориентации для вычисления Width по
 	/// Height у двухключевой настройки «Разрешение» (как пересчитывает
 	/// список разрешений сам движок при fitToScreen). Дефолт 16:9.
-	/// landscapeHeight также ограничивает лестницу вариантов.
 	void SetResolutionAspect(int landscapeWidth, int landscapeHeight) override;
 
 private:
 	std::filesystem::path m_iniPath;
 	int m_aspectWidth = 16;
 	int m_aspectHeight = 9;
-	int m_landscapeHeight = 0; // 0 = не задан, лестница не режется
 };
 
 } // namespace launcher

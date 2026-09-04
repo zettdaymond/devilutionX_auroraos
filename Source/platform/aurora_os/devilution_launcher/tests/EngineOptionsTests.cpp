@@ -81,6 +81,12 @@ TEST(CatalogTest, CycleOptionsAreWellFormed)
 		if (spec.kind != SettingKind::Cycle) {
 			continue;
 		}
+		// Разрешение — цикл с внешним списком (secondaryKey непуст):
+		// статические варианты пусты, список даёт состояние.
+		if (!spec.secondaryKey.empty()) {
+			EXPECT_EQ(spec.optionCount, 0) << spec.key.data();
+			continue;
+		}
 		EXPECT_GE(spec.optionCount, 2) << spec.key.data();
 		EXPECT_LE(spec.optionCount, kMaxSettingOptions) << spec.key.data();
 		for (size_t i = 0; i < spec.optionCount; ++i) {
@@ -259,43 +265,48 @@ TEST_F(EngineOptionsTest, ResolutionWritesAspectCorrectedWidth)
 	EXPECT_EQ(loaded[static_cast<size_t>(SettingId::Resolution)], 540);
 }
 
-TEST_F(EngineOptionsTest, ResolutionSnapsUnknownHeightsDown)
+TEST_F(EngineOptionsTest, ResolutionSurvivesSaveOfOtherSettings)
 {
-	// 1200p из игрового меню планшета — нативная ступень этого экрана,
-	// остаётся 1200p; на телефоне (720) снаппится в 720p.
-	WriteRawIni("[Graphics]\nWidth=2000\nHeight=1200\n");
+	// Выбранное в игре 2160p (или экзотика) обязано пережить запись
+	// ЛЮБЫХ настроек лаунчера: ни снапа, ни clamp-а.
+	WriteRawIni("[Graphics]\nWidth=3840\nHeight=2160\n");
 
-	EngineOptionsService tablet(m_iniPath);
-	tablet.SetResolutionAspect(2000, 1200);
-	EXPECT_EQ(tablet.Load()[static_cast<size_t>(SettingId::Resolution)], 1200);
+	std::array<int, kSettingCount> values;
+	{
+		EngineOptionsService reader(m_iniPath);
+		values = reader.Load();
+	}
+	EXPECT_EQ(values[static_cast<size_t>(SettingId::Resolution)], 2160);
+	values[static_cast<size_t>(SettingId::RunInTown)] = 1;
 
-	EngineOptionsService phone(m_iniPath);
-	phone.SetResolutionAspect(1440, 720);
-	EXPECT_EQ(phone.Load()[static_cast<size_t>(SettingId::Resolution)], 720);
+	EngineOptionsService writer(m_iniPath);
+	writer.SetResolutionAspect(16, 9);
+	writer.SaveAll(values);
+
+	EngineOptionsService recheck(m_iniPath);
+	EXPECT_EQ(recheck.Load()[static_cast<size_t>(SettingId::Resolution)], 2160);
 }
 
-TEST_F(EngineOptionsTest, ResolutionLadderFollowsScreenHeight)
+TEST(ResolutionOptionsTest, MirrorsEngineList)
 {
-	// Телефон 720: только общие ступени.
-	EXPECT_EQ(ResolutionOptionCount(720), 3);
-	EXPECT_EQ(ResolutionValueAt(0, 720), 480);
-	EXPECT_EQ(ResolutionValueAt(2, 720), 720);
-	EXPECT_EQ(ResolutionLabelAt(2, 720), "720p");
+	// Телефон (один режим 720): общие ступени до экрана + экран + 480.
+	const auto phone = BuildResolutionOptions({ 720 }, 480);
+	EXPECT_EQ(phone, (std::vector<int> { 720, 540, 480 }));
 
-	// Планшет 2000x1200: пять общих + нативная 1200p последней.
-	EXPECT_EQ(ResolutionOptionCount(1200), 6);
-	EXPECT_EQ(ResolutionValueAt(4, 1200), 1080);
-	EXPECT_EQ(ResolutionValueAt(5, 1200), 1200);
-	EXPECT_EQ(ResolutionLabelAt(5, 1200), "1200p");
+	// Планшет 2000x1200 (один режим): до 1080 + нативная 1200.
+	const auto tablet = BuildResolutionOptions({ 1200 }, 480);
+	EXPECT_EQ(tablet, (std::vector<int> { 1200, 1080, 960, 720, 540, 480 }));
 
-	// Экран ровно 1440: нативная совпадает со ступенью, дублей нет.
-	EXPECT_EQ(ResolutionOptionCount(1440), 6);
-	EXPECT_EQ(ResolutionValueAt(5, 1440), 1440);
+	// Десктоп со многими режимами: общих ступеней НЕТ (как в движке),
+	// только режимы + сырое значение ini + вечные 480.
+	const auto desktop = BuildResolutionOptions({ 1234, 664, 617, 480 }, 1234);
+	EXPECT_EQ(desktop, (std::vector<int> { 1234, 664, 617, 480 }));
 
-	// Значение между ступенями указывает на ступень ниже.
-	EXPECT_EQ(ResolutionIndexFor(1150, 1200), 4);
-
-	EXPECT_EQ(ResolutionOptionCount(300), 1); // вырожденный экран
+	// Экзотическое значение из ini входит в список (движок гарантирует
+	// присутствие текущего выбора); список — по убыванию.
+	const auto exotic = BuildResolutionOptions({ 720 }, 2034);
+	EXPECT_EQ(exotic.front(), 2034);
+	EXPECT_EQ(exotic, (std::vector<int> { 2034, 720, 540, 480 }));
 }
 
 } // namespace

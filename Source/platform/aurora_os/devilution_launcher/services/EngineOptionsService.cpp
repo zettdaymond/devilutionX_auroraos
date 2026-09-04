@@ -40,7 +40,6 @@ void EngineOptionsService::SetResolutionAspect(int landscapeWidth, int landscape
 	if (landscapeWidth > 0 && landscapeHeight > 0) {
 		m_aspectWidth = landscapeWidth;
 		m_aspectHeight = landscapeHeight;
-		m_landscapeHeight = landscapeHeight;
 	}
 }
 
@@ -72,14 +71,9 @@ std::array<int, kSettingCount> EngineOptionsService::Load()
 			values[i] = static_cast<int>(ini.GetLongValue(spec.section.data(), spec.key.data(), spec.defaultInt));
 			break;
 		}
-		// Двухключевые Cycle (разрешение): стороннее значение из ini
-		// снаппим ВНИЗ до ближайшей ступени ЭКРАНА — лестница как в игре,
-		// включая нативную высоту (1200p на планшете остаётся 1200p).
-		if (!spec.secondaryKey.empty() && spec.kind == SettingKind::Cycle) {
-			const int height = m_landscapeHeight > 0 ? m_landscapeHeight : 1440;
-			const size_t index = ResolutionIndexFor(values[i], height);
-			values[i] = ResolutionValueAt(index, height);
-		}
+		// Разрешение (двухключевой Cycle) читается КАК ЕСТЬ: список
+		// вариантов — зеркало игрового и всегда содержит текущее
+		// значение; снап/clamp молча портил бы выбор пользователя.
 	}
 	return values;
 }
@@ -101,7 +95,9 @@ void EngineOptionsService::SaveAll(const std::array<int, kSettingCount> &values)
 		int value = values[i];
 		if (spec.kind == SettingKind::PercentVolume) {
 			value = VolumePctToIni(value);
-		} else {
+		} else if (spec.secondaryKey.empty()) {
+			// Разрешение не clamp-им: сырое значение из ini переживёт
+			// запись любых других настроек нетронутым.
 			value = std::clamp(value, spec.minValue, spec.maxValue);
 		}
 		// Как движок: десятичная запись, булевы — 1/0, дубликаты заменяются.

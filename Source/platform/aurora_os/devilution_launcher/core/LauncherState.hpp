@@ -77,6 +77,10 @@ struct LauncherState {
 	std::array<int, kSettingCount> settingValues = DefaultSettingValues();
 	bool settingsLoaded = false;
 
+// Варианты «Разрешения» — зеркало игрового списка (BuildResolutionOptions),
+// строится в Init из дисплейных режимов и сырого Height из ini.
+	std::vector<int> resolutionOptions;
+
 // Данные для диалога
 	std::vector<KnownFile> hellfireMissing; // for Dialog::HellfireMissingFiles
 	std::string errorText;                  // for Dialog::Error

@@ -295,9 +295,34 @@ AppResult Application::Run()
 {
 	AttachFileLog();
 
+	// Данные экрана для настройки «Разрешение»: аспект — сервису (Width
+	// по Height), перечисленные режимы — зеркалу игрового списка в Store.
+	std::vector<int> displayHeights;
+	SDL_DisplayMode mode;
+	if (SDL_GetDesktopDisplayMode(0, &mode) == 0) {
+		if (mode.w < mode.h) {
+			std::swap(mode.w, mode.h);
+		}
+		if (m_services.engineOptions != nullptr) {
+			m_services.engineOptions->SetResolutionAspect(mode.w, mode.h);
+		}
+		launcher::ui::Scale::SetScreenSize(mode.w, mode.h);
+
+		for (int i = 0; i < SDL_GetNumDisplayModes(0); ++i) {
+			SDL_DisplayMode candidate;
+			if (SDL_GetDisplayMode(0, i, &candidate) != 0) {
+				continue;
+			}
+			if (candidate.w < candidate.h) {
+				std::swap(candidate.w, candidate.h);
+			}
+			displayHeights.push_back(candidate.h);
+		}
+	}
+
 	m_store = std::make_unique<launcher::Store>(
 	    *m_services.config, *m_services.files, *m_services.downloads, *m_services.paths,
-	    *m_services.engineOptions);
+	    *m_services.engineOptions, std::move(displayHeights));
 
 	// Свёрнутый цикл спит в блокирующем SDL_WaitEvent: фоновые потоки
 	// (прогресс/финиш загрузок zoe) будят его пользовательским событием.
@@ -336,23 +361,9 @@ AppResult Application::Run()
 		}
 	}
 
-	// Аспект экрана (ландшафт) для настройки «Разрешение»: сервис
-	// считает Width по Height и режет лестницу вариантов, как движок.
-	SDL_DisplayMode mode;
-	if (SDL_GetDesktopDisplayMode(0, &mode) == 0) {
-		if (mode.w < mode.h) {
-			std::swap(mode.w, mode.h);
-		}
-		if (m_services.engineOptions != nullptr) {
-			m_services.engineOptions->SetResolutionAspect(mode.w, mode.h);
-		}
-		// Лестница в UI режется по ЭКРАНУ, а не по окну: на десктопе
-		// окно 540px оставляло бы только 480p/540p.
-		launcher::ui::Scale::SetScreenSize(mode.w, mode.h);
-	}
-
 	m_store->Init();
 #ifdef AURORA_OS
+	// Обложка для фазы движка запекается офскрин уже здесь: к моменту
 	// Обложка для фазы движка запекается офскрин уже здесь: к моменту
 	// «Играть» пиксели готовы, из пути выхода рендер убран совсем.
 	BakeGameCover();

@@ -37,12 +37,14 @@ Store::Store(IConfigService &configService,
     IGameFilesService &filesService,
     IDownloadService &downloadService,
     IPathProvider &pathProvider,
-    IEngineOptionsService &engineOptionsService)
+    IEngineOptionsService &engineOptionsService,
+    std::vector<int> displayHeights)
     : m_configService(configService)
     , m_filesService(filesService)
     , m_downloadService(downloadService)
     , m_pathProvider(pathProvider)
     , m_engineOptionsService(engineOptionsService)
+    , m_displayHeights(std::move(displayHeights))
     , m_mainThreadId(std::this_thread::get_id())
 {
 }
@@ -52,6 +54,10 @@ void Store::Init()
 	m_config = m_configService.Load();
 	m_state.settingValues = m_engineOptionsService.Load();
 	m_state.settingsLoaded = true;
+	// Список разрешений — зеркало игрового: режимы дисплеев + сырое
+	// значение из ini (движок всегда держит текущий выбор в списке).
+	m_state.resolutionOptions = BuildResolutionOptions(m_displayHeights,
+	    m_state.settingValues[static_cast<size_t>(SettingId::Resolution)]);
 	RescanAndDerive();
 }
 

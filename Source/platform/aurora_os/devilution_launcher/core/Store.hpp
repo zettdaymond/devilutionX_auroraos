@@ -12,6 +12,7 @@
 #include <deque>
 #include <functional>
 #include <mutex>
+#include <vector>
 #include <thread>
 
 namespace launcher {
@@ -29,7 +30,8 @@ public:
 	      IGameFilesService &filesService,
 	      IDownloadService &downloadService,
 	      IPathProvider &pathProvider,
-	      IEngineOptionsService &engineOptionsService);
+	      IEngineOptionsService &engineOptionsService,
+	      std::vector<int> displayHeights = {});
 
 	/// Читает настройки и делает первичный поиск файлов.
 	void Init();
@@ -66,6 +68,10 @@ private:
 	IDownloadService &m_downloadService;
 	IPathProvider &m_pathProvider;
 	IEngineOptionsService &m_engineOptionsService;
+
+	/// Ландшафтные высоты дисплейных режимов (собирает Application через
+	/// SDL) — исходные данные зеркала игрового списка разрешений.
+	std::vector<int> m_displayHeights;
 
 	LauncherConfig m_config;
 	LauncherState m_state;

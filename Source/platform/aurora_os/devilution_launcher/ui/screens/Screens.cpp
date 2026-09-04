@@ -441,12 +441,26 @@ struct StepperGeometry {
 	float totalWidth;
 };
 
-StepperGeometry StepperMetricsOf(const SettingSpec &spec)
+StepperGeometry StepperMetricsOf(const SettingSpec &spec, const std::vector<int> &resolutionOptions)
 {
 	StepperGeometry metrics;
 	metrics.button = Scale::Px(1.7F);
 	metrics.gap = Scale::Px(0.25F);
-	metrics.cellWidth = WidestOptionWidth(spec) + Scale::Px(0.3F);
+	if (spec.secondaryKey.empty()) {
+		metrics.cellWidth = WidestOptionWidth(spec) + Scale::Px(0.3F);
+	} else {
+		// Разрешение: ячейка — по самой широкой метке зеркала игрового
+		// списка («1440p», «2160p»…).
+		ImFont *font = ImGui::GetFont();
+		const float fontSize = ImGui::GetFontSize();
+		float widest = 0.0F;
+		for (int height : resolutionOptions) {
+			const std::string label = std::to_string(height) + "p";
+			widest = std::max(widest,
+			    font != nullptr ? font->CalcTextSizeA(fontSize, FLT_MAX, 0.0F, label.c_str()).x : fontSize * 4.0F);
+		}
+		metrics.cellWidth = widest + Scale::Px(0.3F);
+	}
 	metrics.totalWidth = metrics.button * 2.0F + metrics.gap * 2.0F + metrics.cellWidth;
 	return metrics;
 }
@@ -458,7 +472,8 @@ StepperGeometry StepperMetricsOf(const SettingSpec &spec)
 /// первую линию абсолютной позицией — SameLine после многострочного
 /// имени относился бы к его последней строке. Контролы только
 /// отправляют интенты.
-void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &dispatch)
+void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &dispatch,
+    const std::vector<int> &resolutionOptions)
 {
 	ImGui::PushID(spec.key.data());
 
@@ -468,7 +483,7 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 
 	// Правая зона контрола: в неё не заезжают ни имя, ни описание.
 	// Ширина известна до отрисовки — по ней же переносится имя.
-	const StepperGeometry stepper = StepperMetricsOf(spec);
+	const StepperGeometry stepper = StepperMetricsOf(spec, resolutionOptions);
 	float controlWidth = 0.0F;
 	switch (spec.kind) {
 	case SettingKind::Toggle:
@@ -502,21 +517,31 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 		// самому широкому варианту, чтобы степпер не прыгал при смене.
 		// Варианты переключаются по индексу, а в интент уходит
 		// optionValues индекса — у зелий значения 0/1/2/4/8/16.
-		// Разрешение: лестница строится от высоты ЭКРАНА (как в игре),
-		// включая нативную высоту, если её нет среди общих ступеней.
-		const bool dynamicLadder = !spec.secondaryKey.empty();
-		const int landscapeHeight = static_cast<int>(Scale::ScreenMinSide());
-		size_t optionCount = spec.optionCount;
-		if (dynamicLadder) {
-			optionCount = ResolutionOptionCount(landscapeHeight);
+		// Разрешение: варианты — зеркало игрового списка из состояния
+		// (BuildResolutionOptions: режимы дисплея + сырое значение ini).
+		const bool fromState = !spec.secondaryKey.empty();
+		const std::vector<int> &stateOptions = resolutionOptions;
+		if (fromState && stateOptions.empty()) {
+			break; // без данных экрана список не строился — нечем листать
 		}
-		const int count = static_cast<int>(optionCount);
-		const int currentIndex = dynamicLadder
-		    ? static_cast<int>(ResolutionIndexFor(value, landscapeHeight))
-		    : SettingCycleIndex(spec, value) % count;
-		const auto valueOfIndex = [dynamicLadder, landscapeHeight, &spec](int index) {
-			return dynamicLadder ? ResolutionValueAt(static_cast<size_t>(index), landscapeHeight)
-			                     : spec.optionValues[static_cast<size_t>(index)];
+		const int count = fromState ? static_cast<int>(stateOptions.size())
+		                            : static_cast<int>(spec.optionCount);
+		// Список разрешений — по убыванию; текущая позиция — первая
+		// ступень ≤ значения (сырое значение между ступенями остаётся
+		// со своей меткой, стрелки идут к соседям от его позиции).
+		int currentIndex = SettingCycleIndex(spec, value) % std::max(count, 1);
+		if (fromState) {
+			currentIndex = static_cast<int>(stateOptions.size()) - 1;
+			for (size_t i = 0; i < stateOptions.size(); ++i) {
+				if (stateOptions[i] <= value) {
+					currentIndex = static_cast<int>(i);
+					break;
+				}
+			}
+		}
+		const auto valueOfIndex = [fromState, &stateOptions, &spec](int index) {
+			return fromState ? stateOptions[static_cast<size_t>(index)]
+			                 : spec.optionValues[static_cast<size_t>(index)];
 		};
 		widgets::GhostButton(icons::ChevronLeft, "", ImVec2(stepper.button, stepper.button),
 		    [&dispatch, id = spec.id, count, currentIndex, valueOfIndex] {
@@ -532,8 +557,8 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 			    dispatch(intent::SettingChanged { id, valueOfIndex((currentIndex + 1) % count) });
 		    });
 
-		const std::string current = dynamicLadder
-		    ? ResolutionLabelAt(static_cast<size_t>(currentIndex), landscapeHeight)
+		const std::string current = fromState
+		    ? std::to_string(value) + "p"
 		    : SettingValueText(spec, value);
 		ImFont *font = ImGui::GetFont();
 		const float font_size = ImGui::GetFontSize();
@@ -630,7 +655,7 @@ void Settings(const LauncherState &state, const Dispatcher &dispatch)
 				ImGui::SetCursorPosY(rowTop + rowHeights[index]);
 				continue;
 			}
-			RenderSettingRow(spec, state.settingValues[index], dispatch);
+			RenderSettingRow(spec, state.settingValues[index], dispatch, state.resolutionOptions);
 			rowHeights[index] = ImGui::GetCursorPosY() - rowTop;
 		}
 	}

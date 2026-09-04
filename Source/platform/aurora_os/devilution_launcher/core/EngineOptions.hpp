@@ -1,10 +1,13 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace launcher {
 
@@ -84,73 +87,44 @@ enum class SettingKind : uint8_t {
 
 constexpr size_t kMaxSettingOptions = 6;
 
-/// Ступени лестницы разрешений — как строит список сам движок при
-/// fitToScreen (options.cpp): общие высоты {480…1440}, обрезанные по
-/// высоте экрана в ландшафте, ПЛЮС нативная высота экрана, если её
-/// нет среди общих (режим дисплея всегда есть в списке движка —
-/// отсюда «1200p» на планшете 2000x1200). Нативная выше 1440 не
-/// предлагается: каталог clamp-ит значение в 480..1440.
-inline size_t ResolutionOptionCount(int landscapeHeight)
+/// ЗЕРКАЛО движкового списка разрешений (options.cpp,
+/// OptionEntryResolution::CheckResolutionsAreInitialized), упрощённое
+/// под наши вечные upscale=true + fitToScreen=true: при fitToScreen
+/// ширина каждой записи пересчитывается под аспект экрана, поэтому
+/// список вырождается в множество ВЫСОТ. Обновить при апгрейде движка.
+///
+/// \param displayHeights ландшафтные высоты всех дисплейных режимов
+///        (перечисляет вызывающий через SDL — core чист от SDL)
+/// \param iniHeight сырое Height из diablo.ini (движок гарантирует
+///        присутствие текущего значения в списке — мы тоже)
+/// \return уникальные высоты по убыванию (порядок списка движка)
+inline std::vector<int> BuildResolutionOptions(const std::vector<int> &displayHeights, int iniHeight)
 {
-	size_t count = 0;
-	int lastLadder = 0;
-	for (int height : { 480, 540, 720, 960, 1080, 1440 }) {
-		if (height <= landscapeHeight) {
-			++count;
-			lastLadder = height;
+	std::vector<int> heights;
+	for (int height : displayHeights) {
+		if (height > 0) {
+			heights.push_back(height);
 		}
 	}
-	if (count == 0) {
-		return 1; // вырожденный экран: минимум одна ступень
-	}
-	if (landscapeHeight > lastLadder && landscapeHeight <= 1440) {
-		++count; // нативная высота вне общей лестницы (1200 на планшете)
-	}
-	return count;
-}
-
-/// Значение ступени index для экрана высотой landscapeHeight
-/// (ландшафт). Нативная высота всегда БОЛЬШЕ последней общей ступени
-/// (иначе она уже есть в лестнице) — значит стоит последней.
-inline int ResolutionValueAt(size_t index, int landscapeHeight)
-{
-	const int ladder[] { 480, 540, 720, 960, 1080, 1440 };
-	size_t ladderCount = 0;
-	int lastLadder = 0;
-	for (int height : ladder) {
-		if (height <= landscapeHeight) {
-			++ladderCount;
-			lastLadder = height;
+	// Движок добавляет общие высоты только при единственном режиме
+	// дисплея (телефон/планшет); на десктопе с многими режимами их нет.
+	if (heights.size() == 1) {
+		const int screen = heights[0];
+		for (int common : { 480, 540, 720, 960, 1080, 1440, 2160 }) {
+			if (common > screen) {
+				break;
+			}
+			heights.push_back(common);
 		}
 	}
-	if (ladderCount == 0) {
-		return ladder[0];
+	if (iniHeight > 0) {
+		heights.push_back(iniHeight);
 	}
-	if (index >= ladderCount) {
-		return (landscapeHeight > lastLadder && landscapeHeight <= 1440) ? landscapeHeight
-		                                                                  : ladder[ladderCount - 1];
-	}
-	return ladder[index];
-}
+	heights.push_back(480); // DEFAULT/vanilla 640x480 — есть всегда
 
-/// Подпись ступени («480p», «1200p») — нативная может быть любой.
-inline std::string ResolutionLabelAt(size_t index, int landscapeHeight)
-{
-	return std::to_string(ResolutionValueAt(index, landscapeHeight)) + "p";
-}
-
-/// Индекс значения в лестнице экрана; не входит — индекс ближайшей
-/// ступени СНИЗУ (как снаппит загрузка сервиса).
-inline size_t ResolutionIndexFor(int value, int landscapeHeight)
-{
-	const size_t count = ResolutionOptionCount(landscapeHeight);
-	size_t index = 0;
-	for (size_t i = 0; i < count; ++i) {
-		if (ResolutionValueAt(i, landscapeHeight) <= value) {
-			index = i;
-		}
-	}
-	return index;
+	std::sort(heights.begin(), heights.end(), std::greater<int> {});
+	heights.erase(std::unique(heights.begin(), heights.end()), heights.end());
+	return heights;
 }
 
 /// Неизменное описание настройки: ключ diablo.ini, вид контрола,
@@ -306,9 +280,8 @@ inline constexpr std::array<SettingSpec, kSettingCount> kSettingCatalog { {
 		"Управление частотой кадров: баланс между плавностью и экономией заряда.",
 		"" },
 	{ SettingId::Resolution, SettingGroup::Graphics, SettingKind::Cycle, "Graphics", "Height",
-		480, 480, 1440,
-		{ "480p", "540p", "720p", "960p", "1080p", "1440p" },
-		{ 480, 540, 720, 960, 1080, 1440 }, 6, "Разрешение",
+		480, 0, 0,
+		{}, {}, 0, "Разрешение",
 		"Внутреннее разрешение рендера: ниже — выше FPS и экономнее батарея, выше — детальнее картинка.",
 		"Width" },
 	{ SettingId::ShowFps, SettingGroup::Graphics, SettingKind::Toggle, "Graphics", "Show FPS",
