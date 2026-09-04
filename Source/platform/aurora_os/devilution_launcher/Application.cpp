@@ -502,10 +502,12 @@ AppResult Application::Run()
 		SDL_RenderClear(m_renderer);
 		ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_renderer);
 
-		// Dev-дамп кадра ДО композитора: ReadPixels из бэкбуфера рендерера
-		// отдаёт чистые пиксели (PrintWindow/CopyFromScreen идут через DWM
-		// и ловят его пересборку кадра). DEVILUTIONX_DUMP_FRAME=N задаёт
-		// номер кадра, DEVILUTIONX_DUMP_PATH — куда писать BMP.
+#ifndef AURORA_OS
+		// Dev-дамп кадра ДО композитора (только десктоп-сборка): ReadPixels
+		// из бэкбуфера рендерера отдаёт чистые пиксели (PrintWindow/
+		// CopyFromScreen идут через DWM и ловят его пересборку кадра).
+		// DEVILUTIONX_DUMP_FRAME=N задаёт номер кадра, DEVILUTIONX_DUMP_PATH —
+		// куда писать BMP. В сборку для устройства код не попадает.
 		static const int dumpFrameNo = [] {
 			const char *env = SDL_getenv("DEVILUTIONX_DUMP_FRAME");
 			return env != nullptr ? std::atoi(env) : -1;
@@ -526,6 +528,7 @@ AppResult Application::Run()
 			}
 		}
 		++frameCounter;
+#endif
 
 		SDL_RenderPresent(m_renderer);
 
