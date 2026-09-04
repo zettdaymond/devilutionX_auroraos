@@ -84,9 +84,25 @@ auto PluralFiles(size_t count) -> std::string
 
 void RenderFirstRun(const LauncherState &state, const Dispatcher &dispatch, const ArtSet &art)
 {
-	const float width = ImGui::GetContentRegionAvail().x;
+	// Геометрия — та же, что у главного экрана с найденной игрой: в
+	// ландшафте контентный блок капится 30rem и центрируется (без капа
+	// hero-панель растягивалась на всю ширину планшета), высота hero в
+	// ландшафте — как у featured-панели.
+	const float fullWidth = ImGui::GetContentRegionAvail().x;
 	const float height = ImGui::GetContentRegionAvail().y;
-	const float heroHeight = std::min(height * 0.62F, Scale::Px(kFirstRunHeroMaxRem));
+	const bool portrait = Scale::Portrait();
+	const float width = portrait ? fullWidth : std::min(fullWidth, Scale::Px(kLandscapeContentMaxRem));
+	const float heroHeight = portrait ? std::min(height * 0.62F, Scale::Px(kFirstRunHeroMaxRem))
+	                                  : Scale::Px(kLandscapeHeroRem);
+
+	// Сдвиг к вертикальному центру, как на главной (там Dummy(free*0.25)
+	// перед hero; здесь блока меньше — берём долю поменьше).
+	ImGui::Dummy(ImVec2(0, height * 0.10F));
+
+	const float sidePad = portrait ? 0.0F : std::max(0.0F, (fullWidth - width) * 0.5F);
+	if (sidePad > 0.0F) {
+		ImGui::Indent(sidePad);
+	}
 
 	const HeroArtRef hero = ResolveHeroArt(art, art.diablo.hero, kDiabloStyle);
 	widgets::HeroPanel("DEVILUTIONX ДЛЯ AURORA OS", "DIABLO",
@@ -106,6 +122,10 @@ void RenderFirstRun(const LauncherState &state, const Dispatcher &dispatch, cons
 	ImGui::TextWrapped("%s",
 	    "Для полной версии скопируйте DIABDAT.MPQ с диска\nили купите игру на GoG.com. Для Hellfire нужны hellfire.mpq,\nhfmonk.mpq, hfmusic.mpq и hfvoice.mpq.");
 	ImGui::PopStyleColor();
+
+	if (sidePad > 0.0F) {
+		ImGui::Unindent(sidePad);
+	}
 }
 
 // ---------------------------------------------------------------------------

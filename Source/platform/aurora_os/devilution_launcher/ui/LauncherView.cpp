@@ -494,17 +494,26 @@ void LauncherView::RenderCover(const LauncherState &state, float coverAlpha)
 		// плитке узнаётся и без него.
 		const std::string_view displayName = spec.displayName.substr(0, spec.displayName.find(" ("));
 
+		// Все размеры прогресса — доли короткой стороны (как логотип
+		// выше): низкий DPI не должен прятать загрузку в плитке.
+		const float nameSizePx = Scale::MinSide() * 0.055F;
+		const float statSizePx = Scale::MinSide() * 0.045F;
+		ImFont *bodyBold = Theme::Font(FontRole::BodyBold);
+		ImFont *body = Theme::Font(FontRole::Body);
+
 		float dy = top.y + v.y * 0.50F;
-		Theme::PushFont(FontRole::BodyBold);
-		const ImVec2 nameSize = ImGui::CalcTextSize(displayName.data(), displayName.data() + displayName.size());
-		draw->AddText(ImVec2(centerX - nameSize.x * 0.5F, dy), argb(ColorRole::TextBody),
-		    displayName.data(), displayName.data() + displayName.size());
-		Theme::PopFont();
+		if (bodyBold != nullptr) {
+			const ImVec2 nameSize = bodyBold->CalcTextSizeA(nameSizePx, FLT_MAX, 0.0F,
+			    displayName.data(), displayName.data() + displayName.size());
+			draw->AddText(bodyBold, nameSizePx, ImVec2(centerX - nameSize.x * 0.5F, dy),
+			    argb(ColorRole::TextBody),
+			    displayName.data(), displayName.data() + displayName.size());
+			dy += nameSize.y + Scale::Px(0.7F);
+		}
 
 		// Полоса: тёмный трек в золотой рамке, заливка и мягкий свет
 		// на переднем крае.
-		dy += nameSize.y + Scale::Px(0.7F);
-		const float barHeight = Scale::Px(0.55F);
+		const float barHeight = Scale::MinSide() * 0.028F;
 		const float barLeft = centerX - contentWidth * 0.5F;
 		draw->AddRectFilled(ImVec2(barLeft, dy), ImVec2(barLeft + contentWidth, dy + barHeight),
 		    argb(ColorRole::Panel));
@@ -520,14 +529,14 @@ void LauncherView::RenderCover(const LauncherState &state, float coverAlpha)
 		draw->AddRect(ImVec2(barLeft, dy), ImVec2(barLeft + contentWidth, dy + barHeight),
 		    argb(ColorRole::BorderGold), 1.0F);
 
-		dy += barHeight + Scale::Px(0.55F);
-		Theme::PushFont(FontRole::Body);
-		const std::string stat = std::to_string(static_cast<int>(d.fraction * 100.0F + 0.5F)) + "% · "
-		    + FormatBytes(d.bytesPerSec) + "/с";
-		const ImVec2 statSize = ImGui::CalcTextSize(stat.c_str());
-		draw->AddText(ImVec2(centerX - statSize.x * 0.5F, dy), argb(ColorRole::TextDim),
-		    stat.c_str());
-		Theme::PopFont();
+		if (body != nullptr) {
+			dy += barHeight + Scale::Px(0.55F);
+			const std::string stat = std::to_string(static_cast<int>(d.fraction * 100.0F + 0.5F)) + "% · "
+			    + FormatBytes(d.bytesPerSec) + "/с";
+			const ImVec2 statSize = body->CalcTextSizeA(statSizePx, FLT_MAX, 0.0F, stat.c_str());
+			draw->AddText(body, statSizePx, ImVec2(centerX - statSize.x * 0.5F, dy),
+			    argb(ColorRole::TextDim), stat.c_str());
+		}
 	}
 }
 
