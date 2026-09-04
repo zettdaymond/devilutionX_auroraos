@@ -66,11 +66,16 @@ list(APPEND DEVILUTIONX_PLATFORM_LINK_LIBRARIES libdevilutionx_aurora_os)
 # корня, чтобы его увидели все pkg_search_module'ы ниже по дереву
 # (вендоренная SDL2 требует xkbcommon для wayland-бэкенда).
 #
-# .pc в prebuilt переносятся через ${pcfiledir}, но кросс-окружение
-# SDK BT разворачивает их в ОТНОСИТЕЛЬНЫЕ -I/-L. Поэтому на этапе
-# конфигурации генерируются копии с литеральным абсолютным prefix
-# (в build-каталоге), и в PKG_CONFIG_PATH уходит только сгенерированная
-# папка — любой pkg-config тогда отдаёт абсолютные пути.
+# Две ловушки prebuilt, закрываемые генерацией shim-каталога в build:
+# 1) .pc с ${pcfiledir}-префиксами кросс-окружение SDK BT разворачивает
+#    в ОТНОСИТЕЛЬНЫЕ -I/-L — пишем собственные .pc с абсолютными путями;
+# 2) файлы библиотек — реальные копии, НЕ симлинки (артефакт conan):
+#    realpath(libxkbcommon.so) = само имя без версии, и SDL запоминает
+#    для dlopen НЕВЕРСИОНИРОВАННОЕ "libxkbcommon.so" — такого файла на
+#    устройствах нет, Wayland_VideoInit зовёт NULL-указатель (сигном
+#    на старте, виден только на SDK BT: в mb2 выручает системный
+#    xkbcommon из sysroot с честными симлинками). Симлинки shim-каталога
+#    дают find_library realpath .so.0.0.0 → soname libxkbcommon.so.0.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "armv7")
     set(DEVILUTIONX_XKB_ARCH "armv7hl")
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|armv8")
@@ -87,20 +92,42 @@ if(EXISTS "${DEVILUTIONX_XKB_PKGCONFIG}/xkbcommon.pc")
     file(TO_CMAKE_PATH "${DEVILUTIONX_XKB_ROOT}" DEVILUTIONX_XKB_ROOT_FORWARD)
 
     set(DEVILUTIONX_XKB_PC_GENERATED "${CMAKE_BINARY_DIR}/pkgconfig-xkb")
-    file(MAKE_DIRECTORY "${DEVILUTIONX_XKB_PC_GENERATED}")
-    file(GLOB DEVILUTIONX_XKB_PC_FILES "${DEVILUTIONX_XKB_PKGCONFIG}/*.pc")
-    foreach(DEVILUTIONX_XKB_PC_IN ${DEVILUTIONX_XKB_PC_FILES})
-        get_filename_component(DEVILUTIONX_XKB_PC_NAME "${DEVILUTIONX_XKB_PC_IN}" NAME)
-        file(READ "${DEVILUTIONX_XKB_PC_IN}" DEVILUTIONX_XKB_PC_CONTENT)
-        string(REPLACE "prefix=\${pcfiledir}/../.."
-            "prefix=${DEVILUTIONX_XKB_ROOT_FORWARD}"
-            DEVILUTIONX_XKB_PC_CONTENT "${DEVILUTIONX_XKB_PC_CONTENT}")
-        file(WRITE "${DEVILUTIONX_XKB_PC_GENERATED}/${DEVILUTIONX_XKB_PC_NAME}"
-            "${DEVILUTIONX_XKB_PC_CONTENT}")
+    set(DEVILUTIONX_XKB_LIB_SHIM "${DEVILUTIONX_XKB_PC_GENERATED}/lib")
+    file(MAKE_DIRECTORY "${DEVILUTIONX_XKB_LIB_SHIM}")
+
+    foreach(DEVILUTIONX_XKB_LIB xkbcommon xkbregistry)
+        set(DEVILUTIONX_XKB_REAL
+            "${DEVILUTIONX_XKB_ROOT}/lib/lib${DEVILUTIONX_XKB_LIB}.so.0.0.0")
+        if(EXISTS "${DEVILUTIONX_XKB_REAL}")
+            if(NOT EXISTS "${DEVILUTIONX_XKB_LIB_SHIM}/lib${DEVILUTIONX_XKB_LIB}.so")
+                file(CREATE_LINK "${DEVILUTIONX_XKB_REAL}"
+                    "${DEVILUTIONX_XKB_LIB_SHIM}/lib${DEVILUTIONX_XKB_LIB}.so" SYMBOLIC)
+            endif()
+            if(NOT EXISTS "${DEVILUTIONX_XKB_LIB_SHIM}/lib${DEVILUTIONX_XKB_LIB}.so.0")
+                file(CREATE_LINK "${DEVILUTIONX_XKB_REAL}"
+                    "${DEVILUTIONX_XKB_LIB_SHIM}/lib${DEVILUTIONX_XKB_LIB}.so.0" SYMBOLIC)
+            endif()
+        endif()
     endforeach()
+
+    foreach(DEVILUTIONX_XKB_PC xkbcommon xkbregistry)
+        file(WRITE "${DEVILUTIONX_XKB_PC_GENERATED}/${DEVILUTIONX_XKB_PC}.pc"
+"prefix=${DEVILUTIONX_XKB_ROOT_FORWARD}
+exec_prefix=\${prefix}
+libdir=${DEVILUTIONX_XKB_LIB_SHIM}
+includedir=\${prefix}/include
+
+Name: ${DEVILUTIONX_XKB_PC}
+Description: ${DEVILUTIONX_XKB_PC} (Aurora conan prebuilt 1.5.0, versioned shim)
+Version: 1.5.0
+Libs: -L\${libdir} -l${DEVILUTIONX_XKB_PC}
+Cflags: -I\${includedir}
+")
+    endforeach()
+
     set(ENV{PKG_CONFIG_PATH} "${DEVILUTIONX_XKB_PC_GENERATED}:$ENV{PKG_CONFIG_PATH}")
     message(STATUS "xkbcommon: prebuilt ${DEVILUTIONX_XKB_ARCH} "
-        "(${DEVILUTIONX_XKB_ROOT_FORWARD}) -> ${DEVILUTIONX_XKB_PC_GENERATED}")
+        "(${DEVILUTIONX_XKB_ROOT_FORWARD}) -> shim ${DEVILUTIONX_XKB_PC_GENERATED}")
 endif()
 
 add_definitions(-DAURORA_OS)
