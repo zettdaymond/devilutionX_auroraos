@@ -61,11 +61,16 @@ list(APPEND DEVILUTIONX_PLATFORM_SUBDIRECTORIES platform/aurora_os)
 list(APPEND DEVILUTIONX_PLATFORM_LINK_LIBRARIES libdevilutionx_aurora_os)
 
 # Прекомпилированный xkbcommon (conan-артефакторий Авроры, 1.5.0) — для
-# локальной сборки вне эмулятора, где пакета нет в системном sysroot.
-# Каталог подкладывается в PKG_CONFIG_PATH ДО add_subdirectory корня,
-# чтобы его увидели все pkg_search_module'ы ниже по дереву (вендоренная
-# SDL2 требует xkbcommon для wayland-бэкенда). Префиксы в .pc переносимые
-# (${pcfiledir}), от пути checkout не зависят.
+# локальной сборки вне эмулятора и SDK BT, где пакета нет в системном
+# sysroot. Каталог подкладывается в PKG_CONFIG_PATH ДО add_subdirectory
+# корня, чтобы его увидели все pkg_search_module'ы ниже по дереву
+# (вендоренная SDL2 требует xkbcommon для wayland-бэкенда).
+#
+# .pc в prebuilt переносятся через ${pcfiledir}, но кросс-окружение
+# SDK BT разворачивает их в ОТНОСИТЕЛЬНЫЕ -I/-L. Поэтому на этапе
+# конфигурации генерируются копии с литеральным абсолютным prefix
+# (в build-каталоге), и в PKG_CONFIG_PATH уходит только сгенерированная
+# папка — любой pkg-config тогда отдаёт абсолютные пути.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "armv7")
     set(DEVILUTIONX_XKB_ARCH "armv7hl")
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|armv8")
@@ -73,11 +78,29 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|armv8")
 else()
     set(DEVILUTIONX_XKB_ARCH "x86_64")
 endif()
-set(DEVILUTIONX_XKB_PKGCONFIG
-    "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/xkbcommon/${DEVILUTIONX_XKB_ARCH}/lib/pkgconfig")
+set(DEVILUTIONX_XKB_ROOT
+    "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/xkbcommon/${DEVILUTIONX_XKB_ARCH}")
+set(DEVILUTIONX_XKB_PKGCONFIG "${DEVILUTIONX_XKB_ROOT}/lib/pkgconfig")
 if(EXISTS "${DEVILUTIONX_XKB_PKGCONFIG}/xkbcommon.pc")
-    set(ENV{PKG_CONFIG_PATH} "${DEVILUTIONX_XKB_PKGCONFIG}:$ENV{PKG_CONFIG_PATH}")
-    message(STATUS "xkbcommon: prebuilt ${DEVILUTIONX_XKB_ARCH} добавлен в PKG_CONFIG_PATH")
+    # В .pc пути обязаны быть с прямыми слэшами (актуально для локальных
+    # конфигураций с Windows-путями).
+    file(TO_CMAKE_PATH "${DEVILUTIONX_XKB_ROOT}" DEVILUTIONX_XKB_ROOT_FORWARD)
+
+    set(DEVILUTIONX_XKB_PC_GENERATED "${CMAKE_BINARY_DIR}/pkgconfig-xkb")
+    file(MAKE_DIRECTORY "${DEVILUTIONX_XKB_PC_GENERATED}")
+    file(GLOB DEVILUTIONX_XKB_PC_FILES "${DEVILUTIONX_XKB_PKGCONFIG}/*.pc")
+    foreach(DEVILUTIONX_XKB_PC_IN ${DEVILUTIONX_XKB_PC_FILES})
+        get_filename_component(DEVILUTIONX_XKB_PC_NAME "${DEVILUTIONX_XKB_PC_IN}" NAME)
+        file(READ "${DEVILUTIONX_XKB_PC_IN}" DEVILUTIONX_XKB_PC_CONTENT)
+        string(REPLACE "prefix=\${pcfiledir}/../.."
+            "prefix=${DEVILUTIONX_XKB_ROOT_FORWARD}"
+            DEVILUTIONX_XKB_PC_CONTENT "${DEVILUTIONX_XKB_PC_CONTENT}")
+        file(WRITE "${DEVILUTIONX_XKB_PC_GENERATED}/${DEVILUTIONX_XKB_PC_NAME}"
+            "${DEVILUTIONX_XKB_PC_CONTENT}")
+    endforeach()
+    set(ENV{PKG_CONFIG_PATH} "${DEVILUTIONX_XKB_PC_GENERATED}:$ENV{PKG_CONFIG_PATH}")
+    message(STATUS "xkbcommon: prebuilt ${DEVILUTIONX_XKB_ARCH} "
+        "(${DEVILUTIONX_XKB_ROOT_FORWARD}) -> ${DEVILUTIONX_XKB_PC_GENERATED}")
 endif()
 
 add_definitions(-DAURORA_OS)
