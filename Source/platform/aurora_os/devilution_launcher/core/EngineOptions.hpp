@@ -61,16 +61,18 @@ enum class SettingId : uint8_t {
 	FloatingNumbers,
 	ShowMonsterType,
 	// Графика
+	Resolution,
 	Zoom,
 	ColorCycling,
 	FrameRateControl,
-	Resolution,
 	ShowFps,
 	GammaCorrection,
 	// Звук
 	SoundVolume,
 	MusicVolume,
 	WalkingSound,
+	AutoEquipSound,
+	ItemPickupSound,
 
 	Count
 };
@@ -267,9 +269,14 @@ inline constexpr std::array<SettingSpec, kSettingCount> kSettingCatalog { {
 	{ SettingId::ShowMonsterType, SettingGroup::Interface, SettingKind::Toggle, "Game", "Show Monster Type",
 		0, 0, 1, {}, {}, 0, "Тип монстра",
 		"В описании монстра показывается его тип (зверь/демон/нежить)." },
+	{ SettingId::Resolution, SettingGroup::Graphics, SettingKind::Cycle, "Graphics", "Height",
+		480, 0, 0,
+		{}, {}, 0, "Разрешение",
+		"Внутреннее разрешение рендера: ниже — выше FPS и экономнее батарея, выше — детальнее картинка.",
+		"Width" },
 	{ SettingId::Zoom, SettingGroup::Graphics, SettingKind::Toggle, "Graphics", "Zoom",
 		0, 0, 1, {}, {}, 0, "Приближение",
-		"Разрешает приближать и отдалять камеру в игре." },
+		"Пиксельное приближение: видна та же область карты, что на низком разрешении, герой крупнее, а пиксели заметнее. На высоких разрешениях без него видно огромный кусок карты и мелкого персонажа." },
 	{ SettingId::ColorCycling, SettingGroup::Graphics, SettingKind::Toggle, "Graphics", "Color Cycling",
 		1, 0, 1, {}, {}, 0, "Анимация палитры",
 		"Живая анимация воды, лавы и кислоты (циклическая палитра)." },
@@ -279,11 +286,6 @@ inline constexpr std::array<SettingSpec, kSettingCount> kSettingCatalog { {
 		{ 0, 1, 2 }, 3, "Частота кадров",
 		"Управление частотой кадров: баланс между плавностью и экономией заряда.",
 		"" },
-	{ SettingId::Resolution, SettingGroup::Graphics, SettingKind::Cycle, "Graphics", "Height",
-		480, 0, 0,
-		{}, {}, 0, "Разрешение",
-		"Внутреннее разрешение рендера: ниже — выше FPS и экономнее батарея, выше — детальнее картинка.",
-		"Width" },
 	{ SettingId::ShowFps, SettingGroup::Graphics, SettingKind::Toggle, "Graphics", "Show FPS",
 		0, 0, 1, {}, {}, 0, "Счётчик FPS",
 		"Показывает частоту кадров в углу экрана." },
@@ -299,6 +301,12 @@ inline constexpr std::array<SettingSpec, kSettingCount> kSettingCatalog { {
 	{ SettingId::WalkingSound, SettingGroup::Audio, SettingKind::Toggle, "Audio", "Walking Sound",
 		1, 0, 1, {}, {}, 0, "Звук шагов",
 		"Персонаж слышен при ходьбе." },
+	{ SettingId::AutoEquipSound, SettingGroup::Audio, SettingKind::Toggle, "Audio", "Auto Equip Sound",
+		0, 0, 1, {}, {}, 0, "Звук автоэкипировки",
+		"Автоматическое надевание предмета при подборе звучит как обычная экипировка." },
+	{ SettingId::ItemPickupSound, SettingGroup::Audio, SettingKind::Toggle, "Audio", "Item Pickup Sound",
+		0, 0, 1, {}, {}, 0, "Звук подбора предметов",
+		"Поднятие предмета с земли издаёт характерный звук." },
 } };
 
 /// Спецификация настройки по её идентификатору.
