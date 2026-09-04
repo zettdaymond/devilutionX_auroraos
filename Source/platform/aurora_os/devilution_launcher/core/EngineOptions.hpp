@@ -99,7 +99,9 @@ constexpr size_t kMaxSettingOptions = 6;
 ///        (перечисляет вызывающий через SDL — core чист от SDL)
 /// \param iniHeight сырое Height из diablo.ini (движок гарантирует
 ///        присутствие текущего значения в списке — мы тоже)
-/// \return уникальные высоты по убыванию (порядок списка движка)
+/// \return уникальные высоты по ВОЗРАСТАНИЮ — стрелка степпера вправо
+///         везде означает «больше» (порядок движка — убывание, но
+///         UI важен только состав, а не порядок)
 inline std::vector<int> BuildResolutionOptions(const std::vector<int> &displayHeights, int iniHeight)
 {
 	std::vector<int> heights;
@@ -124,7 +126,7 @@ inline std::vector<int> BuildResolutionOptions(const std::vector<int> &displayHe
 	}
 	heights.push_back(480); // DEFAULT/vanilla 640x480 — есть всегда
 
-	std::sort(heights.begin(), heights.end(), std::greater<int> {});
+	std::sort(heights.begin(), heights.end());
 	heights.erase(std::unique(heights.begin(), heights.end()), heights.end());
 	return heights;
 }

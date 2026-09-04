@@ -291,22 +291,22 @@ TEST(ResolutionOptionsTest, MirrorsEngineList)
 {
 	// Телефон (один режим 720): общие ступени до экрана + экран + 480.
 	const auto phone = BuildResolutionOptions({ 720 }, 480);
-	EXPECT_EQ(phone, (std::vector<int> { 720, 540, 480 }));
+	EXPECT_EQ(phone, (std::vector<int> { 480, 540, 720 }));
 
 	// Планшет 2000x1200 (один режим): до 1080 + нативная 1200.
 	const auto tablet = BuildResolutionOptions({ 1200 }, 480);
-	EXPECT_EQ(tablet, (std::vector<int> { 1200, 1080, 960, 720, 540, 480 }));
+	EXPECT_EQ(tablet, (std::vector<int> { 480, 540, 720, 960, 1080, 1200 }));
 
 	// Десктоп со многими режимами: общих ступеней НЕТ (как в движке),
 	// только режимы + сырое значение ini + вечные 480.
 	const auto desktop = BuildResolutionOptions({ 1234, 664, 617, 480 }, 1234);
-	EXPECT_EQ(desktop, (std::vector<int> { 1234, 664, 617, 480 }));
+	EXPECT_EQ(desktop, (std::vector<int> { 480, 617, 664, 1234 }));
 
 	// Экзотическое значение из ini входит в список (движок гарантирует
-	// присутствие текущего выбора); список — по убыванию.
+	// присутствие текущего выбора); список — по возрастанию.
 	const auto exotic = BuildResolutionOptions({ 720 }, 2034);
-	EXPECT_EQ(exotic.front(), 2034);
-	EXPECT_EQ(exotic, (std::vector<int> { 2034, 720, 540, 480 }));
+	EXPECT_EQ(exotic.back(), 2034);
+	EXPECT_EQ(exotic, (std::vector<int> { 480, 540, 720, 2034 }));
 }
 
 } // namespace

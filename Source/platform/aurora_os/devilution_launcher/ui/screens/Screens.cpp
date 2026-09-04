@@ -526,14 +526,14 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 		}
 		const int count = fromState ? static_cast<int>(stateOptions.size())
 		                            : static_cast<int>(spec.optionCount);
-		// Список разрешений — по убыванию; текущая позиция — первая
-		// ступень ≤ значения (сырое значение между ступенями остаётся
+		// Список разрешений — по возрастанию; текущая позиция — первая
+		// ступень ≥ значения (сырое значение между ступенями остаётся
 		// со своей меткой, стрелки идут к соседям от его позиции).
 		int currentIndex = SettingCycleIndex(spec, value) % std::max(count, 1);
 		if (fromState) {
 			currentIndex = static_cast<int>(stateOptions.size()) - 1;
 			for (size_t i = 0; i < stateOptions.size(); ++i) {
-				if (stateOptions[i] <= value) {
+				if (stateOptions[i] >= value) {
 					currentIndex = static_cast<int>(i);
 					break;
 				}
@@ -543,13 +543,9 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 			return fromState ? stateOptions[static_cast<size_t>(index)]
 			                 : spec.optionValues[static_cast<size_t>(index)];
 		};
-		// Список разрешений — по УБЫВАНИЮ (зеркало движка), обычные циклы
-		// — по возрастанию значений. Чтобы стрелка вправо везде означала
-		// «больше», для разрешения направление обхода инвертируется.
-		const int stepRight = fromState ? -1 : 1;
 		widgets::GhostButton(icons::ChevronLeft, "", ImVec2(stepper.button, stepper.button),
-		    [&dispatch, id = spec.id, count, currentIndex, valueOfIndex, stepRight] {
-			    dispatch(intent::SettingChanged { id, valueOfIndex(((currentIndex - stepRight) % count + count) % count) });
+		    [&dispatch, id = spec.id, count, currentIndex, valueOfIndex] {
+			    dispatch(intent::SettingChanged { id, valueOfIndex((currentIndex + count - 1) % count) });
 		    });
 		ImGui::SameLine(0, stepper.gap);
 		ImGui::Dummy(ImVec2(stepper.cellWidth, stepper.button));
@@ -557,8 +553,8 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 		const ImVec2 cellMax = ImGui::GetItemRectMax();
 		ImGui::SameLine(0, stepper.gap);
 		widgets::GhostButton(icons::ChevronRight, "", ImVec2(stepper.button, stepper.button),
-		    [&dispatch, id = spec.id, count, currentIndex, valueOfIndex, stepRight] {
-			    dispatch(intent::SettingChanged { id, valueOfIndex(((currentIndex + stepRight) % count + count) % count) });
+		    [&dispatch, id = spec.id, count, currentIndex, valueOfIndex] {
+			    dispatch(intent::SettingChanged { id, valueOfIndex((currentIndex + 1) % count) });
 		    });
 
 		const std::string current = fromState
