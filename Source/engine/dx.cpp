@@ -242,6 +242,21 @@ void Blit(SDL_Surface *src, SDL_Rect *srcRect, SDL_Rect *dstRect)
 #endif
 }
 
+#ifdef AURORA_OS
+// Dev-переключатель для съёмки «чистых» кадров без виртуального
+// геймпада: DEVILUTIONX_HIDE_GAMEPAD=1 при запуске из консоли.
+namespace {
+bool VirtualGamepadHidden()
+{
+	static const bool hidden = [] {
+		const char *env = SDL_getenv("DEVILUTIONX_HIDE_GAMEPAD");
+		return env != nullptr && env[0] == '1';
+	}();
+	return hidden;
+}
+} // namespace
+#endif
+
 void RenderPresent()
 {
 	if (HeadlessMode)
@@ -299,7 +314,7 @@ void RenderPresent()
                 ErrSdl();
             }
 
-            if (ControlMode == ControlTypes::VirtualGamepad) {
+            if (ControlMode == ControlTypes::VirtualGamepad && !VirtualGamepadHidden()) {
                 virtualPadRenderer->RenderVirtualPadToRenderTarget( static_cast<void(*)(SDL_Renderer*)> (&RenderVirtualGamepad) );
 
                 auto vp_texture = virtualPadRenderer->GetSDLTexture();
@@ -324,7 +339,7 @@ void RenderPresent()
                  ErrSdl();
             }
 
-            if (ControlMode == ControlTypes::VirtualGamepad) {
+            if (ControlMode == ControlTypes::VirtualGamepad && !VirtualGamepadHidden()) {
                 RenderVirtualGamepad(renderer);
             }
         }
