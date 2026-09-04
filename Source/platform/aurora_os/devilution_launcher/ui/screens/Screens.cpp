@@ -156,8 +156,11 @@ void RenderFirstRun(const LauncherState &state, const Dispatcher &dispatch, cons
 
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.6F)));
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
+	// ImGui разрешает перенос строки после '.', ',' и ';' — имя файла в
+	// середине строки рискует разорваться («DIABDAT.» / «MPQ»), поэтому
+	// имена ставим в начало коротких строк.
 	ImGui::TextWrapped("%s",
-	    "Для полной версии скопируйте DIABDAT.MPQ с диска\nили купите оригинальную игру. Для Hellfire нужны hellfire.mpq,\nhfmonk.mpq, hfmusic.mpq и hfvoice.mpq.");
+	    "Для полной версии скопируйте\nDIABDAT.MPQ с диска или купите\nоригинальную игру. Для Hellfire нужны\nhellfire.mpq, hfmonk.mpq, hfmusic.mpq\nи hfvoice.mpq.");
 	ImGui::PopStyleColor();
 
 	if (sidePad > 0.0F) {
