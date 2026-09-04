@@ -118,11 +118,17 @@ if(EXISTS "${DEVILUTIONX_XKB_PKGCONFIG}/xkbcommon.pc")
         endif()
     endforeach()
 
-    # find_library кэширует результат: в переиспользуемом build-дереве
-    # SDL нашёл бы СТАРЫЙ путь (реальный файл prebuilt без версии).
-    # Сбрасываем кэш — SDL перезадействит shim.
+    # find_library и pkg_check_modules кэшируют результаты: в
+    # переиспользуемом build-дереве SDL взял бы СТАРЫЙ libdir (сам
+    # prebuilt, файлы без версии). Сбрасываем оба кэша — SDL
+    # перезадействует shim.
     foreach(DEVILUTIONX_XKB_CACHE_VAR
-            XKBCOMMON_LIB WAYLAND_CLIENT_LIB WAYLAND_EGL_LIB WAYLAND_CURSOR_LIB)
+            XKBCOMMON_LIB WAYLAND_CLIENT_LIB WAYLAND_EGL_LIB WAYLAND_CURSOR_LIB
+            PKG_WAYLAND_FOUND PKG_WAYLAND_LIBRARIES PKG_WAYLAND_LIBRARY_DIRS
+            PKG_WAYLAND_INCLUDE_DIRS PKG_WAYLAND_VERSION PKG_WAYLAND_PREFIX
+            PKG_WAYLAND_INCLUDEDIR PKG_WAYLAND_LIBDIR PKG_WAYLAND_STATIC_LIBRARIES
+            PKG_WAYLAND_STATIC_LIBRARY_DIRS PKG_WAYLAND_STATIC_INCLUDE_DIRS
+            PKG_WAYLAND_STATIC_CFLAGS PKG_WAYLAND_CFLAGS)
         unset("${DEVILUTIONX_XKB_CACHE_VAR}" CACHE)
     endforeach()
 
