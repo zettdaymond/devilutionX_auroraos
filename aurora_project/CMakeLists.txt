@@ -95,19 +95,33 @@ if(EXISTS "${DEVILUTIONX_XKB_PKGCONFIG}/xkbcommon.pc")
     set(DEVILUTIONX_XKB_LIB_SHIM "${DEVILUTIONX_XKB_PC_GENERATED}/lib")
     file(MAKE_DIRECTORY "${DEVILUTIONX_XKB_LIB_SHIM}")
 
+    # Shim: ТОЛЬКО копии с версионным именем .so.0. У prebuilt файл
+    # libxkbcommon.so — реальный, без суффикса: если find_library SDL
+    # найдёт его, realpath даст имя без версии и SDL запечёт
+    # dlopen-имя "libxkbcommon.so" — такого файла на устройствах нет
+    # (сигном Wayland_VideoInit на старте). Версионного файла find_library
+    # по имени "xkbcommon" не видит вовсе — SDL берёт ветку статической
+    # линковки: линкер получает -l:libxkbcommon.so.0 и записывает в
+    # DT_NEEDED честный внутренний SONAME (проверен readelf). Копии, а
+    # не симлинки: build-дерево живёт на NTFS-биндмаунте, симлинки из
+    # контейнеров там ненадёжны.
     foreach(DEVILUTIONX_XKB_LIB xkbcommon xkbregistry)
         set(DEVILUTIONX_XKB_REAL
             "${DEVILUTIONX_XKB_ROOT}/lib/lib${DEVILUTIONX_XKB_LIB}.so.0.0.0")
         if(EXISTS "${DEVILUTIONX_XKB_REAL}")
-            if(NOT EXISTS "${DEVILUTIONX_XKB_LIB_SHIM}/lib${DEVILUTIONX_XKB_LIB}.so")
-                file(CREATE_LINK "${DEVILUTIONX_XKB_REAL}"
-                    "${DEVILUTIONX_XKB_LIB_SHIM}/lib${DEVILUTIONX_XKB_LIB}.so" SYMBOLIC)
-            endif()
-            if(NOT EXISTS "${DEVILUTIONX_XKB_LIB_SHIM}/lib${DEVILUTIONX_XKB_LIB}.so.0")
-                file(CREATE_LINK "${DEVILUTIONX_XKB_REAL}"
-                    "${DEVILUTIONX_XKB_LIB_SHIM}/lib${DEVILUTIONX_XKB_LIB}.so.0" SYMBOLIC)
+            set(DEVILUTIONX_XKB_SHIM_LIB "${DEVILUTIONX_XKB_LIB_SHIM}/lib${DEVILUTIONX_XKB_LIB}.so.0")
+            if(NOT EXISTS "${DEVILUTIONX_XKB_SHIM_LIB}")
+                file(COPY_FILE "${DEVILUTIONX_XKB_REAL}" "${DEVILUTIONX_XKB_SHIM_LIB}")
             endif()
         endif()
+    endforeach()
+
+    # find_library кэширует результат: в переиспользуемом build-дереве
+    # SDL нашёл бы СТАРЫЙ путь (реальный файл prebuilt без версии).
+    # Сбрасываем кэш — SDL перезадействит shim.
+    foreach(DEVILUTIONX_XKB_CACHE_VAR
+            XKBCOMMON_LIB WAYLAND_CLIENT_LIB WAYLAND_EGL_LIB WAYLAND_CURSOR_LIB)
+        unset("${DEVILUTIONX_XKB_CACHE_VAR}" CACHE)
     endforeach()
 
     foreach(DEVILUTIONX_XKB_PC xkbcommon xkbregistry)
@@ -120,7 +134,7 @@ includedir=\${prefix}/include
 Name: ${DEVILUTIONX_XKB_PC}
 Description: ${DEVILUTIONX_XKB_PC} (Aurora conan prebuilt 1.5.0, versioned shim)
 Version: 1.5.0
-Libs: -L\${libdir} -l${DEVILUTIONX_XKB_PC}
+Libs: -L\${libdir} -l:lib${DEVILUTIONX_XKB_PC}.so.0
 Cflags: -I\${includedir}
 ")
     endforeach()
