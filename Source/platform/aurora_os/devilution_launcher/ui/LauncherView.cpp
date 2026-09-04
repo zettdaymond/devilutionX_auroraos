@@ -192,18 +192,11 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 			m_flickTrail[0] = FlickSample { ImGui::GetTime(), io.MousePos.y };
 			m_flickActive = true;
 		} else if (m_flickActive && !ImGui::IsMouseDown(0)) {
-			// TODO(кинетика): временная ручка для подбора на устройстве без
-			// пересборки — убрать вместе с glide-логом после утверждения.
+			// Подобранные на устройстве константы затухания инерции.
 #ifdef LAUNCHER_EXPONENTIAL_GLIDE
-			static const float flickK = [] {
-				const char *env = std::getenv("LAUNCHER_FLICK_DECAY");
-				return env != nullptr ? std::max(1.0F, static_cast<float>(std::atof(env))) : 6.0F;
-			}();
+			constexpr float flickK = 6.0F;
 #else
-			static const float flickK = [] {
-				const char *env = std::getenv("LAUNCHER_FLICK_DECEL");
-				return env != nullptr ? std::max(500.0F, static_cast<float>(std::atof(env))) : 2800.0F;
-			}();
+			constexpr float flickK = 2800.0F;
 #endif
 			if (m_flickTrailLen > 0) {
 				// Скорость — по окну ~120 мс: палец тормозит перед
@@ -223,35 +216,23 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 				    ? -(io.MousePos.y - m_flickTrail[base].y) / static_cast<float>(window)
 				    : 0.0F;
 				m_flickTrailLen = 0;
-				m_glideStartY = ImGui::GetScrollY();
-				m_glideStartedAt = now;
 			}
-			// Кинетическая прокрутка: равномерное торможение и решительный
-			// стоп — экспоненциальный хвост на 60 Гц экране читался как
-			// «лаг», а не планирование. У краёв списка и при новом
-			// касании — стоп.
 			ImGui::SetScrollY(ImGui::GetScrollY() + m_flickSpeed * io.DeltaTime);
 #ifdef LAUNCHER_EXPONENTIAL_GLIDE
 			// Вариант А: экспоненциальное затухание (длинное «планирование»,
-			// мягкий хвост). Ручка LAUNCHER_FLICK_DECAY (меньше = дольше).
+			// мягкий хвост).
 			m_flickSpeed *= std::exp(-flickK * io.DeltaTime);
 			const bool glideStopped = std::abs(m_flickSpeed) < 40.0F;
 #else
 			// Вариант Б (по умолчанию): равномерное торможение и решительный
 			// стоп — экспоненциальный хвост на 60 Гц экране читался как
-			// «лаг». Ручка LAUNCHER_FLICK_DECEL (меньше = дольше).
+			// «лаг». У краёв списка и при новом касании — стоп.
 			const float decel = flickK * io.DeltaTime;
 			m_flickSpeed -= std::copysign(std::min(std::abs(m_flickSpeed), decel), m_flickSpeed);
 			const bool glideStopped = m_flickSpeed == 0.0F;
 #endif
 			const float y = ImGui::GetScrollY();
 			if (glideStopped || y <= 0.0F || y >= contentScrollMaxY) {
-				// TODO(кинетика): временная диагностика (fps в момент
-				// остановки — io.Framerate усреднён по последней секунде).
-				spdlog::info("glide: {}px за {:.2f}s, fps={}",
-				    static_cast<int>(std::abs(ImGui::GetScrollY() - m_glideStartY)),
-				    ImGui::GetTime() - m_glideStartedAt,
-				    static_cast<int>(io.Framerate));
 				m_flickActive = false;
 				m_flickSpeed = 0.0F;
 			}
