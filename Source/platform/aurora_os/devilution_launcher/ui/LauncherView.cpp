@@ -452,28 +452,34 @@ void LauncherView::RenderCover(const LauncherState &state, float coverAlpha)
 	const float contentWidth = v.x * 0.72F;
 	float y = top.y + v.y * 0.24F;
 
-	// Логотип Exocet. Рисуем строго нативным размером шрифта: этот бранч
-	// ImGui печёт глифы по-размерно, и произвольный размер потребовал бы
-	// пересборки текстуры атласа прямо в кадре (бэкенд SDL_Renderer её
-	// не подтягивает — текст молча пропадал).
+	// Логотип Exocet. Размер — ДОЛЯ КОРОТКОЙ СТОРОНЫ окна, а не DPI:
+	// композитор вписывает буфер в плитку с сильным уменьшением, и на
+	// больших экранах с низким DPI (эмулятор планшета, dpi~0.6)
+	// DPI-масштабированный шрифт в карточке неразличим. 10% короткой
+	// стороны = выверенные на телефоне 72px при 720-широком окне.
 	ImFont *heading = Theme::Font(FontRole::Heading);
 	if (heading != nullptr) {
 		constexpr const char *kTitle = "DEVILUTIONX";
-		const float size = heading->LegacySize;
+		const float size = Scale::MinSide() * 0.10F;
 		const ImVec2 textSize = heading->CalcTextSizeA(size, FLT_MAX, 0.0F, kTitle);
 		draw->AddText(heading, size, ImVec2(centerX - textSize.x * 0.5F, y),
 		    argb(ColorRole::GoldBright), kTitle);
 		y += textSize.y + Scale::Px(0.55F);
 	}
 
-	// Подпись с версией и разделитель.
+	// Подпись с версией и разделитель. Та же пропорция от короткой
+	// стороны (~5.5% ≈ 40px на телефоне).
 	{
-		Theme::PushFont(FontRole::Body);
+		ImFont *body = Theme::Font(FontRole::Body);
 		const std::string subtitle = std::string("порт для Aurora OS · ") + LAUNCHER_APP_VERSION;
-		const ImVec2 textSize = ImGui::CalcTextSize(subtitle.c_str());
-		draw->AddText(ImVec2(centerX - textSize.x * 0.5F, y), argb(ColorRole::TextDim),
-		    subtitle.c_str());
-		Theme::PopFont();
+		const float subtitleSize = Scale::MinSide() * 0.055F;
+		const ImVec2 textSize = body != nullptr
+		    ? body->CalcTextSizeA(subtitleSize, FLT_MAX, 0.0F, subtitle.c_str())
+		    : ImGui::CalcTextSize(subtitle.c_str());
+		if (body != nullptr) {
+			draw->AddText(body, subtitleSize, ImVec2(centerX - textSize.x * 0.5F, y),
+			    argb(ColorRole::TextDim), subtitle.c_str());
+		}
 		y += textSize.y + Scale::Px(0.9F);
 	}
 	Theme::DrawDivider(draw, ImVec2(centerX - contentWidth * 0.5F, y), ImVec2(centerX + contentWidth * 0.5F, y),
