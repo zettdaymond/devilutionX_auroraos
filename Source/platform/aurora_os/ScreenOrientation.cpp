@@ -41,15 +41,27 @@ float AuroraMouseAngleDegrees()
 
 bool AuroraApplyOrientation( SDL_DisplayOrientation orientation )
 {
+    // Семантика события ЗАВИСИТ от панели (см. маппинг wl_output в
+    // SDL_waylandvideo.c): на портретной панели телефона LANDSCAPE —
+    // transform 90, и выверенная на устройстве пара контринтуитивна
+    // (LANDSCAPE→Flipped). На ландшафтной панели планшета LANDSCAPE —
+    // натуральная ориентация: LANDSCAPE→Primary, LANDSCAPE_FLIPPED→
+    // Flipped(180°). Одна пара для обеих панелей ставила окно планшета
+    // вверх ногами: композитор считал приложение инвертированным —
+    // жест сворачивания срабатывал с верхнего края, а шторка Авроры
+    // показывалась перевёрнутой.
     AuroraLandscape next = g_landscape;
-    // Пара «событие ↔ ландшафт» выверена на устройстве (первый прогон
-    // дал обратную картинку — поменяли местами).
-    if( orientation == SDL_ORIENTATION_LANDSCAPE )
-        next = AuroraLandscape::Flipped;
-    else if( orientation == SDL_ORIENTATION_LANDSCAPE_FLIPPED )
-        next = AuroraLandscape::Primary;
-    else
-        return false; // портреты не меняют ландшафт игры
+    if( g_nativePortrait ) {
+        if( orientation == SDL_ORIENTATION_LANDSCAPE )
+            next = AuroraLandscape::Flipped;
+        else if( orientation == SDL_ORIENTATION_LANDSCAPE_FLIPPED )
+            next = AuroraLandscape::Primary;
+    } else {
+        if( orientation == SDL_ORIENTATION_LANDSCAPE )
+            next = AuroraLandscape::Primary;
+        else if( orientation == SDL_ORIENTATION_LANDSCAPE_FLIPPED )
+            next = AuroraLandscape::Flipped;
+    }
 
     if( next == g_landscape )
         return false;
