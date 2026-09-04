@@ -502,10 +502,10 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 		// самому широкому варианту, чтобы степпер не прыгал при смене.
 		// Варианты переключаются по индексу, а в интент уходит
 		// optionValues индекса — у зелий значения 0/1/2/4/8/16.
-		// Разрешение: лестница строится от высоты экрана (как в игре),
+		// Разрешение: лестница строится от высоты ЭКРАНА (как в игре),
 		// включая нативную высоту, если её нет среди общих ступеней.
 		const bool dynamicLadder = !spec.secondaryKey.empty();
-		const int landscapeHeight = static_cast<int>(Scale::MinSide());
+		const int landscapeHeight = static_cast<int>(Scale::ScreenMinSide());
 		size_t optionCount = spec.optionCount;
 		if (dynamicLadder) {
 			optionCount = ResolutionOptionCount(landscapeHeight);

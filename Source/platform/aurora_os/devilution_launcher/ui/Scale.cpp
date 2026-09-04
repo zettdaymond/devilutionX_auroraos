@@ -12,6 +12,8 @@ namespace {
 float g_rem = 20.0F;
 bool g_portrait = false;
 float g_minSide = 540.0F;
+bool g_screenSizeKnown = false;
+float g_screenMinSide = 540.0F;
 } // namespace
 
 void Scale::BeginFrame(float dpiScale)
@@ -48,6 +50,19 @@ bool Scale::Portrait()
 float Scale::MinSide()
 {
 	return g_minSide;
+}
+
+void Scale::SetScreenSize(int landscapeWidth, int landscapeHeight)
+{
+	if (landscapeWidth > 0 && landscapeHeight > 0) {
+		g_screenMinSide = static_cast<float>(std::min(landscapeWidth, landscapeHeight));
+		g_screenSizeKnown = true;
+	}
+}
+
+float Scale::ScreenMinSide()
+{
+	return g_screenSizeKnown ? g_screenMinSide : g_minSide;
 }
 
 } // namespace launcher::ui

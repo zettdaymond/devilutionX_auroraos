@@ -32,6 +32,15 @@ public:
 
 	/// Меньшая сторона вьюпорта в пикселях.
 	[[nodiscard]] static auto MinSide() -> float;
+
+	/// Размер ФИЗИЧЕСКОГО экрана (SDL_GetDesktopDisplayMode, ландшафт).
+	/// Вьюпорт окна на десктопе меньше экрана, а решающим для лестницы
+	/// разрешений и подобных «экранных» вещей является именно экран —
+	/// как SDL_GetDesktopDisplayMode у движка.
+	static void SetScreenSize(int landscapeWidth, int landscapeHeight);
+
+	/// Меньшая сторона экрана; до SetScreenSize — вьюпорта.
+	[[nodiscard]] static auto ScreenMinSide() -> float;
 };
 
 } // namespace launcher::ui

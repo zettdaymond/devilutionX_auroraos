@@ -338,14 +338,17 @@ AppResult Application::Run()
 
 	// Аспект экрана (ландшафт) для настройки «Разрешение»: сервис
 	// считает Width по Height и режет лестницу вариантов, как движок.
-	if (m_services.engineOptions != nullptr) {
-		SDL_DisplayMode mode;
-		if (SDL_GetDesktopDisplayMode(0, &mode) == 0) {
-			if (mode.w < mode.h) {
-				std::swap(mode.w, mode.h);
-			}
+	SDL_DisplayMode mode;
+	if (SDL_GetDesktopDisplayMode(0, &mode) == 0) {
+		if (mode.w < mode.h) {
+			std::swap(mode.w, mode.h);
+		}
+		if (m_services.engineOptions != nullptr) {
 			m_services.engineOptions->SetResolutionAspect(mode.w, mode.h);
 		}
+		// Лестница в UI режется по ЭКРАНУ, а не по окну: на десктопе
+		// окно 540px оставляло бы только 480p/540p.
+		launcher::ui::Scale::SetScreenSize(mode.w, mode.h);
 	}
 
 	m_store->Init();
