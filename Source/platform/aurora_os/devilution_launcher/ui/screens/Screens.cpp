@@ -106,7 +106,7 @@ void RenderFirstRun(const LauncherState &state, const Dispatcher &dispatch, cons
 
 	const HeroArtRef hero = ResolveHeroArt(art, art.diablo.hero, kDiabloStyle);
 	widgets::HeroPanel("DEVILUTIONX ДЛЯ AURORA OS", "DIABLO",
-	    "Файлы оригинальной игры не найдены.\nСкопируйте DIABDAT.MPQ с диска или купите на GoG,\nлибо скачайте бесплатное демо.",
+	    "Файлы оригинальной игры не найдены.\nСкопируйте DIABDAT.MPQ с диска или купите оригинальную игру,\nлибо скачайте бесплатное демо.",
 	    *hero.art, hero.uv0, hero.uv1, hero.tint, ImVec2(width, heroHeight),
 	    {
 	        widgets::HeroAction { "Скачать демо", true, [&dispatch] {
@@ -120,7 +120,7 @@ void RenderFirstRun(const LauncherState &state, const Dispatcher &dispatch, cons
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.6F)));
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 	ImGui::TextWrapped("%s",
-	    "Для полной версии скопируйте DIABDAT.MPQ с диска\nили купите игру на GoG.com. Для Hellfire нужны hellfire.mpq,\nhfmonk.mpq, hfmusic.mpq и hfvoice.mpq.");
+	    "Для полной версии скопируйте DIABDAT.MPQ с диска\nили купите оригинальную игру. Для Hellfire нужны hellfire.mpq,\nhfmonk.mpq, hfmusic.mpq и hfvoice.mpq.");
 	ImGui::PopStyleColor();
 
 	if (sidePad > 0.0F) {

@@ -75,7 +75,7 @@ BuildRequires: libcurl-devel
 4. Для запуска дополнения Diablo: Hellfire перенесите также hellfire.mpq, hfmonk.mpq, hfmusic.mpq и hfvoice.mpq.
 
 Без файлов оригинальной игры доступна демонстрационная часть (shareware-версия от Blizzard);
-полную версию можно купить на GoG.com.
+полную версию можно купить отдельно.
 
 Порт предоставляется «как есть», без каких-либо гарантий. Diablo, Blizzard Entertainment —
 товарные знаки Blizzard Entertainment, Inc.; порт не связан с Blizzard и не одобрен ею.
