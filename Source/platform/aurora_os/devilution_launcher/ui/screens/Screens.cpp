@@ -15,6 +15,11 @@
 #include <cfloat>
 #include <cstring>
 #include <string>
+#include <string_view>
+
+#ifdef AURORA_OS
+#include <unistd.h>
+#endif
 
 #ifndef LAUNCHER_APP_VERSION
 #   define LAUNCHER_APP_VERSION "dev"
@@ -23,6 +28,38 @@
 namespace launcher::ui::screens {
 
 namespace {
+
+#ifdef AURORA_OS
+/// Полная версия УСТАНОВЛЕННОЙ сборки: на Авроре бинарник живёт в
+/// /opt/app/org.diasurgical.devilutionx/<версия-релиз>/bin/ — путь
+/// собственного исполняемого файла сообщает её сам, всегда совпадая с
+/// rpm -q. Фолбэк — версия из файла VERSION (она же на десктопе).
+std::string InstalledBuildName()
+{
+	static const std::string cached = []() -> std::string {
+		char buffer[512];
+		const ssize_t length = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+		if (length <= 0) {
+			return LAUNCHER_APP_VERSION;
+		}
+		buffer[length] = '\0';
+		const std::string_view path(buffer, static_cast<size_t>(length));
+		constexpr std::string_view kAppDir = "/org.diasurgical.devilutionx/";
+		const auto dirPos = path.find(kAppDir);
+		if (dirPos == std::string_view::npos) {
+			return LAUNCHER_APP_VERSION;
+		}
+		const auto versionStart = dirPos + kAppDir.size();
+		const auto versionEnd = path.find('/', versionStart);
+		if (versionEnd == std::string_view::npos || versionEnd == versionStart) {
+			return LAUNCHER_APP_VERSION;
+		}
+		return std::string(path.substr(versionStart, versionEnd - versionStart));
+	}();
+	return cached;
+}
+#endif
+
 
 // Размеры в rem: rem плавно зависит от вьюпорта (см. Scale), поэтому
 // конкретные значения здесь — единственное место, где они живут.
@@ -698,7 +735,11 @@ void About(const LauncherState &, const Dispatcher &dispatch)
 	ImGui::PushFont(Theme::Font(FontRole::BodyBold));
 	ImGui::TextUnformatted("Версия");
 	ImGui::PopFont();
+#ifdef AURORA_OS
+	ImGui::Text("DevilutionX %s (порт для Aurora OS)", InstalledBuildName().c_str());
+#else
 	ImGui::Text("DevilutionX %s (порт для Aurora OS)", LAUNCHER_APP_VERSION);
+#endif
 
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
 	ImGui::PushFont(Theme::Font(FontRole::BodyBold));
