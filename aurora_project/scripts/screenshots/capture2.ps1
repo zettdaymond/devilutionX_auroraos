@@ -4,7 +4,8 @@ param(
 	[string]$OutFile,
 	[int]$ScrollNotches = 0,
 	[int]$DragScrollPx = 0,
-	[switch]$Client
+	[switch]$Client,
+	[switch]$Gdi
 )
 
 Add-Type -AssemblyName System.Drawing
@@ -13,6 +14,7 @@ Add-Type -MemberDefinition '
 [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
 [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint dwData, UIntPtr extra);
 [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
 [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
 [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdc, uint flags);
 [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr hWnd, out RECT rect);
@@ -89,14 +91,37 @@ $hh = $winRect.Bottom - $winRect.Top
 
 $bmp = New-Object System.Drawing.Bitmap($w, $hh)
 $g = [System.Drawing.Graphics]::FromImage($bmp)
-$hdc = $g.GetHdc()
-# PW_RENDERFULLCONTENT: содержимое окна даже поверх перекрывших его окон
-$ok = [W.U32]::PrintWindow($h, $hdc, 2)
-$g.ReleaseHdc($hdc)
-if (-not $ok) {
-	# фолбэк на экранную копию
-	$g.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bmp.Size)
-} elseif ($Client) {
+if ($Gdi) {
+	# Экранный захват клиентской области: PrintWindow (PW_RENDERFULLCONTENT)
+	# на SDL-окнах порой отдаёт кадр с дизеринг-артефактами на плавных
+	# градиентах фона. Копируем честные экранные пиксели; чтобы не снять
+	# чужие окна поверх — ждём подтверждённый foreground.
+	$fg = [IntPtr]::Zero
+	for ($i = 0; $i -lt 15 -and $fg -ne $h; $i++) {
+		[W.U32]::SetForegroundWindow($h) | Out-Null
+		Start-Sleep -Milliseconds 150
+		$fg = [W.U32]::GetForegroundWindow()
+	}
+	if ($fg -ne $h) { Write-Output "warn: foreground not confirmed" }
+	$g.CopyFromScreen($pt.X, $pt.Y, 0, 0, (New-Object System.Drawing.Size($crect.Right, $crect.Bottom)))
+	$ok = $true
+	if ($bmp.Width -ne $crect.Right -or $bmp.Height -ne $crect.Bottom) {
+		# Битмап создан под полное окно — кропнем до клиентской области.
+		$cb = $bmp.Clone((New-Object System.Drawing.Rectangle(0, 0, $crect.Right, $crect.Bottom)), $bmp.PixelFormat)
+		$bmp.Dispose()
+		$bmp = $cb
+	}
+} else {
+	$hdc = $g.GetHdc()
+	# PW_RENDERFULLCONTENT: содержимое окна даже поверх перекрывших его окон
+	$ok = [W.U32]::PrintWindow($h, $hdc, 2)
+	$g.ReleaseHdc($hdc)
+	if (-not $ok) {
+		# фолбэк на экранную копию
+		$g.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bmp.Size)
+	}
+}
+if ($ok -and -not $Gdi -and $Client) {
 	$offX = $pt.X - $winRect.Left
 	$offY = $pt.Y - $winRect.Top
 	$crop = New-Object System.Drawing.Rectangle($offX, $offY, $crect.Right, $crect.Bottom)

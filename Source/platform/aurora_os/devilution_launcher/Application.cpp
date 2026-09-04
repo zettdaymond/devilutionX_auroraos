@@ -23,6 +23,8 @@
 
 #include <cmrc/cmrc.hpp>
 
+#include <cstdlib>
+
 #ifdef AURORA_OS
 #   include "../StandartPaths.hpp"
 #endif
@@ -499,6 +501,32 @@ AppResult Application::Run()
 		SDL_SetRenderDrawColor(m_renderer, 10, 7, 5, 255);
 		SDL_RenderClear(m_renderer);
 		ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+
+		// Dev-дамп кадра ДО композитора: ReadPixels из бэкбуфера рендерера
+		// отдаёт чистые пиксели (PrintWindow/CopyFromScreen идут через DWM
+		// и ловят его пересборку кадра). DEVILUTIONX_DUMP_FRAME=N задаёт
+		// номер кадра, DEVILUTIONX_DUMP_PATH — куда писать BMP.
+		static const int dumpFrameNo = [] {
+			const char *env = SDL_getenv("DEVILUTIONX_DUMP_FRAME");
+			return env != nullptr ? std::atoi(env) : -1;
+		}();
+		static int frameCounter = 0;
+		if (dumpFrameNo == frameCounter) {
+			int dumpW = 0;
+			int dumpH = 0;
+			SDL_GetRendererOutputSize(m_renderer, &dumpW, &dumpH);
+			SDL_Surface *shot = SDL_CreateRGBSurfaceWithFormat(
+			    0, dumpW, dumpH, 0, SDL_PIXELFORMAT_RGB24);
+			if (shot != nullptr) {
+				if (SDL_RenderReadPixels(m_renderer, nullptr, SDL_PIXELFORMAT_RGB24, shot->pixels, shot->pitch) == 0) {
+					const char *dumpPath = SDL_getenv("DEVILUTIONX_DUMP_PATH");
+					SDL_SaveBMP(shot, dumpPath != nullptr ? dumpPath : "devilutionx_frame.bmp");
+				}
+				SDL_FreeSurface(shot);
+			}
+		}
+		++frameCounter;
+
 		SDL_RenderPresent(m_renderer);
 
 		// Кадровый темп ~60 fps: без паузы цикл крутится вхолостую на
