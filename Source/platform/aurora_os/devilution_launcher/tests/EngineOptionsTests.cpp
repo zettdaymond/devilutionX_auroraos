@@ -242,5 +242,61 @@ TEST_F(EngineOptionsTest, OutOfRangeValuesClampedOnSave)
 	EXPECT_EQ(loaded[static_cast<size_t>(SettingId::GammaCorrection)], 125);
 }
 
+TEST_F(EngineOptionsTest, ResolutionWritesAspectCorrectedWidth)
+{
+	std::array<int, kSettingCount> values = DefaultSettingValues();
+	values[static_cast<size_t>(SettingId::Resolution)] = 540;
+
+	EngineOptionsService service(m_iniPath);
+	service.SetResolutionAspect(1440, 720); // телефон 2:1
+	service.SaveAll(values);
+
+	const std::string content = ReadRawIni();
+	EXPECT_NE(content.find("Height=540"), std::string::npos);
+	EXPECT_NE(content.find("Width=1080"), std::string::npos);
+
+	const auto loaded = service.Load();
+	EXPECT_EQ(loaded[static_cast<size_t>(SettingId::Resolution)], 540);
+}
+
+TEST_F(EngineOptionsTest, ResolutionSnapsUnknownHeightsDown)
+{
+	// 1200p из игрового меню планшета — нативная ступень этого экрана,
+	// остаётся 1200p; на телефоне (720) снаппится в 720p.
+	WriteRawIni("[Graphics]\nWidth=2000\nHeight=1200\n");
+
+	EngineOptionsService tablet(m_iniPath);
+	tablet.SetResolutionAspect(2000, 1200);
+	EXPECT_EQ(tablet.Load()[static_cast<size_t>(SettingId::Resolution)], 1200);
+
+	EngineOptionsService phone(m_iniPath);
+	phone.SetResolutionAspect(1440, 720);
+	EXPECT_EQ(phone.Load()[static_cast<size_t>(SettingId::Resolution)], 720);
+}
+
+TEST_F(EngineOptionsTest, ResolutionLadderFollowsScreenHeight)
+{
+	// Телефон 720: только общие ступени.
+	EXPECT_EQ(ResolutionOptionCount(720), 3);
+	EXPECT_EQ(ResolutionValueAt(0, 720), 480);
+	EXPECT_EQ(ResolutionValueAt(2, 720), 720);
+	EXPECT_EQ(ResolutionLabelAt(2, 720), "720p");
+
+	// Планшет 2000x1200: пять общих + нативная 1200p последней.
+	EXPECT_EQ(ResolutionOptionCount(1200), 6);
+	EXPECT_EQ(ResolutionValueAt(4, 1200), 1080);
+	EXPECT_EQ(ResolutionValueAt(5, 1200), 1200);
+	EXPECT_EQ(ResolutionLabelAt(5, 1200), "1200p");
+
+	// Экран ровно 1440: нативная совпадает со ступенью, дублей нет.
+	EXPECT_EQ(ResolutionOptionCount(1440), 6);
+	EXPECT_EQ(ResolutionValueAt(5, 1440), 1440);
+
+	// Значение между ступенями указывает на ступень ниже.
+	EXPECT_EQ(ResolutionIndexFor(1150, 1200), 4);
+
+	EXPECT_EQ(ResolutionOptionCount(300), 1); // вырожденный экран
+}
+
 } // namespace
 } // namespace launcher

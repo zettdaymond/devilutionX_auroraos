@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace launcher {
@@ -59,7 +60,8 @@ enum class SettingId : uint8_t {
 	// Графика
 	Zoom,
 	ColorCycling,
-	FpsLimiter,
+	FrameRateControl,
+	Resolution,
 	ShowFps,
 	GammaCorrection,
 	// Звук
@@ -82,6 +84,75 @@ enum class SettingKind : uint8_t {
 
 constexpr size_t kMaxSettingOptions = 6;
 
+/// Ступени лестницы разрешений — как строит список сам движок при
+/// fitToScreen (options.cpp): общие высоты {480…1440}, обрезанные по
+/// высоте экрана в ландшафте, ПЛЮС нативная высота экрана, если её
+/// нет среди общих (режим дисплея всегда есть в списке движка —
+/// отсюда «1200p» на планшете 2000x1200). Нативная выше 1440 не
+/// предлагается: каталог clamp-ит значение в 480..1440.
+inline size_t ResolutionOptionCount(int landscapeHeight)
+{
+	size_t count = 0;
+	int lastLadder = 0;
+	for (int height : { 480, 540, 720, 960, 1080, 1440 }) {
+		if (height <= landscapeHeight) {
+			++count;
+			lastLadder = height;
+		}
+	}
+	if (count == 0) {
+		return 1; // вырожденный экран: минимум одна ступень
+	}
+	if (landscapeHeight > lastLadder && landscapeHeight <= 1440) {
+		++count; // нативная высота вне общей лестницы (1200 на планшете)
+	}
+	return count;
+}
+
+/// Значение ступени index для экрана высотой landscapeHeight
+/// (ландшафт). Нативная высота всегда БОЛЬШЕ последней общей ступени
+/// (иначе она уже есть в лестнице) — значит стоит последней.
+inline int ResolutionValueAt(size_t index, int landscapeHeight)
+{
+	const int ladder[] { 480, 540, 720, 960, 1080, 1440 };
+	size_t ladderCount = 0;
+	int lastLadder = 0;
+	for (int height : ladder) {
+		if (height <= landscapeHeight) {
+			++ladderCount;
+			lastLadder = height;
+		}
+	}
+	if (ladderCount == 0) {
+		return ladder[0];
+	}
+	if (index >= ladderCount) {
+		return (landscapeHeight > lastLadder && landscapeHeight <= 1440) ? landscapeHeight
+		                                                                  : ladder[ladderCount - 1];
+	}
+	return ladder[index];
+}
+
+/// Подпись ступени («480p», «1200p») — нативная может быть любой.
+inline std::string ResolutionLabelAt(size_t index, int landscapeHeight)
+{
+	return std::to_string(ResolutionValueAt(index, landscapeHeight)) + "p";
+}
+
+/// Индекс значения в лестнице экрана; не входит — индекс ближайшей
+/// ступени СНИЗУ (как снаппит загрузка сервиса).
+inline size_t ResolutionIndexFor(int value, int landscapeHeight)
+{
+	const size_t count = ResolutionOptionCount(landscapeHeight);
+	size_t index = 0;
+	for (size_t i = 0; i < count; ++i) {
+		if (ResolutionValueAt(i, landscapeHeight) <= value) {
+			index = i;
+		}
+	}
+	return index;
+}
+
 /// Неизменное описание настройки: ключ diablo.ini, вид контрола,
 /// значение по умолчанию и русские тексты. Для PercentVolume defaultInt
 /// и minValue/maxValue заданы в процентах. Для Cycle optionCount > 0,
@@ -101,6 +172,9 @@ struct SettingSpec {
 	uint8_t optionCount;                                          // 0 = не Cycle
 	std::string_view nameRu;
 	std::string_view descriptionRu; // пустая строка = без описания
+	/// Непустой вторичный ключ (Resolution: key="Height", secondary="Width")
+	/// — настройка хранится парой целых; сервис пишет оба.
+	std::string_view secondaryKey;
 };
 
 /// Каталог всех настраиваемых движковых опций. Держать синхронно
@@ -225,9 +299,18 @@ inline constexpr std::array<SettingSpec, kSettingCount> kSettingCatalog { {
 	{ SettingId::ColorCycling, SettingGroup::Graphics, SettingKind::Toggle, "Graphics", "Color Cycling",
 		1, 0, 1, {}, {}, 0, "Анимация палитры",
 		"Живая анимация воды, лавы и кислоты (циклическая палитра)." },
-	{ SettingId::FpsLimiter, SettingGroup::Graphics, SettingKind::Toggle, "Graphics", "FPS Limiter",
-		1, 0, 1, {}, {}, 0, "Ограничение FPS",
-		"Ограничивает частоту кадров — меньше нагрев и расход заряда." },
+	{ SettingId::FrameRateControl, SettingGroup::Graphics, SettingKind::Cycle, "Graphics", "Frame Rate Control",
+		1, 0, 2,
+		{ "Отключено", "V-Sync", "Лимит FPS" },
+		{ 0, 1, 2 }, 3, "Частота кадров",
+		"Управление частотой кадров: баланс между плавностью и экономией заряда.",
+		"" },
+	{ SettingId::Resolution, SettingGroup::Graphics, SettingKind::Cycle, "Graphics", "Height",
+		480, 480, 1440,
+		{ "480p", "540p", "720p", "960p", "1080p", "1440p" },
+		{ 480, 540, 720, 960, 1080, 1440 }, 6, "Разрешение",
+		"Внутреннее разрешение рендера: ниже — выше FPS и экономнее батарея, выше — детальнее картинка.",
+		"Width" },
 	{ SettingId::ShowFps, SettingGroup::Graphics, SettingKind::Toggle, "Graphics", "Show FPS",
 		0, 0, 1, {}, {}, 0, "Счётчик FPS",
 		"Показывает частоту кадров в углу экрана." },

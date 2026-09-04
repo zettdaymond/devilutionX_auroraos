@@ -20,6 +20,10 @@ public:
 	/// Записывает все настройки, не трогая чужие ключи и секции
 	/// (их пишет сам движок: раскладки, сеть, язык и т.д.).
 	virtual void SaveAll(const std::array<int, kSettingCount> &values) = 0;
+
+	/// Аспект экрана в ландшафте для настройки «Разрешение» (Width по
+	/// Height и обрезка лестницы вариантов). Вызывается до Load().
+	virtual void SetResolutionAspect(int landscapeWidth, int landscapeHeight) = 0;
 };
 
 } // namespace launcher

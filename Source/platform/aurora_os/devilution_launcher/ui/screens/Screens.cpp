@@ -502,12 +502,25 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 		// самому широкому варианту, чтобы степпер не прыгал при смене.
 		// Варианты переключаются по индексу, а в интент уходит
 		// optionValues индекса — у зелий значения 0/1/2/4/8/16.
-		const int count = static_cast<int>(spec.optionCount);
-		const int currentIndex = SettingCycleIndex(spec, value);
+		// Разрешение: лестница строится от высоты экрана (как в игре),
+		// включая нативную высоту, если её нет среди общих ступеней.
+		const bool dynamicLadder = !spec.secondaryKey.empty();
+		const int landscapeHeight = static_cast<int>(Scale::MinSide());
+		size_t optionCount = spec.optionCount;
+		if (dynamicLadder) {
+			optionCount = ResolutionOptionCount(landscapeHeight);
+		}
+		const int count = static_cast<int>(optionCount);
+		const int currentIndex = dynamicLadder
+		    ? static_cast<int>(ResolutionIndexFor(value, landscapeHeight))
+		    : SettingCycleIndex(spec, value) % count;
+		const auto valueOfIndex = [dynamicLadder, landscapeHeight, &spec](int index) {
+			return dynamicLadder ? ResolutionValueAt(static_cast<size_t>(index), landscapeHeight)
+			                     : spec.optionValues[static_cast<size_t>(index)];
+		};
 		widgets::GhostButton(icons::ChevronLeft, "", ImVec2(stepper.button, stepper.button),
-		    [&dispatch, &spec, count, currentIndex] {
-			    const int next = (currentIndex + count - 1) % count;
-			    dispatch(intent::SettingChanged { spec.id, spec.optionValues[static_cast<size_t>(next)] });
+		    [&dispatch, id = spec.id, count, currentIndex, valueOfIndex] {
+			    dispatch(intent::SettingChanged { id, valueOfIndex((currentIndex + count - 1) % count) });
 		    });
 		ImGui::SameLine(0, stepper.gap);
 		ImGui::Dummy(ImVec2(stepper.cellWidth, stepper.button));
@@ -515,12 +528,13 @@ void RenderSettingRow(const SettingSpec &spec, int value, const Dispatcher &disp
 		const ImVec2 cellMax = ImGui::GetItemRectMax();
 		ImGui::SameLine(0, stepper.gap);
 		widgets::GhostButton(icons::ChevronRight, "", ImVec2(stepper.button, stepper.button),
-		    [&dispatch, &spec, count, currentIndex] {
-			    const int next = (currentIndex + 1) % count;
-			    dispatch(intent::SettingChanged { spec.id, spec.optionValues[static_cast<size_t>(next)] });
+		    [&dispatch, id = spec.id, count, currentIndex, valueOfIndex] {
+			    dispatch(intent::SettingChanged { id, valueOfIndex((currentIndex + 1) % count) });
 		    });
 
-		const std::string current = SettingValueText(spec, value);
+		const std::string current = dynamicLadder
+		    ? ResolutionLabelAt(static_cast<size_t>(currentIndex), landscapeHeight)
+		    : SettingValueText(spec, value);
 		ImFont *font = ImGui::GetFont();
 		const float font_size = ImGui::GetFontSize();
 		const ImVec2 textSize = font->CalcTextSizeA(font_size, FLT_MAX, 0.0F, current.c_str());

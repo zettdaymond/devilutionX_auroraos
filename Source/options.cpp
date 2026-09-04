@@ -1017,6 +1017,14 @@ GraphicsOptions::GraphicsOptions()
 	frameRateControl.SetValueChangedCallback(ReinitializeRenderer);
 #endif
 	showFPS.SetValueChangedCallback(OptionShowFPSChanged);
+#ifdef AURORA_OS
+	// Порт держит upscale+fitToScreen включёнными, а integer scaling
+	// меняет ту же геометрию: смена этих опций гоняет окно по
+	// непроверенным с ротатором RecreateUI-путям. Выбор разрешения
+	// (480p/540p/720p) пользователь делает в лаунчере.
+	fitToScreen.flags |= OptionEntryFlags::Invisible;
+	integerScaling.flags |= OptionEntryFlags::Invisible;
+#endif
 }
 std::vector<OptionEntryBase *> GraphicsOptions::GetEntries()
 {

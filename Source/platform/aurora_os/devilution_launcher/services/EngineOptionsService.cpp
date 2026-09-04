@@ -35,6 +35,15 @@ EngineOptionsService::EngineOptionsService(std::filesystem::path iniPath)
 {
 }
 
+void EngineOptionsService::SetResolutionAspect(int landscapeWidth, int landscapeHeight)
+{
+	if (landscapeWidth > 0 && landscapeHeight > 0) {
+		m_aspectWidth = landscapeWidth;
+		m_aspectHeight = landscapeHeight;
+		m_landscapeHeight = landscapeHeight;
+	}
+}
+
 std::array<int, kSettingCount> EngineOptionsService::Load()
 {
 	std::array<int, kSettingCount> values = DefaultSettingValues();
@@ -63,6 +72,14 @@ std::array<int, kSettingCount> EngineOptionsService::Load()
 			values[i] = static_cast<int>(ini.GetLongValue(spec.section.data(), spec.key.data(), spec.defaultInt));
 			break;
 		}
+		// Двухключевые Cycle (разрешение): стороннее значение из ini
+		// снаппим ВНИЗ до ближайшей ступени ЭКРАНА — лестница как в игре,
+		// включая нативную высоту (1200p на планшете остаётся 1200p).
+		if (!spec.secondaryKey.empty() && spec.kind == SettingKind::Cycle) {
+			const int height = m_landscapeHeight > 0 ? m_landscapeHeight : 1440;
+			const size_t index = ResolutionIndexFor(values[i], height);
+			values[i] = ResolutionValueAt(index, height);
+		}
 	}
 	return values;
 }
@@ -89,6 +106,14 @@ void EngineOptionsService::SaveAll(const std::array<int, kSettingCount> &values)
 		}
 		// Как движок: десятичная запись, булевы — 1/0, дубликаты заменяются.
 		ini.SetLongValue(spec.section.data(), spec.key.data(), value, nullptr, false, true);
+		// Двухключевая настройка (разрешение): Width пересчитывается из
+		// Height по аспекту экрана — ровно как строит список сам движок
+		// при fitToScreen (options.cpp: size.width = size.height * mode.w / mode.h).
+		if (!spec.secondaryKey.empty()) {
+			const int width = static_cast<int>(
+			    std::int64_t { value } * m_aspectWidth / m_aspectHeight);
+			ini.SetLongValue(spec.section.data(), spec.secondaryKey.data(), width, nullptr, false, true);
+		}
 	}
 
 	std::error_code ec;

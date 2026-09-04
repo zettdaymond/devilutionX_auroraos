@@ -34,6 +34,7 @@ public:
 		m_values = values;
 		m_saves.push_back(values);
 	}
+	void SetResolutionAspect(int, int) override { }
 
 	[[nodiscard]] const std::vector<std::array<int, kSettingCount>> &Saves() const { return m_saves; }
 

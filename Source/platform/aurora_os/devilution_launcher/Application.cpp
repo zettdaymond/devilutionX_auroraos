@@ -336,6 +336,18 @@ AppResult Application::Run()
 		}
 	}
 
+	// Аспект экрана (ландшафт) для настройки «Разрешение»: сервис
+	// считает Width по Height и режет лестницу вариантов, как движок.
+	if (m_services.engineOptions != nullptr) {
+		SDL_DisplayMode mode;
+		if (SDL_GetDesktopDisplayMode(0, &mode) == 0) {
+			if (mode.w < mode.h) {
+				std::swap(mode.w, mode.h);
+			}
+			m_services.engineOptions->SetResolutionAspect(mode.w, mode.h);
+		}
+	}
+
 	m_store->Init();
 #ifdef AURORA_OS
 	// Обложка для фазы движка запекается офскрин уже здесь: к моменту
