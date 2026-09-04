@@ -609,10 +609,10 @@ void Settings(const LauncherState &state, const Dispatcher &dispatch)
 void About(const LauncherState &, const Dispatcher &dispatch)
 {
 	Theme::PushFont(FontRole::Heading);
-	widgets::CenteredText("DIABLO", ColorRole::TextHeading);
+	widgets::CenteredText("\nDevilutionX", ColorRole::TextHeading);
 	Theme::PopFont();
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextBody));
-	widgets::CenteredText("DevilutionX — порт для Aurora OS");
+	widgets::CenteredText("Порт для Aurora OS");
 	ImGui::PopStyleColor();
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.8F)));
 
@@ -646,8 +646,7 @@ void About(const LauncherState &, const Dispatcher &dispatch)
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
 	ImGui::TextWrapped("Файлы игры ищутся в папке, выбранной на экране «Данные»,"
 	                   " и в каталоге приложения (~/.local/share/org.diasurgical/devilutionx).");
-	ImGui::TextWrapped("Сохранения и настройки хранятся там же и переживают"
-	                   " обновление приложения.");
+	ImGui::TextWrapped("Сохранения и настройки хранятся там же.");
 	ImGui::PopStyleColor();
 
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
@@ -660,9 +659,9 @@ void About(const LauncherState &, const Dispatcher &dispatch)
 
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
 	ImGui::PushFont(Theme::Font(FontRole::BodyBold));
-	ImGui::TextUnformatted("Поддержка");
+	ImGui::TextUnformatted("Связь");
 	ImGui::PopFont();
-	ImGui::TextWrapped("%s  Нашли проблему или есть предложение? Пишите: zettday@gmail.com", icons::Envelope);
+	ImGui::TextWrapped("%s  По вопросам: zettday@gmail.com", icons::Envelope);
 
 	ImGui::Dummy(ImVec2(0, Scale::Px(0.4F)));
 	ImGui::PushStyleColor(ImGuiCol_Text, Theme::Color(ColorRole::TextDim));
