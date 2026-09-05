@@ -30,7 +30,9 @@ namespace {
 
 extern const wl_interface qt_extended_surface_interface_impl;
 
-const wl_interface *const kGetExtendedSurfaceTypes[2] = {
+// wl_message::types — const wl_interface** (массив мутабелен, как в
+// коде wayland-scanner).
+const wl_interface *kGetExtendedSurfaceTypes[2] = {
 	&qt_extended_surface_interface_impl,
 	&wl_surface_interface,
 };
@@ -76,11 +78,10 @@ enum SurfaceExtensionRequest {
 // ---------------------------------------------------------------------------
 
 enum QMetaTypeKind : uint32_t {
-	QVariantVoid = 0,
-	QVariantBool = 1,
-	QVariantUInt = 3,
-	QVariantULongLong = 5,
-	QVariantString = 10,
+	kTypeBool = 1,
+	kTypeUInt = 3,
+	kTypeULongLong = 5,
+	kTypeString = 10,
 };
 
 void AppendBe32(std::vector<unsigned char> &out, uint32_t value)
@@ -101,7 +102,7 @@ void AppendBe64(std::vector<unsigned char> &out, uint64_t value)
 std::vector<unsigned char> QVariantBool(bool value)
 {
 	std::vector<unsigned char> out;
-	AppendBe32(out, QVariantBool);
+	AppendBe32(out, kTypeBool);
 	out.push_back(0);
 	out.push_back(value ? 1 : 0);
 	return out;
@@ -110,7 +111,7 @@ std::vector<unsigned char> QVariantBool(bool value)
 std::vector<unsigned char> QVariantUInt(uint64_t value)
 {
 	std::vector<unsigned char> out;
-	AppendBe32(out, QVariantULongLong);
+	AppendBe32(out, kTypeULongLong);
 	out.push_back(0);
 	AppendBe64(out, value);
 	return out;
@@ -119,7 +120,7 @@ std::vector<unsigned char> QVariantUInt(uint64_t value)
 std::vector<unsigned char> QVariantString(const char *value)
 {
 	std::vector<unsigned char> out;
-	AppendBe32(out, QVariantString);
+	AppendBe32(out, kTypeString);
 	out.push_back(0);
 	// Длина — в байтах UTF-16 (2 байта на BMP-символ).
 	const size_t chars = std::strlen(value);
