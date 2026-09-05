@@ -84,7 +84,18 @@ FUNC_EXPORT(int argc, char **argv)
         devilution::ErrSdl();
     }
 
-    devilution::ghMainWnd = SDL_CreateWindow("Diablo launcher", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1, 1, SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_ALLOW_HIGHDPI);
+    // Оконный режим по умолчанию (720x1600 toplevel) — fullscreen-роль
+    // маскирует windowProperties lipstick'а (статусбар-зонд). Полный
+    // экран можно вернуть DEVILUTIONX_COVER_WINDOWED=0.
+    Uint32 launcherWinFlags = SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE;
+    int launcherWinW = 720;
+    int launcherWinH = 1600;
+    if (const char *windowed = SDL_getenv("DEVILUTIONX_COVER_WINDOWED"); windowed != nullptr && windowed[0] == '0') {
+        launcherWinFlags = SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_ALLOW_HIGHDPI;
+        launcherWinW = 1;
+        launcherWinH = 1;
+    }
+    devilution::ghMainWnd = SDL_CreateWindow("Diablo launcher", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, launcherWinW, launcherWinH, launcherWinFlags);
     launcher::AppResult launcherResult;
     {
         // Скоуп ради раннего ~Application: рендерер, ImGui и текстуры

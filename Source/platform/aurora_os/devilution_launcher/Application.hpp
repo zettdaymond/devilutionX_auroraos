@@ -172,6 +172,13 @@ private:
 	/// на устройстве через DEVILUTIONX_NATIVE_COVER=0.
 	void TryNativeCover();
 
+	/// Нативная обложка связана (для кардиограммы отладки).
+	bool m_nativeCoverActive = false;
+
+	/// Пользовательское событие «перезалить кадр обложки» (таймер 500 мс
+	/// в режиме DEVILUTIONX_NATIVE_COVER_DEBUG=1).
+	Uint32 m_nativeCoverHeartbeat = 0;
+
 #endif
 };
 

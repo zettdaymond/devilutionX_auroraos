@@ -20,6 +20,11 @@ if(DEVILUTIONX_AURORA_OS)
 	    GIT_REPOSITORY https://github.com/savegame/SDL.git
 	    GIT_TAG        aurora-sdl-2.30.0
 	    GIT_SHALLOW    1
+	    # Экспорт SDL_WaylandSetWindowGenericProperty: lipstick читает
+	    # generic-свойства окна только с ПЕРВОГО qt_extended_surface,
+	    # который SDL создаёт сам. Применяется после свежего клона —
+	    # при смене патча снести _deps/sdl2-src.
+	    PATCH_COMMAND sh -c "git apply ${CMAKE_CURRENT_LIST_DIR}/sdl-wayland-generic-property.patch 2>/dev/null || echo 'SDL patch: already applied'"
 	)
 else()
 	FetchContent_Declare(SDL2

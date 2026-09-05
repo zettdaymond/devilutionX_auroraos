@@ -10,6 +10,11 @@
 #include <wayland-client.h>
 #include <wayland-client-protocol.h>
 
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
 #include <cstdio>
 #include <cstring>
 #include <optional>
@@ -18,6 +23,11 @@
 
 namespace devilution {
 
+// Патч SDL-форка (3rdParty/SDL2/sdl-wayland-generic-property.patch):
+// ставит generic-свойство через qt_extended_surface, созданный самим SDL.
+extern "C" void SDL_WaylandSetWindowGenericProperty(
+    SDL_Window *window, const char *name, const void *value, size_t length);
+
 namespace {
 
 // ---------------------------------------------------------------------------
@@ -25,7 +35,8 @@ namespace {
 // v1). Генерировать wayland-scanner'ом ради трёх запросов не хочется —
 // интерфейсы описаны вручную; сигнатуры обязаны совпадать с XML, иначе
 // композитор порвёт соединение (события демаршализуются по нашим же
-// сигнатурам даже без слушателя).
+// сигнатурам даже без слушателя). Core-протоколы (compositor/shm/shell)
+// берём из wayland-client-protocol.h — там всё сгенерировано.
 // ---------------------------------------------------------------------------
 
 extern const wl_interface qt_extended_surface_interface_impl;
@@ -135,13 +146,17 @@ std::vector<unsigned char> QVariantString(const char *value)
 }
 
 // ---------------------------------------------------------------------------
-// Транспорт: бинд глобала на дисплейном коннекте окна (тот же приём, что в
-// ComposerAdapter::GetScreenDpi) и по qt_extended_surface на каждое окно.
+// Транспорт: один проход по registry дисплея окна — qt_surface_extension +
+// core-глобалы для собственной поверхности обложки (тот же приём, что в
+// ComposerAdapter::GetScreenDpi).
 // ---------------------------------------------------------------------------
 
 struct RegistryState {
 	uint32_t extensionName = 0;
-	bool found = false;
+	uint32_t compositorName = 0;
+	uint32_t shmName = 0;
+	uint32_t shellName = 0;
+	bool extensionFound = false;
 };
 
 void RegistryGlobal(void *data, wl_registry *registry, uint32_t name,
@@ -152,7 +167,13 @@ void RegistryGlobal(void *data, wl_registry *registry, uint32_t name,
 	auto *state = static_cast<RegistryState *>(data);
 	if (std::strcmp(interface, "qt_surface_extension") == 0) {
 		state->extensionName = name;
-		state->found = true;
+		state->extensionFound = true;
+	} else if (std::strcmp(interface, "wl_compositor") == 0) {
+		state->compositorName = name;
+	} else if (std::strcmp(interface, "wl_shm") == 0) {
+		state->shmName = name;
+	} else if (std::strcmp(interface, "wl_shell") == 0) {
+		state->shellName = name;
 	}
 }
 
@@ -168,30 +189,17 @@ const wl_registry_listener kRegistryListener = {
 	RegistryGlobalRemove,
 };
 
-wl_proxy *BindSurfaceExtension(wl_display *display)
-{
-	wl_registry *registry = wl_display_get_registry(display);
-	if (registry == nullptr) {
-		return nullptr;
-	}
-	RegistryState state;
-	wl_registry_add_listener(registry, &kRegistryListener, &state);
-	wl_display_roundtrip(display);
-	wl_registry_destroy(registry);
-	if (!state.found) {
-		return nullptr;
-	}
-	return static_cast<wl_proxy *>(
-	    wl_registry_bind(registry, state.extensionName, &kSurfaceExtensionInterface, 1));
-}
-
 wl_proxy *ExtendedSurfaceOf(wl_proxy *extension, wl_surface *surface)
 {
 	if (extension == nullptr || surface == nullptr) {
 		return nullptr;
 	}
+	// Вариадик конструктора повторяет сигнатуру запроса: слот new_id
+	// занимает NULL-заглушка (объект создаст сам конструктор), фактические
+	// аргументы идут после неё — как в коде wayland-scanner.
 	return wl_proxy_marshal_constructor(
-	    extension, RequestGetExtendedSurface, &qt_extended_surface_interface_impl, surface, nullptr);
+	    extension, RequestGetExtendedSurface, &qt_extended_surface_interface_impl,
+	    nullptr, surface);
 }
 
 void SetProperty(wl_proxy *extendedSurface, const char *name, const std::vector<unsigned char> &value)
@@ -207,19 +215,33 @@ void SetProperty(wl_proxy *extendedSurface, const char *name, const std::vector<
 		return;
 	}
 	std::memcpy(payload, value.data(), value.size());
-	wl_proxy_marshal(extendedSurface, RequestUpdateGenericProperty, name, &wire, nullptr);
+	wl_proxy_marshal(extendedSurface, RequestUpdateGenericProperty, name, &wire);
 	wl_array_release(&wire);
 }
 
 // ---------------------------------------------------------------------------
-// Состояние POC: окно обложки и его расширенная поверхность живут до конца
-// процесса (обложка нужна всё время работы приложения).
+// Поверхность обложки. Своя, минуя SDL: SDL делает окно toplevel и не
+// отдаёт wl_shell_surface, а обложка обязана быть transient — иначе она
+// поднимается в стек обычных окон (реестр ошибки Aurora 5.2 от автора
+// winit-форка). Кадр — свой SHM-буфер XRGB8888.
 // ---------------------------------------------------------------------------
 
 struct NativeCoverState {
-	SDL_Window *window = nullptr;
+	wl_display *display = nullptr;
 	wl_proxy *extension = nullptr;
-	wl_proxy *extendedSurface = nullptr;
+	wl_shm *shm = nullptr;
+	wl_surface *surface = nullptr;
+	wl_shell_surface *shellSurface = nullptr;
+	wl_shm_pool *pool = nullptr;
+	wl_buffer *buffer = nullptr;
+	void *poolPixels = nullptr;
+	size_t poolSize = 0;
+	int width = 0;
+	int height = 0;
+	std::vector<unsigned char> content;
+	int contentWidth = 0;
+	int contentHeight = 0;
+	int contentStride = 0;
 	uint64_t winId = 0;
 	bool linked = false;
 };
@@ -229,6 +251,65 @@ NativeCoverState &State()
 	static NativeCoverState state;
 	return state;
 }
+
+bool EnsureShmBuffer(NativeCoverState &s, wl_shm *shm);
+bool CommitFrame(const unsigned char *rgb24, int strideBytes, int srcWidth, int srcHeight);
+
+void ShellSurfacePing(void *data, wl_shell_surface *shellSurface, uint32_t serial)
+{
+	(void)data;
+	// Не отвечать на ping = «окно зависло» с точки зрения композитора.
+	wl_shell_surface_pong(shellSurface, serial);
+}
+
+void ShellSurfaceConfigure(void *data, wl_shell_surface *shellSurface,
+    uint32_t edges, int32_t width, int32_t height)
+{
+	(void)data;
+	(void)shellSurface;
+	(void)edges;
+	// Свитчер ресайзит окно обложки под карточку плитки (cover.resize):
+	// без ответа на configure плитка остаётся пустой. Пересоздаём пул под
+	// новый размер и перезаливаем контент с масштабированием.
+	NativeCoverState &s = State();
+	if (!s.linked || width <= 0 || height <= 0 || (width == s.width && height == s.height)) {
+		return;
+	}
+	s.width = width;
+	s.height = height;
+	if (s.buffer != nullptr) {
+		wl_buffer_destroy(s.buffer);
+		s.buffer = nullptr;
+	}
+	if (s.pool != nullptr) {
+		wl_shm_pool_destroy(s.pool);
+		s.pool = nullptr;
+	}
+	if (s.poolPixels != nullptr) {
+		::munmap(s.poolPixels, s.poolSize);
+		s.poolPixels = nullptr;
+		s.poolSize = 0;
+	}
+	if (s.shm == nullptr || s.content.empty()) {
+		return;
+	}
+	if (EnsureShmBuffer(s, s.shm) && !CommitFrame(s.content.data(), s.contentStride, s.contentWidth, s.contentHeight)) {
+		spdlog::warn("aurora-native-cover: перезаливка после configure не удалась");
+	}
+}
+
+void ShellSurfacePopupDone(void *data, wl_shell_surface *shellSurface)
+{
+	(void)data;
+	(void)shellSurface;
+}
+
+const wl_shell_surface_listener kShellSurfaceListener = {
+	ShellSurfacePing,
+	ShellSurfaceConfigure,
+	ShellSurfacePopupDone,
+};
+
 
 std::optional<wl_surface *> WindowSurface(SDL_Window *window)
 {
@@ -240,27 +321,96 @@ std::optional<wl_surface *> WindowSurface(SDL_Window *window)
 	return info.info.wl.surface;
 }
 
-bool BlitFrame(SDL_Window *window, int width, int height, const unsigned char *rgb24, int strideBytes)
+/// Один постоянный SHM-пул на всё время жизни обложки: memfd + mmap,
+/// буфер создаётся раз. Кадры пишутся прямо в mmap и коммитятся тем же
+/// wl_buffer — никакого пересоздания пулов (уничтожение пула под ногами
+/// композитора давало «спектр» из переработанной памяти).
+bool EnsureShmBuffer(NativeCoverState &s, wl_shm *shm)
 {
-	SDL_Surface *src = SDL_CreateRGBSurfaceWithFormatFrom(
-	    const_cast<unsigned char *>(rgb24), width, height, 24, strideBytes, SDL_PIXELFORMAT_RGB24);
-	if (src == nullptr) {
-		spdlog::warn("aurora-native-cover: SDL_CreateRGBSurfaceWithFormatFrom: {}", SDL_GetError());
+	if (s.buffer != nullptr) {
+		return true;
+	}
+	const size_t size = static_cast<size_t>(s.width) * s.height * 4;
+	const int fd = static_cast<int>(::syscall(SYS_memfd_create, "dx-cover", 1 /* MFD_CLOEXEC */));
+	if (fd < 0) {
 		return false;
 	}
-	SDL_Surface *dst = SDL_GetWindowSurface(window);
-	bool ok = false;
-	if (dst != nullptr) {
-		ok = SDL_BlitScaled(src, nullptr, dst, nullptr) == 0;
-		if (ok && SDL_UpdateWindowSurface(window) != 0) {
-			ok = false;
+	if (::ftruncate(fd, static_cast<off_t>(size)) != 0) {
+		::close(fd);
+		return false;
+	}
+	s.poolPixels = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (s.poolPixels == MAP_FAILED) {
+		s.poolPixels = nullptr;
+		::close(fd);
+		return false;
+	}
+	s.pool = wl_shm_create_pool(shm, fd, static_cast<int32_t>(size));
+	::close(fd);
+	if (s.pool == nullptr) {
+		::munmap(s.poolPixels, size);
+		s.poolPixels = nullptr;
+		return false;
+	}
+	s.buffer = wl_shm_pool_create_buffer(s.pool, 0, s.width, s.height, s.width * 4, WL_SHM_FORMAT_ARGB8888);
+	if (s.buffer == nullptr) {
+		wl_shm_pool_destroy(s.pool);
+		s.pool = nullptr;
+		::munmap(s.poolPixels, size);
+		s.poolPixels = nullptr;
+		return false;
+	}
+	s.poolSize = size;
+	return true;
+}
+
+bool CommitFrame(const unsigned char *rgb24, int strideBytes, int srcWidth, int srcHeight)
+{
+	NativeCoverState &s = State();
+	if (!EnsureShmBuffer(s, s.shm)) {
+		spdlog::warn("aurora-native-cover: SHM-буфер не создан");
+		return false;
+	}
+	// Кадр сохраняем в исходном разрешении — после configure свитчера
+	// (окно обложки ресайзится под карточку плитки) перезаливаем его
+	// с масштабированием.
+	s.content.assign(rgb24, rgb24 + static_cast<size_t>(srcHeight) * strideBytes);
+	s.contentWidth = srcWidth;
+	s.contentHeight = srcHeight;
+	s.contentStride = strideBytes;
+	// Дебаг-гейт: сплошной красный вместо контента.
+	const bool debugRed = [] {
+		const char *env = SDL_getenv("DEVILUTIONX_NATIVE_COVER_DEBUG");
+		return env != nullptr && env[0] == '1';
+	}();
+	auto *dst = static_cast<uint32_t *>(s.poolPixels);
+	// Aspect crop: заполняем карточку целиком, сохраняя пропорции —
+	// избыток исходника режется по центру (без полей, full-bleed).
+	const int scaledH = srcWidth > 0 ? s.width * srcHeight / srcWidth : s.height;
+	const int fillByWidth = srcWidth <= 0 || scaledH >= s.height;
+	const int fitW = fillByWidth ? s.width : (srcHeight > 0 ? srcWidth * s.height / srcHeight : s.width);
+	const int fitH = fillByWidth ? (srcWidth > 0 ? scaledH : s.height) : s.height;
+	const int cropX = (fitW - s.width) / 2;
+	const int cropY = (fitH - s.height) / 2;
+	for (int y = 0; y < s.height; ++y) {
+		uint32_t *row = dst + static_cast<size_t>(y) * s.width;
+		const int sy = fitH > 0 ? (y + cropY) * srcHeight / fitH : 0;
+		const unsigned char *src = rgb24 + static_cast<size_t>(sy) * strideBytes;
+		for (int x = 0; x < s.width; ++x) {
+			const int sx = fitW > 0 ? (x + cropX) * srcWidth / fitW : 0;
+			row[x] = debugRed
+			    ? 0xFFFF0000u
+			    : (0xFF000000u
+			          | (static_cast<uint32_t>(src[sx * 3]) << 16)
+			          | (static_cast<uint32_t>(src[sx * 3 + 1]) << 8)
+			          | static_cast<uint32_t>(src[sx * 3 + 2]));
 		}
 	}
-	if (!ok) {
-		spdlog::warn("aurora-native-cover: заливка кадра не удалась: {}", SDL_GetError());
-	}
-	SDL_FreeSurface(src);
-	return ok;
+	wl_surface_attach(s.surface, s.buffer, 0, 0);
+	wl_surface_damage(s.surface, 0, 0, s.width, s.height);
+	wl_surface_commit(s.surface);
+	wl_display_flush(s.display);
+	return true;
 }
 
 } // namespace
@@ -278,7 +428,7 @@ bool NativeCover::CreateAndLink(
 		spdlog::info("aurora-native-cover: окно без wayland-поверхности, нативная обложка выключена");
 		return false;
 	}
-	wl_display *display = {};
+	wl_display *display = nullptr;
 	SDL_SysWMinfo info;
 	SDL_VERSION(&info.version);
 	if (SDL_GetWindowWMInfo(mainWindow, &info) && info.subsystem == SDL_SYSWM_WAYLAND) {
@@ -288,69 +438,152 @@ bool NativeCover::CreateAndLink(
 		return false;
 	}
 
-	s.extension = BindSurfaceExtension(display);
-	if (s.extension == nullptr) {
-		spdlog::info("aurora-native-cover: qt_surface_extension не предоставлен композитором");
+	RegistryState registry;
+	wl_registry *reg = wl_display_get_registry(display);
+	wl_registry_add_listener(reg, &kRegistryListener, &registry);
+	wl_display_roundtrip(display);
+	wl_proxy *extension = nullptr;
+	wl_proxy *shmProxy = nullptr;
+	wl_proxy *compositorProxy = nullptr;
+	wl_proxy *shellProxy = nullptr;
+	if (registry.extensionFound) {
+		extension = static_cast<wl_proxy *>(wl_registry_bind(reg, registry.extensionName, &kSurfaceExtensionInterface, 1));
+	}
+	if (registry.compositorName != 0) {
+		compositorProxy = static_cast<wl_proxy *>(wl_registry_bind(reg, registry.compositorName, &wl_compositor_interface, 1));
+	}
+	if (registry.shmName != 0) {
+		shmProxy = static_cast<wl_proxy *>(wl_registry_bind(reg, registry.shmName, &wl_shm_interface, 1));
+	}
+	if (registry.shellName != 0) {
+		shellProxy = static_cast<wl_proxy *>(wl_registry_bind(reg, registry.shellName, &wl_shell_interface, 1));
+	}
+	wl_registry_destroy(reg);
+	if (extension == nullptr || compositorProxy == nullptr || shmProxy == nullptr || shellProxy == nullptr) {
+		spdlog::info("aurora-native-cover: композитор не отдал полный набор глобалов "
+		             "(ext={} comp={} shm={} shell={})",
+		    registry.extensionFound, compositorProxy != nullptr, shmProxy != nullptr, shellProxy != nullptr);
 		return false;
 	}
 
-	s.window = SDL_CreateWindow("cover", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-	    width, height, SDL_WINDOW_HIDDEN | SDL_WINDOW_BORDERLESS | SDL_WINDOW_ALLOW_HIGHDPI);
-	if (s.window == nullptr) {
-		spdlog::warn("aurora-native-cover: SDL_CreateWindow(обложка): {}", SDL_GetError());
+	// Собственная поверхность обложки: transient к самой себе — так окно
+	// выпадает из стека обычных окон и остаётся только в слое обложек
+	// (рецепт рабочий связки Aurora 5.2 из форка lmaxyz/winit).
+	auto *compositor = reinterpret_cast<wl_compositor *>(compositorProxy);
+	auto *shell = reinterpret_cast<wl_shell *>(shellProxy);
+	wl_surface *coverSurface = wl_compositor_create_surface(compositor);
+	if (coverSurface == nullptr) {
 		return false;
 	}
-	auto coverSurface = WindowSurface(s.window);
-	if (!coverSurface.has_value() || *coverSurface == nullptr) {
-		spdlog::warn("aurora-native-cover: у окна обложки нет wayland-поверхности");
-		SDL_DestroyWindow(s.window);
-		s.window = nullptr;
+	wl_shell_surface *shellSurface = wl_shell_get_shell_surface(shell, coverSurface);
+	if (shellSurface == nullptr) {
+		wl_surface_destroy(coverSurface);
 		return false;
 	}
-
-	// Свойства ставим ДО первого коммита окна обложки: категория cover
-	// должна встать раньше, чем композитор увидит буфер.
-	s.winId = 1;
-	wl_proxy *coverExtended = ExtendedSurfaceOf(s.extension, *coverSurface);
-	SetProperty(coverExtended, "WINID", QVariantUInt(s.winId));
-	SetProperty(coverExtended, "CATEGORY", QVariantString("cover"));
-	SetProperty(coverExtended, "TRANSPARENT", QVariantBool(false));
-
-	wl_proxy *mainExtended = ExtendedSurfaceOf(s.extension, *mainSurface);
-	char winRef[32];
-	std::snprintf(winRef, sizeof(winRef), "__winref:%llu", static_cast<unsigned long long>(s.winId));
-	SetProperty(mainExtended, "SAILFISH_HAVE_COVER", QVariantBool(true));
-	SetProperty(mainExtended, "SAILFISH_COVER_WINDOW", QVariantString(winRef));
-
-	wl_display_flush(display);
-
-	// Мапим окно и заливаем первый кадр: без закоммиченного буфера плитке
-	// нечего показывать. Свойства уже на месте — Lipstick обязан отнести
-	// окно к слою обложек, а не к стеку обычных окон.
-	SDL_ShowWindow(s.window);
-	if (!BlitFrame(s.window, width, height, rgb24, strideBytes)) {
-		// Обложка без кадра бессмысленна, но связку не рвём: кадр можно
-		// долить через UpdateFrame по ходу работы.
-		spdlog::warn("aurora-native-cover: первый кадр не залит, продолжаем");
+	wl_shell_surface_add_listener(shellSurface, &kShellSurfaceListener, nullptr);
+	// DEVILUTIONX_COVER_SEQ — порядок установки роли/свойств/мапа:
+	//   a: transient -> свойства -> commit (классификация до мапа);
+	//   b: toplevel -> commit -> свойства -> transient (флоу aurora-gui);
+	//   c: toplevel -> свойства -> transient -> commit.
+	const char *seqEnv = SDL_getenv("DEVILUTIONX_COVER_SEQ");
+	const char seq = (seqEnv != nullptr && seqEnv[0] >= 'a' && seqEnv[0] <= 'c') ? seqEnv[0] : 'a';
+	const bool roleTopFirst = seq == 'b' || seq == 'c';
+	if (roleTopFirst) {
+		wl_shell_surface_set_toplevel(shellSurface);
+	} else {
+		// Родитель transient — ГЛАВНОЕ окно (так делает Qt/Silica; transient
+		// к самой себе — вырожденный случай, lipstick мог не создавать
+		// оконный айтем вовсе).
+		wl_shell_surface_set_transient(shellSurface, *mainSurface, 0, 0, 0);
 	}
+	wl_shell_surface_set_title(shellSurface, "cover");
+	// Class обложки = class главного окна (у SDL это SDL_VIDEO_WAYLAND_WMCLASS
+	// либо имя бинарника) — home ассоциирует окна приложения.
+	const char *wmClass = SDL_getenv("SDL_VIDEO_WAYLAND_WMCLASS");
+	if (wmClass == nullptr) {
+		char exe[512];
+		const ssize_t n = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+		exe[n > 0 ? n : 0] = '\0';
+		const char *base = std::strrchr(exe, '/');
+		wmClass = base != nullptr ? base + 1 : exe;
+	}
+	wl_shell_surface_set_class(shellSurface, wmClass);
 
-	s.extendedSurface = coverExtended;
+	s.display = display;
+	s.extension = extension;
+	s.shm = reinterpret_cast<wl_shm *>(shmProxy);
+	s.surface = coverSurface;
+	s.shellSurface = shellSurface;
+	s.width = width;
+	s.height = height;
+	const auto applyProperties = [&]() {
+		// Свойства главного окна — ТОЛЬКО через SDL (патч форка): lipstick
+		// читает их с первого qt_extended_surface, принадлежащего SDL.
+		// Свойства обложки — через наш extended surface: он первый у её
+		// собственной поверхности. Порядок зеркалит эталон (jolla-settings).
+		s.winId = 2;
+		char winRef[32];
+		std::snprintf(winRef, sizeof(winRef), "__winref:%llu", static_cast<unsigned long long>(s.winId));
+		const std::vector<unsigned char> mainWinId = QVariantUInt(1);
+		SDL_WaylandSetWindowGenericProperty(mainWindow, "WINID", mainWinId.data(), mainWinId.size());
+		// Зонд живости SDL-пути: DEVILUTIONX_NATIVE_COVER_PROBE=1 —
+		// статусбар должен появиться поверх приложения.
+		const char *probe = SDL_getenv("DEVILUTIONX_NATIVE_COVER_PROBE");
+		if (probe != nullptr && probe[0] == '1') {
+			const std::vector<unsigned char> statusBar = QVariantBool(true);
+			SDL_WaylandSetWindowGenericProperty(mainWindow, "STATUSBAR_VISIBLE", statusBar.data(), statusBar.size());
+		}
+		const std::vector<unsigned char> haveCover = QVariantBool(true);
+		SDL_WaylandSetWindowGenericProperty(mainWindow, "SAILFISH_HAVE_COVER", haveCover.data(), haveCover.size());
+		const std::vector<unsigned char> coverWindow = QVariantString(winRef);
+		SDL_WaylandSetWindowGenericProperty(mainWindow, "SAILFISH_COVER_WINDOW", coverWindow.data(), coverWindow.size());
+
+		wl_proxy *coverExtended = ExtendedSurfaceOf(extension, coverSurface);
+		SetProperty(coverExtended, "WINID", QVariantUInt(s.winId));
+		SetProperty(coverExtended, "CATEGORY", QVariantString("cover"));
+		SetProperty(coverExtended, "TRANSPARENT", QVariantBool(false));
+		wl_display_flush(display);
+	};
+	const auto makeTransient = [&]() {
+		wl_shell_surface_set_transient(shellSurface, *mainSurface, 0, 0, 0);
+		wl_display_flush(display);
+	};
+
+	if (seq == 'b') {
+		if (!CommitFrame(rgb24, strideBytes, width, height)) {
+			spdlog::warn("aurora-native-cover: первый кадр не залит");
+		}
+		wl_display_roundtrip(display);
+		applyProperties();
+		wl_display_roundtrip(display);
+		makeTransient();
+	} else if (seq == 'c') {
+		applyProperties();
+		makeTransient();
+		if (!CommitFrame(rgb24, strideBytes, width, height)) {
+			spdlog::warn("aurora-native-cover: первый кадр не залит");
+		}
+	} else {
+		applyProperties();
+		if (!CommitFrame(rgb24, strideBytes, width, height)) {
+			spdlog::warn("aurora-native-cover: первый кадр не залит");
+		}
+	}
+	wl_display_roundtrip(display);
+
 	s.linked = true;
-	spdlog::info("aurora-native-cover: нативная обложка связана (WINID={}, {}x{})",
-	    s.winId, width, height);
+	spdlog::info("aurora-native-cover: нативная обложка связана (seq={}, WINID={}, {}x{})",
+	    seq, s.winId, width, height);
 	return true;
 }
 
-bool NativeCover::UpdateFrame(const unsigned char *rgb24, int strideBytes)
+bool NativeCover::UpdateFrame(const unsigned char *rgb24, int strideBytes, int srcWidth, int srcHeight)
 {
 	NativeCoverState &s = State();
-	if (!s.linked || s.window == nullptr || rgb24 == nullptr) {
+	if (!s.linked || s.surface == nullptr || rgb24 == nullptr) {
 		return false;
 	}
-	int width = 0;
-	int height = 0;
-	SDL_GetWindowSize(s.window, &width, &height);
-	return BlitFrame(s.window, width, height, rgb24, strideBytes);
+	return CommitFrame(rgb24, strideBytes, srcWidth, srcHeight);
 }
 
 } // namespace devilution

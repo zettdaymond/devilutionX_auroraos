@@ -84,6 +84,7 @@ BuildRequires: libcurl-devel
 %autosetup
 
 %build
+export CMAKE_GENERATOR=Ninja
 %cmake
 %ninja_build
 

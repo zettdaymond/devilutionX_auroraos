@@ -1,0 +1,38 @@
+--- a/src/video/wayland/SDL_waylandwindow.c
++++ b/src/video/wayland/SDL_waylandwindow.c
+@@ -2443,6 +2443,35 @@
+     SDL_DelHintCallback(SDL_HINT_VIDEO_EGL_ALLOW_TRANSPARENCY, EGLTransparencyChangedCallback, data);
+ }
+ 
++#ifdef SDL_VIDEO_DRIVER_WAYLAND_QT_TOUCH
++/*
++ * Set a generic window property on the qt_extended_surface created by SDL
++ * for this window. The compositor (Lipstick) only honors properties that
++ * arrive through the first extended surface of the underlying wl_surface,
++ * so applications must use this entry point instead of creating their own
++ * qt_extended_surface object.
++ */
++void SDL_WaylandSetWindowGenericProperty(SDL_Window *window, const char *name,
++                                         const void *value, size_t length)
++{
++    SDL_WindowData *wind;
++    struct wl_array array;
++
++    if (window == NULL || window->driverdata == NULL) {
++        return;
++    }
++    wind = (SDL_WindowData *)window->driverdata;
++    if (wind->extended_surface == NULL || name == NULL || value == NULL) {
++        return;
++    }
++
++    array.size = length;
++    array.alloc = 0;
++    array.data = (void *)value;
++    qt_extended_surface_update_generic_property(wind->extended_surface, name, &array);
++}
++#endif /* SDL_VIDEO_DRIVER_WAYLAND_QT_TOUCH */
++
+ #endif /* SDL_VIDEO_DRIVER_WAYLAND */
+ 
+ /* vi: set ts=4 sw=4 expandtab: */

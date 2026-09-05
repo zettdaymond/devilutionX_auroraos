@@ -372,6 +372,23 @@ AppResult Application::Run()
 	// POC нативной обложки Lipstick: то же изображение уезжает в окно
 	// категории cover — плитку показывает композитор, не наш буфер.
 	TryNativeCover();
+	// Кардиограмма отладки: DEVILUTIONX_NATIVE_COVER_DEBUG=1 — каждые
+	// 500 мс перезаливать кадр обложки (красным), чтобы видеть, живут ли
+	// коммиты окна обложки (в плитке или где-либо ещё).
+	if (m_nativeCoverActive) {
+		const char *debugEnv = SDL_getenv("DEVILUTIONX_NATIVE_COVER_DEBUG");
+		if (debugEnv != nullptr && debugEnv[0] == '1') {
+			const Uint32 heartbeat = SDL_RegisterEvents(1);
+			m_nativeCoverHeartbeat = heartbeat;
+			SDL_AddTimer(500, [](Uint32, void *userdata) -> Uint32 {
+				const auto type = *static_cast<Uint32 *>(userdata);
+				SDL_Event pulse {};
+				pulse.type = type;
+				SDL_PushEvent(&pulse);
+				return 500;
+			}, &m_nativeCoverHeartbeat);
+		}
+	}
 #endif
 	if (m_initialScreen.has_value()) {
 		m_store->Dispatch(launcher::intent::UiNavigate { *m_initialScreen });
@@ -393,6 +410,18 @@ AppResult Application::Run()
 	auto processEvent = [this](const SDL_Event &event) {
 		ImGui_ImplSDL2_ProcessEvent(&event);
 
+#ifdef AURORA_OS
+		if (m_nativeCoverHeartbeat != 0 && event.type == m_nativeCoverHeartbeat) {
+			// Кардиограмма обложки: свежий кадр в её окно (в режиме
+			// DEVILUTIONX_NATIVE_COVER_DEBUG=1 — красным).
+			std::vector<unsigned char> pixels;
+			int width = 0;
+			int height = 0;
+			if (launcher::aurora::GameCover::CopyBakedPixels(pixels, width, height)) {
+				devilution::NativeCover::UpdateFrame(pixels.data(), width * 3, width, height);
+			}
+		}
+#endif
 		if (event.type == m_wakeEventType) {
 			// Фоновый поток положил интент в Store — в свёрнутом состоянии
 			// это значит, что обложку (прогресс в плитке) надо перерисовать.
@@ -645,7 +674,8 @@ void Application::TryNativeCover()
 		spdlog::info("aurora-native-cover: запечённых пикселей нет — пропускаем");
 		return;
 	}
-	if (!devilution::NativeCover::CreateAndLink(m_window, width, height, pixels.data(), width * 3)) {
+	m_nativeCoverActive = devilution::NativeCover::CreateAndLink(m_window, width, height, pixels.data(), width * 3);
+	if (!m_nativeCoverActive) {
 		spdlog::info("aurora-native-cover: композитор не поддержал, работает старая схема");
 	}
 }
