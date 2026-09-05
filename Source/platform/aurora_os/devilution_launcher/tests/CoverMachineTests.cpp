@@ -127,3 +127,20 @@ TEST(CoverMachine, ResetReturnsToStarting)
 	m.Handle(aurora::CoverEvent::FocusLost);
 	EXPECT_EQ(m.Action(), aurora::CoverAction::RenderGame);
 }
+
+/// Reset(true) — посев Game для окна, переиспользованного после лаунчера
+/// (handover без пересоздания): стартового фокус-блика нет, поэтому
+/// потеря фокуса (сворачивание в плитку уже при загрузке движка) сразу
+/// включает обложку — защита Starting здесь не нужна.
+TEST(CoverMachine, ResetSeededGameHonorsFocusLoss)
+{
+	aurora::CoverMachine m;
+	ReachGame(m);
+	m.Handle(aurora::CoverEvent::FocusLost);
+	m.Reset(true);
+	EXPECT_EQ(m.Action(), aurora::CoverAction::RenderGame);
+	m.Handle(aurora::CoverEvent::FocusLost);
+	EXPECT_EQ(m.Action(), aurora::CoverAction::RenderCover);
+	m.Handle(aurora::CoverEvent::FocusGained);
+	EXPECT_EQ(m.Action(), aurora::CoverAction::RenderGame);
+}

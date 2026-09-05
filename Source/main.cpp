@@ -85,18 +85,29 @@ FUNC_EXPORT(int argc, char **argv)
     }
 
     devilution::ghMainWnd = SDL_CreateWindow("Diablo launcher", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1, 1, SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_ALLOW_HIGHDPI);
-    auto app = App::Application(devilution::ghMainWnd, "org.diasurgical", "devilutionx");
-    const auto launcherResult = app.Run();
-
-    SDL_DestroyWindow(devilution::ghMainWnd);
-    SDL_Quit();
+    launcher::AppResult launcherResult;
+    {
+        // Скоуп ради раннего ~Application: рендерер, ImGui и текстуры
+        // лаунчера умирают сразу после Run(), пока окно ещё живо — движок
+        // создаст свой рендерер на этом же окне.
+        auto app = App::Application(devilution::ghMainWnd, "org.diasurgical", "devilutionx");
+        launcherResult = app.Run();
+    }
 
     if (!launcherResult.success) {
         // Пользователь закрыл лаунчер, не выбрав игру — выходим из
         // приложения вместо запуска игры в режиме по умолчанию.
+        SDL_DestroyWindow(devilution::ghMainWnd);
+        devilution::ghMainWnd = nullptr;
+        SDL_Quit();
         devilution::DisplayBlankerController::Shutdown();
         return 0;
     }
+
+    // Handover: окно переезжает движку без пересоздания (SpawnWindow
+    // обнаружит живой ghMainWnd) — без close/open анимаций липстика.
+    // Хвост событий лаунчера (последний тап, фокус-шум) движку не нужен.
+    SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
 
     // Папку с MPQ движок получает аргументом --data-dir и, независимо
     // от запуска, читает её же из launcher.ini (StandartPaths).

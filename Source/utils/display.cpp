@@ -44,6 +44,7 @@
 
 #if defined(AURORA_OS)
 #include "Utilities.hpp"
+#include "AuroraOSAudio.hpp"
 #include "ComposerAdapter.hpp"
 #include "ScreenOrientation.hpp"
 #include "InputAdapter.hpp"
@@ -362,7 +363,27 @@ bool SpawnWindow(const char *lpWindowName)
 		flags |= SDL_WINDOW_FULLSCREEN;
 	}
 
+#ifdef AURORA_OS
+	if (ghMainWnd != nullptr) {
+		// Окно, пережившее лаунчер (main.cpp не сносит его на handover):
+		// surface не пересоздаётся — липстик не играет close/open анимации,
+		// последний кадр лаунчера висит до первого кадра игры. ДоOR-иваем
+		// паритет с fresh-флагами и сеем специфику фазы движка.
+		SDL_SetWindowTitle(ghMainWnd, lpWindowName);
+		if (*sgOptions.Graphics.upscale) {
+			SDL_SetWindowResizable(ghMainWnd, SDL_TRUE);
+		}
+		launcher::aurora::GameCover::SetWindowReused();
+		// Фокус окно не теряло, FOCUS_GAINED через фильтр не случится —
+		// аудиоресурс политики запрашиваем сами; асинхронно, как в
+		// фильтре: блокирующий dbus здесь уже замораживал первый кадр.
+		AcquireAudioResourceAsync();
+	} else {
+		ghMainWnd = SDL_CreateWindow(lpWindowName, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, windowSize.width, windowSize.height, flags);
+	}
+#else
 	ghMainWnd = SDL_CreateWindow(lpWindowName, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, windowSize.width, windowSize.height, flags);
+#endif
 
 #ifdef AURORA_OS
     AuroraOSInputAdapter::InstallInputEventsFilter(ghMainWnd,

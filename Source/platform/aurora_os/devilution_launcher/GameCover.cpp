@@ -53,6 +53,7 @@ struct CoverState {
 	SDL_Window *window = nullptr;   ///< окно движка — для buffer transform
 	bool portraitRotated = false;   ///< режим порта: transform 270 + ротатор
 	bool coverActive = false;       ///< обложка сейчас в буфере (transform NORMAL)
+	bool windowReused = false;      ///< окно движка — то же, что было у лаунчера
 	bool inputFocused = true;       ///< SDL-фокус окна (антидребезг ниже)
 	bool focusLostDispatched = true; ///< FocusLost уже отправлен машине
 	bool wasDisplayOn = true;       ///< детект смены состояния дисплея
@@ -187,7 +188,11 @@ void GameCover::Init(SDL_Window *window, bool portraitRotated)
 	s.portraitRotated = portraitRotated;
 	if (s.watch == nullptr) {
 		s.watch = std::make_unique<StateWatch>();
-		s.machine.Reset();
+		// Переиспользованное окно фокус не теряет: сеем Game, иначе машина
+		// застрянет в Starting (FocusLost там игнорируется) и плитка во
+		// время игры не получит обложку.
+		s.machine.Reset(s.windowReused);
+		s.windowReused = false;
 		s.coverActive = false;
 		s.inputFocused = true;
 		s.focusLostDispatched = true;
@@ -213,6 +218,11 @@ void GameCover::ResetTexture()
 		SDL_DestroyTexture(Cover().texture);
 		Cover().texture = nullptr;
 	}
+}
+
+void GameCover::SetWindowReused()
+{
+	Cover().windowReused = true;
 }
 
 bool GameCover::BeginCoverFrame(SDL_Renderer *renderer)

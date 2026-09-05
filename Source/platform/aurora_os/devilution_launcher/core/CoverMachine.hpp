@@ -55,8 +55,12 @@ public:
 	/// Стабильное действие текущего состояния, без одноразовых.
 	[[nodiscard]] CoverAction Action() const;
 
-	/// Сброс в начальное состояние (Starting).
-	void Reset();
+	/// Сброс в начальное состояние. По умолчанию Starting: у свежего окна
+	/// движка старт мельком теряет фокус, и FocusLost там игнорируется.
+	/// startInGame=true сеет Game — для окна, переиспользованного после
+	/// лаунчера: фокус-блика у него нет, и сворачивание в плитку должно
+	/// включать обложку сразу.
+	void Reset(bool startInGame = false);
 
 private:
 	enum class State { Starting, Game, Cover, Dark, GameAwaitingFocus };

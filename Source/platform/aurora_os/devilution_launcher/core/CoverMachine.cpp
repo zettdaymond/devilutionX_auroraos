@@ -105,10 +105,11 @@ CoverAction CoverMachine::Action() const
 	return CoverAction::RenderGame;
 }
 
-void CoverMachine::Reset()
+void CoverMachine::Reset(bool startInGame)
 {
-	m_state = State::Starting;
-	spdlog::info("aurora-cover: Reset -> Starting");
+	m_state = startInGame ? State::Game : State::Starting;
+	m_swapFramePending = false;
+	spdlog::info("aurora-cover: Reset -> {}", StateName(m_state));
 }
 
 } // namespace launcher::aurora
