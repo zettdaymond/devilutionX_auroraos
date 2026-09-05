@@ -6,10 +6,11 @@ namespace launcher::ui {
 
 /// Роль шрифта: шриты грузятся по назначению, а не по имени файла.
 enum class FontRole {
-	Body,     ///< Beaufort Regular + кириллица + иконки
-	BodyBold, ///< Beaufort Bold + кириллица + иконки
-	Heading,  ///< Exocet (только латиница — стиль логотипа Diablo)
-	IconBig,  ///< крупные одиночные иконки
+	Body,       ///< Beaufort Regular + кириллица + иконки
+	BodyBold,   ///< Beaufort Bold + кириллица + иконки
+	Heading,    ///< Exocet (только латиница — стиль логотипа Diablo)
+	HeadingCyr, ///< Exocet Cyrillic (кириллица в фирменном стиле)
+	IconBig,    ///< крупные одиночные иконки
 };
 
 /// Роль цвета из палитры Diablo-темы.

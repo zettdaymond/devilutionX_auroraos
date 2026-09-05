@@ -197,6 +197,11 @@ Application::~Application()
 			SDL_DestroyTexture(texture);
 		}
 	}
+	for (SDL_Texture *texture : m_coverFaceTextures) {
+		if (texture != nullptr) {
+			SDL_DestroyTexture(texture);
+		}
+	}
 	for (const auto &levels : m_iconTextures) {
 		for (SDL_Texture *texture : levels) {
 			if (texture != nullptr) {
@@ -257,6 +262,15 @@ void Application::LoadArtTextures()
 		m_iconLevelCounts[idx]
 		    = BuildIconLevels(m_renderer, asset.iconPath, m_iconTextures[idx].data(), m_iconSizes[idx].data());
 	}
+
+	// Лица режимов для карточки плитки: белый лайн-арт (череп/монах);
+	// демо-режим черпа не имеет — карточка возьмёт череп Diablo.
+	m_coverFaceTextures[static_cast<size_t>(ExitAction::LaunchDiablo)]
+	    = LoadAssetTexture(m_renderer, "assets/cover_face_diablo.png",
+	        m_coverFaceSizes[static_cast<size_t>(ExitAction::LaunchDiablo)]);
+	m_coverFaceTextures[static_cast<size_t>(ExitAction::LaunchHellfire)]
+	    = LoadAssetTexture(m_renderer, "assets/cover_face_hellfire.png",
+	        m_coverFaceSizes[static_cast<size_t>(ExitAction::LaunchHellfire)]);
 }
 
 void Application::AttachFileLog()
@@ -352,6 +366,9 @@ AppResult Application::Run()
 		if (m_heroTextures[i] != nullptr) {
 			m_view->SetHeroTexture(static_cast<launcher::ExitAction>(i), m_heroTextures[i], m_heroSizes[i]);
 		}
+		if (m_coverFaceTextures[i] != nullptr) {
+			m_view->SetCoverFace(static_cast<launcher::ExitAction>(i), m_coverFaceTextures[i], m_coverFaceSizes[i]);
+		}
 		if (m_iconLevelCounts[i] > 0) {
 			launcher::ui::widgets::BackgroundArt levels[3];
 			for (int l = 0; l < m_iconLevelCounts[i]; ++l) {
@@ -441,7 +458,15 @@ AppResult Application::Run()
 		ImGui::NewFrame();
 
 		if (m_coverPreview) {
-			m_view->RenderCover(m_store->State());
+			// Синтетическое состояние «запущена игра» для отладки карточки
+			// паузы: настоящий pendingLaunch завершил бы цикл сразу.
+			if (m_coverPause) {
+				launcher::LauncherState paused = m_store->State();
+				paused.pendingLaunch = launcher::ExitAction::LaunchDiablo;
+				m_view->RenderCover(paused);
+			} else {
+				m_view->RenderCover(m_store->State());
+			}
 		} else {
 			m_view->Render(m_store->State(), dispatch);
 		}
@@ -457,13 +482,40 @@ AppResult Application::Run()
 		// из бэкбуфера рендерера отдаёт чистые пиксели (PrintWindow/
 		// CopyFromScreen идут через DWM и ловят его пересборку кадра).
 		// DEVILUTIONX_DUMP_FRAME=N задаёт номер кадра, DEVILUTIONX_DUMP_PATH —
-		// куда писать BMP. В сборку для устройства код не попадает.
-		static const int dumpFrameNo = [] {
+		// куда писать BMP; для анимаций кадры можно перечислить через
+		// запятую, а «{}» в пути подставляет номер кадра. В сборку для
+		// устройства код не попадает.
+		static const std::vector<int> dumpFrames = [] {
+			std::vector<int> frames;
 			const char *env = SDL_getenv("DEVILUTIONX_DUMP_FRAME");
-			return env != nullptr ? std::atoi(env) : -1;
+			if (env == nullptr) {
+				return frames;
+			}
+			const std::string list(env);
+			size_t pos = 0;
+			while (pos <= list.size()) {
+				const size_t comma = list.find(',', pos);
+				const std::string tok = list.substr(
+				    pos, comma == std::string::npos ? std::string::npos : comma - pos);
+				if (!tok.empty()) {
+					frames.push_back(std::atoi(tok.c_str()));
+				}
+				if (comma == std::string::npos) {
+					break;
+				}
+				pos = comma + 1;
+			}
+			return frames;
 		}();
 		static int frameCounter = 0;
-		if (dumpFrameNo == frameCounter) {
+		bool dumpThisFrame = false;
+		for (const int f : dumpFrames) {
+			if (f == frameCounter) {
+				dumpThisFrame = true;
+				break;
+			}
+		}
+		if (dumpThisFrame) {
 			int dumpW = 0;
 			int dumpH = 0;
 			SDL_GetRendererOutputSize(m_renderer, &dumpW, &dumpH);
@@ -472,7 +524,12 @@ AppResult Application::Run()
 			if (shot != nullptr) {
 				if (SDL_RenderReadPixels(m_renderer, nullptr, SDL_PIXELFORMAT_RGB24, shot->pixels, shot->pitch) == 0) {
 					const char *dumpPath = SDL_getenv("DEVILUTIONX_DUMP_PATH");
-					SDL_SaveBMP(shot, dumpPath != nullptr ? dumpPath : "devilutionx_frame.bmp");
+					std::string path = dumpPath != nullptr ? dumpPath : "devilutionx_frame.bmp";
+					const size_t hole = path.find("{}");
+					if (hole != std::string::npos) {
+						path.replace(hole, 2, std::to_string(frameCounter));
+					}
+					SDL_SaveBMP(shot, path.c_str());
 				}
 				SDL_FreeSurface(shot);
 			}
@@ -564,8 +621,17 @@ bool Application::WindowHidden() const
 	}
 #endif
 	const Uint32 flags = SDL_GetWindowFlags(m_window);
+#ifdef AURORA_OS
+	// Аврора не шлёт MINIMIZED/HIDDEN при сворачивании в плитку — видимость
+	// определяется фокусом: плитка и локскрин отбирают INPUT_FOCUS.
 	return (flags & SDL_WINDOW_INPUT_FOCUS) == 0
 	    || (flags & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
+#else
+	// Десктоп: окно без фокуса всё равно видно — блокируемся только когда
+	// оно действительно скрыто (иначе фоновый запуск из терминала/отладчика
+	// сразу уводил бы цикл в сон без рендера).
+	return (flags & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
+#endif
 }
 
 void Application::RunCoverLoop()
@@ -642,10 +708,6 @@ bool Application::RenderCoverPixels(std::vector<unsigned char> &outPixels, int &
 	io.DisplaySize = ImVec2(static_cast<float>(width), static_cast<float>(height));
 	io.DisplayFramebufferScale = ImVec2(1.0F, 1.0F);
 	ImGui::NewFrame();
-
-	// Вьюха обновляет масштаб только в живом кадре UI; без этого офскрин-
-	// кадр брал масштаб прошлого кадра интерфейса.
-	launcher::ui::Scale::BeginFrame(DPIHandler::GetScale());
 
 	m_view->RenderCover(m_store->State());
 

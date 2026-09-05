@@ -72,6 +72,10 @@ public:
 /// Начать загрузку демо сразу при старте (отладка обложки с прогрессом).
 	void SetInitialDownload(bool start) { m_initialDownload = start; }
 
+/// Рисовать карточку «Пауза» в режиме превью обложки (отладка плитки
+/// на фазе движка: состояние pendingLaunch, которого в превью нет).
+	void SetCoverPause(bool enabled) { m_coverPause = enabled; }
+
 	void Stop();
 	void OnEvent(const SDL_WindowEvent &event);
 
@@ -103,6 +107,11 @@ private:
 	std::array<SDL_Texture *, 3> m_heroTextures {};
 	std::array<ImVec2, 3> m_heroSizes {};
 
+	/// Лица режимов для карточки плитки (белый лайн-арт на прозрачном);
+	/// индекс — ExitAction, демо наследует череп Diablo.
+	std::array<SDL_Texture *, 3> m_coverFaceTextures {};
+	std::array<ImVec2, 3> m_coverFaceSizes {};
+
 	/// Золотые иконки плиток в виде заранее уменьшенных копий (256/128/64);
 	/// индексы: сначала режим, затем уровень; 0 уровней = глиф FontAwesome.
 	std::array<std::array<SDL_Texture *, 3>, 3> m_iconTextures {};
@@ -114,6 +123,7 @@ private:
 	bool m_initialBrowser = false;
 	std::optional<launcher::Dialog> m_initialDialog;
 	bool m_coverPreview = false;
+	bool m_coverPause = false;
 	bool m_initialDownload = false;
 
 	/// Общий обработчик SDL-событий: кадры ImGui, кардиограмма обложки,

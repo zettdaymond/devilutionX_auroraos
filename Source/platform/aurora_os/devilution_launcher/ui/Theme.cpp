@@ -87,6 +87,7 @@ void Init(float dpiScale)
 	ImFont *bodyBold = loadFont("assets/Beaufort-Bold.ttf", bodySize, io.Fonts->GetGlyphRangesCyrillic(), false);
 	loadFont("assets/fontawesome-webfont.ttf", bodySize, iconRanges(), true);
 	ImFont *heading = loadFont("assets/exocet2.ttf", 40.0F * dpiScale, nullptr, false);
+	ImFont *headingCyr = loadFont("assets/exotec_cyrillic.ttf", 40.0F * dpiScale, io.Fonts->GetGlyphRangesCyrillic(), false);
 
 	ImFont *iconBig = nullptr;
 	try {
@@ -104,6 +105,7 @@ void Init(float dpiScale)
 	fonts()[FontRole::Body] = body;
 	fonts()[FontRole::BodyBold] = bodyBold;
 	fonts()[FontRole::Heading] = heading;
+	fonts()[FontRole::HeadingCyr] = headingCyr;
 	fonts()[FontRole::IconBig] = iconBig;
 	io.FontDefault = body;
 

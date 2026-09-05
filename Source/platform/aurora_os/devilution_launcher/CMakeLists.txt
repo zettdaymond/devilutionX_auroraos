@@ -133,6 +133,8 @@ cmrc_add_resource_library(launcher_assets
         assets/icon_diablo.png
         assets/icon_hellfire.png
         assets/icon_demo.png
+        assets/cover_face_diablo.png
+        assets/cover_face_hellfire.png
         assets/Beaufort-Bold.ttf
         assets/Beaufort-Regular.ttf
         assets/Roboto-Bold.ttf
@@ -140,6 +142,7 @@ cmrc_add_resource_library(launcher_assets
         assets/fontawesome-webfont.ttf
         assets/exocet1.ttf
         assets/exocet2.ttf
+        assets/exotec_cyrillic.ttf
 )
 
 # ---------------------------------------------------------------------------

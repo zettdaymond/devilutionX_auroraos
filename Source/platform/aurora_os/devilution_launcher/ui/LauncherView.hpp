@@ -55,6 +55,10 @@ public:
 	/// нулевое число — глиф FontAwesome в плитках.
 	void SetModeIconLevels(ExitAction mode, const widgets::BackgroundArt *levels, int count);
 
+	/// Подключает лицо режима для карточки плитки (белый лайн-арт на
+	/// прозрачном); демо без своего ассета наследует череп Diablo.
+	void SetCoverFace(ExitAction mode, void *texture, ImVec2 size);
+
 private:
 	void RenderBackground() const;
 	void RenderQuickActions(const Dispatcher &dispatch);
@@ -77,6 +81,8 @@ private:
 	ImVec2 m_backgroundTextureSize { 0.0F, 0.0F };
 	widgets::BackgroundArt m_heroArts[3] = {};   // indexed by ExitAction
 	widgets::IconSet m_iconSets[3] = {};         // indexed by ExitAction
+	void *m_coverFaces[3] = {};                  // indexed by ExitAction
+	ImVec2 m_coverFaceSizes[3] = {};             // indexed by ExitAction
 	float m_dpiScale = 1.0F;
 
 	Dialog m_lastDialog = Dialog::None;

@@ -10,6 +10,8 @@
 #include "thirdparty/FileBrowser.h"
 
 #include <imgui.h>
+
+#include <SDL2/SDL.h>
 #include <spdlog/spdlog.h>
 
 #ifndef LAUNCHER_APP_VERSION
@@ -429,124 +431,136 @@ void LauncherView::RenderCover(const LauncherState &state)
 	if (viewport->WorkSize.x <= 0.0F || viewport->WorkSize.y <= 0.0F) {
 		return;
 	}
-	// Текст на background-списке в этой паре ImGui/SDL_Renderer не
-	// рендерится (картинки — рендерятся, глифы — нет), поэтому вся
-	// обложка рисуется в foreground-списке: в кадре обложки больше
-	// ничего нет, так что «поверх всего» — то, что нужно.
+	// Карточка сама обновляет масштаб под текущий вьюпорт: и офскрин-кадр
+	// (RenderCoverPixels с подменой DisplaySize), и десктопное превью
+	// (--cover-preview) приходят без предварительного BeginFrame — иначе
+	// Scale держит масштаб прошлого кадра интерфейса (или дефолт) и
+	// содержимое карточки надувается.
+	Scale::BeginFrame(m_dpiScale);
+	// Вся карточка — в foreground-списке: текст на background-списке в
+	// этой паре ImGui/SDL_Renderer не рендерится.
 	ImDrawList *draw = ImGui::GetForegroundDrawList();
 	const ImVec2 &top = viewport->WorkPos;
 	const ImVec2 &v = viewport->WorkSize;
 	const float centerX = top.x + v.x * 0.5F;
 
-	const auto argb = [](ColorRole role) {
-		return ImGui::GetColorU32(Theme::Color(role));
-	};
+	// Состояния: плитка на фазе движка (запуск), активная загрузка,
+	// простой лаунчера. Имя приложения композитор уже рисует в шапке
+	// плитки — внутри не дублируем.
+	const bool launching = state.pendingLaunch.has_value();
+	const DownloadState *download = state.DownloadInProgress() ? &*state.download : nullptr;
 
-	// Фон — тот же aspect-fill кроп, что у главного экрана.
-	if (m_backgroundTexture != nullptr && m_backgroundTextureSize.x > 0.0F && m_backgroundTextureSize.y > 0.0F) {
-		const ImVec2 &t = m_backgroundTextureSize;
-		const float scale = std::max(v.x / t.x, v.y / t.y);
-		const ImVec2 shown(t.x * scale, t.y * scale);
-		const ImVec2 crop(0.5F - (v.x / shown.x) * 0.5F, 0.5F - (v.y / shown.y) * 0.5F);
-		draw->AddImage(m_backgroundTexture, top, top + v,
-		    ImVec2(crop.x, crop.y), ImVec2(1.0F - crop.x, 1.0F - crop.y));
+	// Фон — тёплый уголь без фото-арта: в миниатюре плитки фотография
+	// превращается в кашу, а канон обложек Авроры просит приглушённость
+	// и читаемость контента.
+	draw->AddRectFilled(top, top + v, IM_COL32(24, 18, 13, 255));
+
+	// Ember-свечение за центральным элементом: вложенные круги с ростом
+	// непрозрачности к центру — имитация радиального градиента.
+	// В состоянии «пауза» (запущена игра) уголёк дышит: медленная синусоида
+	// ~3.5 с — жар то разгорается ярче статики, то тлеет глубже, но не
+	// гаснет; текста на карточке нет, топить нечего, поэтому пик горит
+	// в полную силу. Простой лаунчера и загрузка статичны и сдержанны:
+	// жив только тот, кто ждёт игрока.
+	constexpr float kPi = 3.14159265F;
+	const bool paused = launching;
+	const float breath = paused
+	    ? 0.5F + 0.5F * std::sin(static_cast<float>(ImGui::GetTime()) * (2.0F * kPi / 3.5F))
+	    : 1.0F;
+	const float emberR = paused ? 0.82F + 0.18F * breath : 1.0F;
+	const float emberG = paused ? 0.30F + 0.12F * breath : 0.42F;
+	const float glowY = top.y + v.y * (download != nullptr ? 0.41F : 0.43F);
+	const float glowR = Scale::MinSide() * 0.55F * (paused ? 0.85F + 0.20F * breath : 1.0F);
+	const float glowAlpha = paused ? 1.00F + 1.30F * breath : 1.0F;
+	constexpr int kGlowLayers = 48;
+	for (int i = kGlowLayers; i >= 1; --i) {
+		const float t = static_cast<float>(i) / kGlowLayers;
+		draw->AddCircleFilled(ImVec2(centerX, glowY), glowR * t,
+		    ImGui::GetColorU32(ImVec4(emberR, emberG, 0.12F, (2.0F + 8.0F * (1.0F - t)) * glowAlpha / 255.0F)), 40);
 	}
 
-	// Затемнение плотнее, чем на главном экране: плитка мелкая, тексту
-	// нужен контраст. Угольки не рисуем — кадр статичный между правками.
-	draw->AddRectFilled(top, top + v, ImGui::GetColorU32(ImVec4(0.02F, 0.01F, 0.01F, 0.45F)));
-
-	// Композитор кропает буфер под пропорции плитки — контент держим
-	// в центральной полосе шириной ~72%, края небезопасны.
-	const float contentWidth = v.x * 0.72F;
-	float y = top.y + v.y * 0.24F;
-
-	// Логотип Exocet. Размер — ДОЛЯ КОРОТКОЙ СТОРОНЫ окна, а не DPI:
-	// композитор вписывает буфер в плитку с сильным уменьшением, и на
-	// больших экранах с низким DPI (эмулятор планшета, dpi~0.6)
-	// DPI-масштабированный шрифт в карточке неразличим. 10% короткой
-	// стороны = выверенные на телефоне 72px при 720-широком окне.
-	ImFont *heading = Theme::Font(FontRole::Heading);
-	if (heading != nullptr) {
-		constexpr const char *kTitle = "DEVILUTIONX";
-		const float size = Scale::MinSide() * 0.10F;
-		const ImVec2 textSize = heading->CalcTextSizeA(size, FLT_MAX, 0.0F, kTitle);
-		draw->AddText(heading, size, ImVec2(centerX - textSize.x * 0.5F, y),
-		    argb(ColorRole::GoldBright), kTitle);
-		y += textSize.y + Scale::Px(0.55F);
-	}
-
-	// Подпись с версией и разделитель. Та же пропорция от короткой
-	// стороны (~5.5% ≈ 40px на телефоне).
-	{
-		ImFont *body = Theme::Font(FontRole::Body);
-		const std::string subtitle = std::string("порт для Aurora OS · ") + LAUNCHER_APP_VERSION;
-		const float subtitleSize = Scale::MinSide() * 0.055F;
-		const ImVec2 textSize = body != nullptr
-		    ? body->CalcTextSizeA(subtitleSize, FLT_MAX, 0.0F, subtitle.c_str())
-		    : ImGui::CalcTextSize(subtitle.c_str());
-		if (body != nullptr) {
-			draw->AddText(body, subtitleSize, ImVec2(centerX - textSize.x * 0.5F, y),
-			    argb(ColorRole::TextDim), subtitle.c_str());
+	if (download != nullptr) {
+		// Загрузка: золотое кольцо-дуга с процентом в центре (акцент-число
+		// по канону Авроры; форма перекликается с iris-анимацией запуска),
+		// имя файла и скорость — под кольцом.
+		const ImVec2 ringCenter(centerX, top.y + v.y * 0.43F);
+		const float radius = Scale::MinSide() * 0.26F;
+		const float thickness = std::max(Scale::MinSide() * 0.05F, Scale::Px(0.08F));
+		const float frac = std::clamp(download->fraction, 0.0F, 1.0F);
+		draw->AddCircle(ringCenter, radius,
+		    ImGui::GetColorU32(ImVec4(1.0F, 0.72F, 0.25F, 0.40F)), 48, thickness);
+		if (frac > 0.0F) {
+			constexpr float kStart = -kPi * 0.5F;
+			draw->PathArcTo(ringCenter, radius, kStart, kStart + frac * kPi * 2.0F, 48);
+			draw->PathStroke(ImGui::GetColorU32(ImVec4(0.78F, 0.58F, 0.24F, 1.0F)), 0, thickness);
+			// «Горячий» край дуги — как у бара экрана данных.
+			const float endA = kStart + frac * kPi * 2.0F;
+			draw->AddCircleFilled(
+			    ImVec2(ringCenter.x + std::cos(endA) * radius, ringCenter.y + std::sin(endA) * radius),
+			    thickness * 0.85F, ImGui::GetColorU32(ImVec4(1.0F, 0.78F, 0.35F, 0.80F)), 16);
 		}
-		y += textSize.y + Scale::Px(0.9F);
-	}
-	Theme::DrawDivider(draw, ImVec2(centerX - contentWidth * 0.5F, y), ImVec2(centerX + contentWidth * 0.5F, y),
-	    0.7F);
-
-	// Активная загрузка: имя файла, полоса с «горячим» краем, процент и
-	// скорость — упрощённый вариант бара экрана данных.
-	if (state.DownloadInProgress()) {
-		const DownloadState &d = *state.download;
-		const FileSpec &spec = FileSpecOf(d.file);
-		// Отрезаем пояснение в скобках («демо-версия») — имя файла в
-		// плитке узнаётся и без него.
-		const std::string_view displayName = spec.displayName.substr(0, spec.displayName.find(" ("));
-
-		// Все размеры прогресса — доли короткой стороны (как логотип
-		// выше): низкий DPI не должен прятать загрузку в плитке.
-		const float nameSizePx = Scale::MinSide() * 0.055F;
-		const float statSizePx = Scale::MinSide() * 0.045F;
 		ImFont *bodyBold = Theme::Font(FontRole::BodyBold);
-		ImFont *body = Theme::Font(FontRole::Body);
-
-		float dy = top.y + v.y * 0.50F;
 		if (bodyBold != nullptr) {
-			const ImVec2 nameSize = bodyBold->CalcTextSizeA(nameSizePx, FLT_MAX, 0.0F,
-			    displayName.data(), displayName.data() + displayName.size());
-			draw->AddText(bodyBold, nameSizePx, ImVec2(centerX - nameSize.x * 0.5F, dy),
-			    argb(ColorRole::TextBody),
-			    displayName.data(), displayName.data() + displayName.size());
-			dy += nameSize.y + Scale::Px(0.7F);
+			const std::string percent = std::to_string(static_cast<int>(frac * 100.0F + 0.5F)) + "%";
+			float sizePx = Scale::MinSide() * 0.26F;
+			ImVec2 ts = bodyBold->CalcTextSizeA(sizePx, FLT_MAX, 0.0F, percent.c_str());
+			// «100%» шире «7%» — сжимаем шрифт, чтобы число не давило на дугу.
+			const float maxWidth = radius * 1.30F;
+			if (ts.x > maxWidth) {
+				sizePx *= maxWidth / ts.x;
+				ts = bodyBold->CalcTextSizeA(sizePx, FLT_MAX, 0.0F, percent.c_str());
+			}
+			draw->AddText(bodyBold, sizePx, ImVec2(centerX - ts.x * 0.5F, ringCenter.y - ts.y * 0.5F + Scale::Px(0.05F)),
+			    ImGui::GetColorU32(ImVec4(1.0F, 0.93F, 0.66F, 1.0F)), percent.c_str());
 		}
-
-		// Полоса: тёмный трек в золотой рамке, заливка и мягкий свет
-		// на переднем крае.
-		const float barHeight = Scale::MinSide() * 0.028F;
-		const float barLeft = centerX - contentWidth * 0.5F;
-		draw->AddRectFilled(ImVec2(barLeft, dy), ImVec2(barLeft + contentWidth, dy + barHeight),
-		    argb(ColorRole::Panel));
-		const float fill = contentWidth * std::clamp(d.fraction, 0.0F, 1.0F);
-		if (fill > 0.0F) {
-			draw->AddRectFilled(ImVec2(barLeft, dy), ImVec2(barLeft + fill, dy + barHeight),
-			    argb(ColorRole::GoldDim));
-			draw->AddCircleFilled(ImVec2(barLeft + fill, dy + barHeight * 0.5F), barHeight,
-			    ImGui::GetColorU32(Theme::Color(ColorRole::GoldBright)
-			        * ImVec4(1.0F, 1.0F, 1.0F, 0.35F)),
-			    12);
+		ImFont *body = Theme::Font(FontRole::Body);
+		const FileSpec &spec = FileSpecOf(download->file);
+		const std::string_view displayName = spec.displayName.substr(0, spec.displayName.find(" ("));
+		float y = ringCenter.y + radius + Scale::Px(0.5F);
+		if (bodyBold != nullptr) {
+			const float namePx = Scale::MinSide() * 0.072F;
+			const std::string name(displayName);
+			const ImVec2 ts = bodyBold->CalcTextSizeA(namePx, FLT_MAX, 0.0F, name.c_str());
+			draw->AddText(bodyBold, namePx, ImVec2(centerX - ts.x * 0.5F, y),
+			    ImGui::GetColorU32(ImVec4(0.96F, 0.93F, 0.86F, 1.0F)), name.c_str());
+			y += ts.y + Scale::Px(0.2F);
 		}
-		draw->AddRect(ImVec2(barLeft, dy), ImVec2(barLeft + contentWidth, dy + barHeight),
-		    argb(ColorRole::BorderGold), 1.0F);
-
 		if (body != nullptr) {
-			dy += barHeight + Scale::Px(0.55F);
-			const std::string stat = std::to_string(static_cast<int>(d.fraction * 100.0F + 0.5F)) + "% · "
-			    + FormatBytes(d.bytesPerSec) + "/с";
-			const ImVec2 statSize = body->CalcTextSizeA(statSizePx, FLT_MAX, 0.0F, stat.c_str());
-			draw->AddText(body, statSizePx, ImVec2(centerX - statSize.x * 0.5F, dy),
-			    argb(ColorRole::TextDim), stat.c_str());
+			const std::string stat = FormatBytes(download->bytesPerSec) + "/с";
+			const float statPx = Scale::MinSide() * 0.060F;
+			const ImVec2 ts = body->CalcTextSizeA(statPx, FLT_MAX, 0.0F, stat.c_str());
+			draw->AddText(body, statPx, ImVec2(centerX - ts.x * 0.5F, y),
+			    ImGui::GetColorU32(ImVec4(0.88F, 0.84F, 0.76F, 1.0F)), stat.c_str());
 		}
+		return;
 	}
+
+	// Простой лаунчера / плитка на фазе движка: лицо режима — идентичность,
+	// которой нет в системной шапке (череп Diablo — лаунчер и демо, монах —
+	// Hellfire). Белый лайн-арт тонирован в костяной цвет. В «паузе» лицо
+	// притушено — спит, а не выключено; живость несёт дышащий уголёк выше.
+	const size_t faceIdx = launching
+	    ? (static_cast<size_t>(*state.pendingLaunch) == static_cast<size_t>(ExitAction::LaunchHellfire)
+	            ? static_cast<size_t>(ExitAction::LaunchHellfire)
+	            : static_cast<size_t>(ExitAction::LaunchDiablo))
+	    : static_cast<size_t>(ExitAction::LaunchDiablo);
+	const float w = Scale::MinSide() * 0.75F;
+	float h = w;
+	const ImVec2 center(centerX, top.y + v.y * 0.45F);
+	if (m_coverFaces[faceIdx] != nullptr) {
+		const ImVec2 &s = m_coverFaceSizes[faceIdx];
+		h = s.x > 0.0F ? w * s.y / s.x : w;
+		draw->AddImage(m_coverFaces[faceIdx], ImVec2(center.x - w * 0.5F, center.y - h * 0.5F),
+		    ImVec2(center.x + w * 0.5F, center.y + h * 0.5F), ImVec2(0, 0), ImVec2(1, 1),
+		    ImGui::GetColorU32(ImVec4(0.93F, 0.89F, 0.80F, launching ? 0.28F + 0.08F * breath : 0.95F)));
+	}
+}
+
+void LauncherView::SetCoverFace(ExitAction mode, void *texture, ImVec2 size)
+{
+	const size_t idx = static_cast<size_t>(mode);
+	m_coverFaces[idx] = texture;
+	m_coverFaceSizes[idx] = size;
 }
 
 void LauncherView::RenderBackground() const

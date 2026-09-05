@@ -36,6 +36,7 @@ struct Args {
 	std::optional<launcher::Dialog> dialog;
 	bool coverPreview = false;
 	bool coverDownload = false;
+	bool coverPause = false;
 	int windowWidth = 540;
 	int windowHeight = 960;
 };
@@ -64,6 +65,8 @@ Args ParseArgs(int argc, char **argv)
 			args.coverPreview = true;
 		} else if (arg == "--cover-download") {
 			args.coverDownload = true;
+		} else if (arg == "--cover-pause") {
+			args.coverPause = true;
 		} else if (arg.rfind("--dialog=", 0) == 0) {
 			const std::string value = arg.substr(std::strlen("--dialog="));
 			if (value == "confirm-demo") {
@@ -155,6 +158,9 @@ int main(int argc, char **argv)
 	}
 	if (args.coverPreview) {
 		app->SetCoverPreview(true);
+	}
+	if (args.coverPause) {
+		app->SetCoverPause(true);
 	}
 	if (args.coverDownload) {
 		app->SetInitialDownload(true);
