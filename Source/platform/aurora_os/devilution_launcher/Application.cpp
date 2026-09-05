@@ -37,6 +37,7 @@
 #include <vector>
 
 #ifdef AURORA_OS
+#	include "AuroraStateWatch.hpp"
 #	include "GameCover.hpp"
 #endif
 
@@ -351,6 +352,9 @@ AppResult Application::Run()
 
 	m_store->Init();
 #ifdef AURORA_OS
+	// Наблюдатель состояния Авроры: дисплей для WindowHidden(); события
+	// из его потока дрена (смена дисплея) будят цикл обложки.
+	m_stateWatch = std::make_unique<launcher::aurora::StateWatch>();
 	// Обложка для фазы движка запекается офскрин уже здесь: к моменту
 	// «Играть» пиксели готовы, из пути выхода рендер убран совсем.
 	BakeGameCover();
@@ -392,44 +396,32 @@ AppResult Application::Run()
 		m_store->Dispatch(std::move(intent));
 	};
 
-	auto processEvent = [this](const SDL_Event &event) {
-		ImGui_ImplSDL2_ProcessEvent(&event);
-
-#ifdef AURORA_OS
-		if (m_nativeCoverHeartbeat != 0 && event.type == m_nativeCoverHeartbeat) {
-			// Кардиограмма обложки: свежий кадр в её окно (в режиме
-			// DEVILUTIONX_NATIVE_COVER_DEBUG=1 — красным).
-			std::vector<unsigned char> pixels;
-			int width = 0;
-			int height = 0;
-			if (launcher::aurora::GameCover::CopyBakedPixels(pixels, width, height)) {
-				devilution::NativeCover::UpdateFrame(pixels.data(), width * 3, width, height);
-			}
-		}
-#endif
-		if (event.type == SDL_QUIT) {
-			Stop();
-		}
-		if (event.type == SDL_WINDOWEVENT && event.window.windowID == SDL_GetWindowID(m_window)) {
-			OnEvent(event.window);
-		}
-	};
-
 	m_running = true;
 	// После «Играть» цикл дорисовывает iris-анимацию (сужающийся круг
 	// поверх последнего кадра) и только затем отдаёт управление движку.
-	// Плитку свёрнутого окна ведёт нативная обложка Lipstick (TryNativeCover);
-	// цикл рендерит интерфейс независимо от видимости окна.
+	// Плитку свёрнутого окна ведёт нативная обложка Lipstick (TryNativeCover):
+	// скрытое окно не рендерится вовсе — цикл уходит в блокирующее
+	// ожидание (RunCoverLoop) до возврата видимости.
 	while (m_running
 	    && (!m_store->State().pendingLaunch.has_value() || !m_view->LaunchIrisDone())) {
 		const auto frameStart = std::chrono::steady_clock::now();
 
 		SDL_Event event {};
 		while (SDL_PollEvent(&event) == 1) {
-			processEvent(event);
+			ProcessEvent(event);
 		}
 
 		m_store->Poll();
+
+		if (WindowHidden()) {
+			RunCoverLoop();
+			// Выход из приложения или запуск игры: iris дорисовывать
+			// некому — сразу отдаём результат.
+			if (!m_running || m_store->State().pendingLaunch.has_value()) {
+				break;
+			}
+			continue;
+		}
 
 		ImGui_ImplSDLRenderer2_NewFrame();
 		ImGui_ImplSDL2_NewFrame();
@@ -490,6 +482,10 @@ AppResult Application::Run()
 		}
 	}
 
+#ifdef AURORA_OS
+	m_stateWatch.reset();
+#endif
+
 	AppResult result;
 	if (const auto launch = m_store->State().pendingLaunch) {
 		result.success = true;
@@ -502,6 +498,73 @@ AppResult Application::Run()
 void Application::Stop()
 {
 	m_running = false;
+}
+
+void Application::ProcessEvent(const SDL_Event &event)
+{
+	ImGui_ImplSDL2_ProcessEvent(&event);
+
+#ifdef AURORA_OS
+	if (m_nativeCoverHeartbeat != 0 && event.type == m_nativeCoverHeartbeat) {
+		// Кардиограмма обложки: свежий кадр в её окно (в режиме
+		// DEVILUTIONX_NATIVE_COVER_DEBUG=1 — красным).
+		std::vector<unsigned char> pixels;
+		int width = 0;
+		int height = 0;
+		if (launcher::aurora::GameCover::CopyBakedPixels(pixels, width, height)) {
+			devilution::NativeCover::UpdateFrame(pixels.data(), width * 3, width, height);
+		}
+	}
+#endif
+	if (event.type == SDL_QUIT) {
+		Stop();
+	}
+	if (event.type == SDL_WINDOWEVENT && event.window.windowID == SDL_GetWindowID(m_window)) {
+		OnEvent(event.window);
+	}
+}
+
+bool Application::WindowHidden() const
+{
+	if (m_window == nullptr) {
+		return false;
+	}
+#ifdef AURORA_OS
+	// Зашёлка от дедлока старта: FOCUS_LOST на Авроре приходит ДО первого
+	// кадра, а фокус композитор даёт только показанному окну — до первого
+	// FOCUS_GAINED обязаны рендерить, что бы ни говорили флаги.
+	if (!m_focusKnown) {
+		return false;
+	}
+	if (m_stateWatch != nullptr && !m_stateWatch->DisplayOn()) {
+		return true;
+	}
+#endif
+	const Uint32 flags = SDL_GetWindowFlags(m_window);
+	return (flags & SDL_WINDOW_INPUT_FOCUS) == 0
+	    || (flags & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
+}
+
+void Application::RunCoverLoop()
+{
+	// Плитку ведёт нативная обложка Lipstick, интерфейс в свёрнутом окне
+	// не меняется — рендерить не для кого. Спим в блокирующем SDL_WaitEvent:
+	// будит любое событие (возврат фокуса/закрытие окна, кардиограмма
+	// отладки, события наблюдателя дисплея), а wake-интенты стора
+	// применяются сразу, чтобы состояние не старело. Выход: окно снова
+	// видимо, приложение закрывается или запускается игра (iris в скрытом
+	// окне анимировать некому).
+	while (m_running
+	    && !m_store->State().pendingLaunch.has_value()
+	    && WindowHidden()) {
+		SDL_Event wait {};
+		if (SDL_WaitEvent(&wait) == 1) {
+			ProcessEvent(wait);
+			m_store->Poll();
+		} else {
+			SDL_Delay(100);
+		}
+	}
 }
 
 #ifdef AURORA_OS
@@ -577,6 +640,11 @@ void Application::TryNativeCover()
 
 void Application::OnEvent(const SDL_WindowEvent &event)
 {
+	// Зашёлка «окно уже показывалось»: только FOCUS_GAINED считается
+	// доказательством (FOCUS_LOST приходит и до первого кадра).
+	if (event.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+		m_focusKnown = true;
+	}
 	if (event.event == SDL_WINDOWEVENT_CLOSE) {
 		Stop();
 	}
