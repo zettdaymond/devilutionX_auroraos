@@ -170,6 +170,17 @@ devilution_launcher [--mock-scenario=<имя>] [--screen=home|data|settings|abou
 «закрыл лаунчер без игры» живёт по-старому: `SDL_DestroyWindow` +
 `SDL_Quit`; окно на фазе движка прибирает `dx_cleanup` при выходе.
 
+### Нативная обложка Lipstick (POC)
+
+`platform/aurora_os/NativeCover` — эксперимент: отдельное окно с
+категорией cover, связанное с главным через qt_surface_extension
+(`WINID`/`CATEGORY`/`SAILFISH_COVER_WINDOW=__winref:<id>`, значения —
+QVariant). Так плитку показывают Qt-приложения Авроры: композитор сам
+рисует окно обложки при уходе приложения в фон, без нашего детекта
+свёрнутости. На старте лаунчер отдаёт туда тот же запечённый кадр
+(`GameCover::CopyBakedPixels`). Пока обе схемы работают параллельно;
+A/B-гейт на устройстве — `DEVILUTIONX_NATIVE_COVER=0` (только старая).
+
 ## Адаптивная вёрстка
 
 Все размеры выражены в rem: `rem = clamp(диагональ_вьюпорта / 44,

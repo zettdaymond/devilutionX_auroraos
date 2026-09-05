@@ -167,6 +167,11 @@ private:
 	/// буферов окна (иначе кадр мигал бы перед стартом игры).
 	void BakeGameCover();
 
+	/// POC нативной обложки Lipstick: окно категории cover, связанное с
+	/// главным через SAILFISH_COVER_WINDOW (см. NativeCover). Отключается
+	/// на устройстве через DEVILUTIONX_NATIVE_COVER=0.
+	void TryNativeCover();
+
 #endif
 };
 

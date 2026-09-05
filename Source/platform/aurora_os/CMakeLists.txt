@@ -19,6 +19,7 @@ add_devilutionx_object_library(libdevilutionx_aurora_os
     DisplayBlankerController.cpp
     DBus.cpp
     AuroraOSAudio.cpp
+    NativeCover.cpp
 )
 
 target_include_directories(libdevilutionx_aurora_os

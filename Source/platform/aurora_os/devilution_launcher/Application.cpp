@@ -26,6 +26,7 @@
 #include <cstdlib>
 
 #ifdef AURORA_OS
+#   include "../NativeCover.hpp"
 #   include "../StandartPaths.hpp"
 #endif
 
@@ -366,9 +367,11 @@ AppResult Application::Run()
 	m_store->Init();
 #ifdef AURORA_OS
 	// Обложка для фазы движка запекается офскрин уже здесь: к моменту
-	// Обложка для фазы движка запекается офскрин уже здесь: к моменту
 	// «Играть» пиксели готовы, из пути выхода рендер убран совсем.
 	BakeGameCover();
+	// POC нативной обложки Lipstick: то же изображение уезжает в окно
+	// категории cover — плитку показывает композитор, не наш буфер.
+	TryNativeCover();
 #endif
 	if (m_initialScreen.has_value()) {
 		m_store->Dispatch(launcher::intent::UiNavigate { *m_initialScreen });
@@ -624,6 +627,27 @@ void Application::BakeGameCover()
 
 	SDL_SetRenderTarget(m_renderer, previousTarget);
 	SDL_DestroyTexture(target);
+}
+
+void Application::TryNativeCover()
+{
+	// Гейт для A/B-проверки на устройстве: DEVILUTIONX_NATIVE_COVER=0 —
+	// только старая схема (запечённый кадр в буфере главного окна).
+	const char *disabled = SDL_getenv("DEVILUTIONX_NATIVE_COVER");
+	if (disabled != nullptr && disabled[0] == '0') {
+		spdlog::info("aurora-native-cover: выключен (DEVILUTIONX_NATIVE_COVER=0)");
+		return;
+	}
+	std::vector<unsigned char> pixels;
+	int width = 0;
+	int height = 0;
+	if (!launcher::aurora::GameCover::CopyBakedPixels(pixels, width, height)) {
+		spdlog::info("aurora-native-cover: запечённых пикселей нет — пропускаем");
+		return;
+	}
+	if (!devilution::NativeCover::CreateAndLink(m_window, width, height, pixels.data(), width * 3)) {
+		spdlog::info("aurora-native-cover: композитор не поддержал, работает старая схема");
+	}
 }
 
 void Application::ApplyAuroraState(launcher::aurora::StateEvent what, bool value)

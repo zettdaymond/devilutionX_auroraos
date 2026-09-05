@@ -181,6 +181,18 @@ void GameCover::CaptureFromBackbuffer(SDL_Renderer *renderer)
 	spdlog::info("aurora: обложка для фазы движка запечена ({}x{})", width, height);
 }
 
+bool GameCover::CopyBakedPixels(std::vector<unsigned char> &out, int &width, int &height)
+{
+	CoverState &s = Cover();
+	if (s.pixels.empty()) {
+		return false;
+	}
+	out = s.pixels;
+	width = s.width;
+	height = s.height;
+	return true;
+}
+
 void GameCover::Init(SDL_Window *window, bool portraitRotated)
 {
 	CoverState &s = Cover();

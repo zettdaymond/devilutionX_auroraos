@@ -4,6 +4,8 @@
 
 #include <SDL2/SDL.h>
 
+#include <vector>
+
 namespace launcher::aurora {
 
 /// Обложка свёрнутого окна на время игры. Пока работает лаунчер, кадр
@@ -35,6 +37,11 @@ public:
 	/// отрисовки кадра обложки и ДО SDL_RenderPresent: при двойной
 	/// буферизации после обмена читается уже не тот буфер.
 	static void CaptureFromBackbuffer(SDL_Renderer *renderer);
+
+	/// Копия запечённых пикселей обложки (RGB24, stride = width*3).
+	/// false — обложка ещё не запечена или запеклась пустой.
+	[[nodiscard]] static bool CopyBakedPixels(
+	    std::vector<unsigned char> &out, int &width, int &height);
 
 	/// Запустить/остановить наблюдателя на фазу движка. portraitRotated —
 	/// работает ли окно движка в повёрнутом режиме порта (есть ротатор):
