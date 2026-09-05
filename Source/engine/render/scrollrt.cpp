@@ -1364,8 +1364,8 @@ void DrawMain(const Surface &out, int dwHgt, bool drawDesc, bool drawHp, bool dr
 	}
 #ifdef AURORA_OS
 	// Аврора не гасит gbActive при сворачивании в плитку: свёрнутое или
-	// пригашенное состояние знает стейтмашина обложки — игровой кадр
-	// в софтверном рендере не молотим (честная пауза, батарея).
+	// пригашенное состояние знает предикат обложки (GameCover::IsHidden)
+	// — игровой кадр в софтверном рендере не молотим (пауза, батарея).
 	if (launcher::aurora::GameCover::IsHidden()) {
 		return;
 	}

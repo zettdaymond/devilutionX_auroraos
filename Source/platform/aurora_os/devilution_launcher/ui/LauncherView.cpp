@@ -284,14 +284,6 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	}
 }
 
-void LauncherView::NotifyShown()
-{
-	// RenderDialogs открывает ImGui-попап только на СМЕНЕ state.dialog.
-	// За кадры обложки попап умер — сбрасываем кэш, и первый видимый
-	// кадр переоткроет активный диалог (с коротким fade).
-	m_lastDialog = Dialog::None;
-}
-
 bool LauncherView::LaunchIrisDone() const
 {
 	if (m_irisStartedAt < 0.0) {
@@ -421,7 +413,7 @@ void LauncherView::RenderLaunchIris(const LauncherState &state)
 	    ImGui::GetColorU32(ImVec4(0.91F, 0.55F, 0.16F, rimAlpha * 0.6F)), 48, Scale::Px(0.18F));
 }
 
-void LauncherView::RenderCover(const LauncherState &state, float coverAlpha)
+void LauncherView::RenderCover(const LauncherState &state)
 {
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
 	// Дегенеративный вьюпорт (свёрнутое окно) — рисовать нечего, а
@@ -438,11 +430,8 @@ void LauncherView::RenderCover(const LauncherState &state, float coverAlpha)
 	const ImVec2 &v = viewport->WorkSize;
 	const float centerX = top.x + v.x * 0.5F;
 
-	// Цвет темы с альфой кросс-фейда (1.0 — обычный кадр обложки).
-	const auto argb = [coverAlpha](ColorRole role) {
-		ImVec4 color = Theme::Color(role);
-		color.w *= coverAlpha;
-		return ImGui::GetColorU32(color);
+	const auto argb = [](ColorRole role) {
+		return ImGui::GetColorU32(Theme::Color(role));
 	};
 
 	// Фон — тот же aspect-fill кроп, что у главного экрана.
@@ -452,13 +441,12 @@ void LauncherView::RenderCover(const LauncherState &state, float coverAlpha)
 		const ImVec2 shown(t.x * scale, t.y * scale);
 		const ImVec2 crop(0.5F - (v.x / shown.x) * 0.5F, 0.5F - (v.y / shown.y) * 0.5F);
 		draw->AddImage(m_backgroundTexture, top, top + v,
-		    ImVec2(crop.x, crop.y), ImVec2(1.0F - crop.x, 1.0F - crop.y),
-		    ImGui::GetColorU32(ImVec4(1.0F, 1.0F, 1.0F, coverAlpha)));
+		    ImVec2(crop.x, crop.y), ImVec2(1.0F - crop.x, 1.0F - crop.y));
 	}
 
 	// Затемнение плотнее, чем на главном экране: плитка мелкая, тексту
 	// нужен контраст. Угольки не рисуем — кадр статичный между правками.
-	draw->AddRectFilled(top, top + v, ImGui::GetColorU32(ImVec4(0.02F, 0.01F, 0.01F, 0.45F * coverAlpha)));
+	draw->AddRectFilled(top, top + v, ImGui::GetColorU32(ImVec4(0.02F, 0.01F, 0.01F, 0.45F)));
 
 	// Композитор кропает буфер под пропорции плитки — контент держим
 	// в центральной полосе шириной ~72%, края небезопасны.
@@ -496,7 +484,7 @@ void LauncherView::RenderCover(const LauncherState &state, float coverAlpha)
 		y += textSize.y + Scale::Px(0.9F);
 	}
 	Theme::DrawDivider(draw, ImVec2(centerX - contentWidth * 0.5F, y), ImVec2(centerX + contentWidth * 0.5F, y),
-	    0.7F * coverAlpha);
+	    0.7F);
 
 	// Активная загрузка: имя файла, полоса с «горячим» краем, процент и
 	// скорость — упрощённый вариант бара экрана данных.
@@ -536,7 +524,7 @@ void LauncherView::RenderCover(const LauncherState &state, float coverAlpha)
 			    argb(ColorRole::GoldDim));
 			draw->AddCircleFilled(ImVec2(barLeft + fill, dy + barHeight * 0.5F), barHeight,
 			    ImGui::GetColorU32(Theme::Color(ColorRole::GoldBright)
-			        * ImVec4(1.0F, 1.0F, 1.0F, 0.35F * coverAlpha)),
+			        * ImVec4(1.0F, 1.0F, 1.0F, 0.35F)),
 			    12);
 		}
 		draw->AddRect(ImVec2(barLeft, dy), ImVec2(barLeft + contentWidth, dy + barHeight),

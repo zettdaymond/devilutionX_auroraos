@@ -48,7 +48,6 @@
 #include "ComposerAdapter.hpp"
 #include "ScreenOrientation.hpp"
 #include "InputAdapter.hpp"
-#include "GameCover.hpp"
 #endif
 namespace devilution {
 
@@ -125,12 +124,6 @@ void FreeRenderer()
 #endif
 
 	if (renderer != nullptr) {
-#ifdef AURORA_OS
-        // The tile-cover texture belongs to the renderer - free it before
-        // the renderer dies (unlike rotator/padRenderer above, which hold
-        // no renderer-owned objects).
-        launcher::aurora::GameCover::ResetTexture();
-#endif
 		SDL_DestroyRenderer(renderer);
 		renderer = nullptr;
 #ifdef AURORA_OS
@@ -368,12 +361,11 @@ bool SpawnWindow(const char *lpWindowName)
 		// Окно, пережившее лаунчер (main.cpp не сносит его на handover):
 		// surface не пересоздаётся — липстик не играет close/open анимации,
 		// последний кадр лаунчера висит до первого кадра игры. ДоOR-иваем
-		// паритет с fresh-флагами и сеем специфику фазы движка.
+		// паритет с fresh-флагами.
 		SDL_SetWindowTitle(ghMainWnd, lpWindowName);
 		if (*sgOptions.Graphics.upscale) {
 			SDL_SetWindowResizable(ghMainWnd, SDL_TRUE);
 		}
-		launcher::aurora::GameCover::SetWindowReused();
 		// Фокус окно не теряло, FOCUS_GAINED через фильтр не случится —
 		// аудиоресурс политики запрашиваем сами; асинхронно, как в
 		// фильтре: блокирующий dbus здесь уже замораживал первый кадр.

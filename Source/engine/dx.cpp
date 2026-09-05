@@ -104,10 +104,10 @@ void dx_init()
 #ifdef AURORA_OS
 	// Second StateWatch instance for the engine phase (the launcher's own
 	// watcher died at the end of Application::Run; the window itself
-	// survives the handover and is reused by the engine) - powers the tile
-	// cover below. The window handle feeds the tile-time buffer-transform
-	// switch; the rotator flag says whether the port runs in rotated mode.
-	launcher::aurora::GameCover::Init(ghMainWnd, rotator != nullptr);
+	// survives the handover and is reused by the engine) - powers the
+	// IsHidden() visibility predicate (honest pauses while tiled, audio
+	// device switching).
+	launcher::aurora::GameCover::Init(ghMainWnd);
 #endif
 
 	palette_init();
@@ -123,8 +123,7 @@ Surface GlobalBackBuffer()
 void dx_cleanup()
 {
 #ifdef AURORA_OS
-	// The cover texture lives in the renderer and the watcher owns a
-	// thread - release both before the renderer/window die.
+	// The watcher owns a thread - release it before the window dies.
 	launcher::aurora::GameCover::Shutdown();
 #endif
 
@@ -262,17 +261,6 @@ void RenderPresent()
 {
 	if (HeadlessMode)
 		return;
-
-#ifdef AURORA_OS
-	// Minimized into an Aurora tile: present the branded cover frame
-	// baked by the launcher instead of the game frame. Must run before
-	// the gbActive check - Aurora never sends HIDDEN/MINIMIZED, so the
-	// game keeps presenting while tiled.
-	if (launcher::aurora::GameCover::BeginCoverFrame(renderer)) {
-		LimitFrameRate();
-		return;
-	}
-#endif
 
 	SDL_Surface *surface = GetOutputSurface();
 

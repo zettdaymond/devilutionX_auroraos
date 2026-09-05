@@ -166,10 +166,8 @@ void CreditsRenderer::PauseIfHidden()
 		pause_started_at_ = std::chrono::steady_clock::now();
 		SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "aurora: титры на паузе");
 	}
-	// RenderPresent кормит машину обложки и держит кадр-карточку; спим
-	// до события (фокус/дисплей всегда событием), проснутое возвращаем
-	// в очередь — его обработает насос цикла диалога.
-	RenderPresent();
+	// Спим до события (фокус/дисплей всегда событием), проснутое
+	// возвращаем в очередь — его обработает насос цикла диалога.
 	SDL_Event wait {};
 	if (SDL_WaitEvent(&wait) == 1) {
 		SDL_PushEvent(&wait);

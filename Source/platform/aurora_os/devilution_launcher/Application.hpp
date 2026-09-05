@@ -4,7 +4,6 @@
 #include <imgui.h>
 
 #include "core/AppResult.hpp"
-#include "core/CoverMachine.hpp"
 #include "core/LauncherState.hpp"
 #include "services/ServiceFactory.hpp"
 
@@ -16,11 +15,6 @@
 
 namespace launcher {
 class Store;
-}
-
-namespace launcher::aurora {
-class StateWatch;
-enum class StateEvent : int;
 }
 
 
@@ -87,12 +81,6 @@ private:
 	/// журнал читается только рутом, а файл доступен пользователю напрямую.
 	void AttachFileLog();
 
-	/// Один кадр «обложки» для плитки Авроры: после сворачивания композитор
-	/// показывает буфер окна в плитке домашнего экрана, поэтому вместо
-	/// интерфейса рисуем фирменный кадр (LauncherView::RenderCover) и
-	/// обновляем его только по факту изменений (прогресс загрузки).
-	void RenderCoverFrame();
-
 	SDL_Window *m_window { nullptr };
 	SDL_Renderer *m_renderer { nullptr };
 
@@ -123,48 +111,11 @@ private:
 	bool m_coverPreview = false;
 	bool m_initialDownload = false;
 
-	/// Тип пользовательского SDL-события: «фоновый поток положил интент
-	/// в очередь Store» — будит блокирующее ожидание свёрнутого цикла.
-	Uint32 m_wakeEventType { 0 };
-
-	/// Состояние обложки свёрнутого окна: был ли кадр уже нарисован и
-	/// устарел ли он (пришёл wake-пинок с новым прогрессом загрузки).
-	bool m_wasHidden = false;
-	bool m_coverDirty = false;
-
-	/// Что рисовать в плитке/при блокировке, решает событийная стейтмашина
-	/// (core/CoverMachine): входы — края фокуса окна (антидребезг 100 мс,
-	/// TickFocusDebounce) и края дисплея (ApplyAuroraState). Под песочницей
-	/// иконочного запуска живёт только это; topmost/tklock мертвы и в
-	/// решениях не участвуют.
-	launcher::aurora::CoverMachine m_coverMachine;
-	std::optional<std::chrono::steady_clock::time_point> m_focusLostAt;
-	bool m_focusLostDispatched = true;
-
-	/// Досылает FocusLost машине после антидребезга (шторки/диалоги мигают
-	/// фокусом — машина должна получить одно событие на смену).
-	void TickFocusDebounce();
-
 #ifdef AURORA_OS
-	/// Кросс-фейд на входе в плитку (время ImGui; <0 — анимации нет):
-	/// первые доли секунды кадр содержит интерфейс и обложку поверх с
-	/// растущей непрозрачностью, чтобы переход не был скачком.
-	double m_coverFadeStartedAt = -1.0;
-
-	/// Наблюдатель состояния Авроры (aurora::StateWatch).
-	std::unique_ptr<launcher::aurora::StateWatch> m_stateWatch;
-
-	/// Применяет событие наблюдателя к машине обложки (живые входы).
-	void ApplyAuroraState(launcher::aurora::StateEvent what, bool value);
-
-	/// Кросс-фейд на входе в плитку: пока возвращает true, кадр рисует
-	/// интерфейс и обложку поверх с растущей непрозрачностью (alpha).
-	bool CoverFadeFrame(float &alpha);
-
 	/// Запечь обложку для фазы движка (GameCover) в офскрин-таргет — один
 	/// раз на старте: на Авроре после «Играть» окно лаунчера умирает, а
-	/// движок в плитке показывает фирменную обложку; рендер не касается
-	/// буферов окна (иначе кадр мигал бы перед стартом игры).
+	/// плитку ведёт нативное окно обложки; рендер не касается буферов
+	/// окна (иначе кадр мигал бы перед стартом игры).
 	void BakeGameCover();
 
 	/// POC нативной обложки Lipstick: окно категории cover, связанное с

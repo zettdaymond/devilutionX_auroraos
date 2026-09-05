@@ -30,7 +30,6 @@
 #   include "../StandartPaths.hpp"
 #endif
 
-#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <iterator>
@@ -38,7 +37,6 @@
 #include <vector>
 
 #ifdef AURORA_OS
-#	include "AuroraStateWatch.hpp"
 #	include "GameCover.hpp"
 #endif
 
@@ -327,19 +325,6 @@ AppResult Application::Run()
 	    *m_services.config, *m_services.files, *m_services.downloads, *m_services.paths,
 	    *m_services.engineOptions, std::move(displayHeights));
 
-	// Свёрнутый цикл спит в блокирующем SDL_WaitEvent: фоновые потоки
-	// (прогресс/финиш загрузок zoe) будят его пользовательским событием.
-	m_wakeEventType = SDL_RegisterEvents(1);
-	m_store->SetWakeCallback([this]() {
-		SDL_Event wake {};
-		wake.type = m_wakeEventType;
-		SDL_PushEvent(&wake);
-	});
-	m_coverMachine.Reset();
-#ifdef AURORA_OS
-	m_stateWatch = std::make_unique<launcher::aurora::StateWatch>();
-#endif
-
 	// Setup() создаёт контекст ImGui и грузит шрифты, поэтому вид (и его
 	// файловый браузер, которому нужен шрифтовый атлас) создаётся после него.
 	if (m_renderer == nullptr && !Setup()) {
@@ -422,20 +407,6 @@ AppResult Application::Run()
 			}
 		}
 #endif
-		if (event.type == m_wakeEventType) {
-			// Фоновый поток положил интент в Store — в свёрнутом состоянии
-			// это значит, что обложку (прогресс в плитке) надо перерисовать.
-			m_coverDirty = true;
-		}
-#ifdef AURORA_OS
-		if (m_stateWatch != nullptr && event.type == m_stateWatch->EventType()) {
-			// Сменилось состояние Авроры — кадр надо переоценить: на
-			// вернувшийся экран плитка показывает последний буфер.
-			m_coverDirty = true;
-			ApplyAuroraState(static_cast<launcher::aurora::StateEvent>(event.user.code),
-			    event.user.data1 != nullptr);
-		}
-#endif
 		if (event.type == SDL_QUIT) {
 			Stop();
 		}
@@ -447,54 +418,11 @@ AppResult Application::Run()
 	m_running = true;
 	// После «Играть» цикл дорисовывает iris-анимацию (сужающийся круг
 	// поверх последнего кадра) и только затем отдаёт управление движку.
+	// Плитку свёрнутого окна ведёт нативная обложка Lipstick (TryNativeCover);
+	// цикл рендерит интерфейс независимо от видимости окна.
 	while (m_running
 	    && (!m_store->State().pendingLaunch.has_value() || !m_view->LaunchIrisDone())) {
 		const auto frameStart = std::chrono::steady_clock::now();
-		TickFocusDebounce();
-		// В фоне (свёрнуто в плитку/скрыто) интерфейс не рендерится: рисуем
-		// один кадр «обложки» для плитки композитора и спим в блокирующем
-		// SDL_WaitEvent — никакого опроса по таймеру. Будят только события
-		// окна (разворачивание) и wake-пинки фоновых интентов (прогресс
-		// загрузок), по которым обложка перерисовывается с новым процентом.
-#ifdef AURORA_OS
-		float coverAlpha = 1.0F;
-		const bool coverFading = CoverFadeFrame(coverAlpha);
-#else
-		constexpr bool coverFading = false;
-#endif
-		// Что рисовать, решает стейтмашина (core/CoverMachine): входы —
-		// края фокуса окна и края дисплея, только то, что живёт под
-		// песочницей иконочного запуска. RenderGame — интерфейс (в том
-		// числе за локскрином после пробуждения), RenderCover — плитка,
-		// RenderNothing — экран погашен.
-		using launcher::aurora::CoverAction;
-		const CoverAction action = m_coverMachine.NextAction();
-		const bool hidden = action == CoverAction::RenderNothing
-		    || (action == CoverAction::RenderCover && !coverFading);
-		if (hidden) {
-			// Анимировать закрытое окно не для кого: iris не стартует без
-			// рендера, и цикл выше никогда не увидел бы его завершения.
-			if (m_store->State().pendingLaunch.has_value()) {
-				break;
-			}
-			if (action == CoverAction::RenderCover && (!m_wasHidden || m_coverDirty)) {
-				RenderCoverFrame();
-				m_coverDirty = false;
-			}
-			m_wasHidden = true;
-			SDL_Event wait {};
-			if (SDL_WaitEvent(&wait) == 1) {
-				processEvent(wait);
-			}
-		} else {
-			if (m_wasHidden) {
-				// Возврат из плитки: кадры обложки без ImGui-окон убили
-				// попап активного диалога (например, прогресса загрузки)
-				// — переоткроем его на первом видимом кадре.
-				m_view->NotifyShown();
-			}
-			m_wasHidden = false;
-		}
 
 		SDL_Event event {};
 		while (SDL_PollEvent(&event) == 1) {
@@ -502,14 +430,6 @@ AppResult Application::Run()
 		}
 
 		m_store->Poll();
-		TickFocusDebounce();
-
-		// Обработанные события могли развернуть окно — видим ли мы ещё?
-		const CoverAction actionNow = m_coverMachine.Action();
-		if (actionNow == CoverAction::RenderNothing
-		    || (actionNow == CoverAction::RenderCover && !coverFading)) {
-			continue;
-		}
 
 		ImGui_ImplSDLRenderer2_NewFrame();
 		ImGui_ImplSDL2_NewFrame();
@@ -519,13 +439,6 @@ AppResult Application::Run()
 			m_view->RenderCover(m_store->State());
 		} else {
 			m_view->Render(m_store->State(), dispatch);
-#ifdef AURORA_OS
-			// Кадр кросс-фейда: обложка поверх интерфейса (решение машины
-			// свежее — событие выше могло успеть развернуть окно).
-			if (coverFading && m_coverMachine.Action() == launcher::aurora::CoverAction::RenderCover) {
-				m_view->RenderCover(m_store->State(), coverAlpha);
-			}
-#endif
 		}
 
 		ImGui::Render();
@@ -577,10 +490,6 @@ AppResult Application::Run()
 		}
 	}
 
-#ifdef AURORA_OS
-	m_stateWatch.reset();
-#endif
-
 	AppResult result;
 	if (const auto launch = m_store->State().pendingLaunch) {
 		result.success = true;
@@ -593,22 +502,6 @@ AppResult Application::Run()
 void Application::Stop()
 {
 	m_running = false;
-}
-
-void Application::RenderCoverFrame()
-{
-	ImGui_ImplSDLRenderer2_NewFrame();
-	ImGui_ImplSDL2_NewFrame();
-	ImGui::NewFrame();
-
-	m_view->RenderCover(m_store->State());
-
-	ImGui::Render();
-
-	SDL_SetRenderDrawColor(m_renderer, 10, 7, 5, 255);
-	SDL_RenderClear(m_renderer);
-	ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_renderer);
-	SDL_RenderPresent(m_renderer);
 }
 
 #ifdef AURORA_OS
@@ -680,109 +573,12 @@ void Application::TryNativeCover()
 	}
 }
 
-void Application::ApplyAuroraState(launcher::aurora::StateEvent what, bool value)
-{
-	// Под песочницей иконочного запуска живёт только дисплей: topmost и
-	// tklock dbus-прокси не пропускает, в решениях они не участвуют —
-	// стейтмашину кормят фокус окна и состояние дисплея.
-	switch (what) {
-	case launcher::aurora::StateEvent::DisplayOn:
-		m_coverMachine.Handle(value ? launcher::aurora::CoverEvent::DisplayOn
-		                            : launcher::aurora::CoverEvent::DisplayOff);
-		break;
-	case launcher::aurora::StateEvent::TkLocked:
-	case launcher::aurora::StateEvent::TopmostOurs:
-		break;
-	}
-}
-
-bool Application::CoverFadeFrame(float &alpha)
-{
-	if (m_coverMachine.Action() != launcher::aurora::CoverAction::RenderCover
-	    || m_store->State().pendingLaunch.has_value()) {
-		m_coverFadeStartedAt = -1.0;
-		return false;
-	}
-	if (m_coverFadeStartedAt < 0.0) {
-		// Фейд живёт только на переходе «видимое → плитка»: m_wasHidden
-		// ещё false. Будить его повторно нельзя — иначе каждое
-		// пробуждение в плитке (прогресс загрузки, чужие окна) снова
-		// рисовало бы интерфейс под обложкой.
-		if (m_wasHidden) {
-			return false;
-		}
-		m_coverFadeStartedAt = ImGui::GetTime();
-	}
-	// Кросс-фейд на входе в плитку: первые kCoverFade секунд кадр —
-	// интерфейс с обложкой поверх (непрозрачность растёт), чтобы переход
-	// не был резким скачком; затем обычный режим плитки. Разворачивание
-	// мгновенное, без фейда.
-	constexpr float kCoverFade = 0.3F;
-	const float t = std::clamp(static_cast<float>(ImGui::GetTime() - m_coverFadeStartedAt) / kCoverFade,
-	    0.0F, 1.0F);
-	if (t >= 1.0F) {
-		m_coverFadeStartedAt = -1.0;
-		return false;
-	}
-	// smoothstep: линейный фейд воспринимается резким вначале.
-	alpha = t * t * (3.0F - 2.0F * t);
-	return true;
-}
-
 #endif
 
 void Application::OnEvent(const SDL_WindowEvent &event)
 {
-	// Края видимости кормят стейтмашину. На Авроре сворачивание в плитку
-	// шлёт только FOCUS_LOST, на десктопе — MINIMIZED/HIDDEN: обе группы
-	// эквивалентны, повторная подача безвредна (машина игнорирует её).
-	const bool lost = event.event == SDL_WINDOWEVENT_FOCUS_LOST
-	    || event.event == SDL_WINDOWEVENT_MINIMIZED
-	    || event.event == SDL_WINDOWEVENT_HIDDEN;
-	const bool gained = event.event == SDL_WINDOWEVENT_FOCUS_GAINED
-	    || event.event == SDL_WINDOWEVENT_SHOWN
-	    || event.event == SDL_WINDOWEVENT_RESTORED;
-	if (lost) {
-		// Отсчёт антидребезга не перезапускаем (шторки мигают серией).
-		if (!m_focusLostAt.has_value()) {
-			m_focusLostAt = std::chrono::steady_clock::now();
-			m_focusLostDispatched = false;
-		}
-#ifdef AURORA_OS
-		// Смена фокуса — мгновенный триггер переспросить дисплей:
-		// под песочницей mce-сигналы не приходят, а блокировка/пробуждение
-		// всегда меняют фокус. Без пинка разблокировка узнавалась бы до
-		// двух секунд (интервал опроса) — плитка лаунчера пустела.
-		if (m_stateWatch != nullptr) {
-			m_stateWatch->RefreshDisplay();
-		}
-#endif
-	} else if (gained) {
-		m_focusLostAt.reset();
-		m_focusLostDispatched = true;
-		m_coverMachine.Handle(launcher::aurora::CoverEvent::FocusGained);
-#ifdef AURORA_OS
-		if (m_stateWatch != nullptr) {
-			m_stateWatch->RefreshDisplay();
-		}
-#endif
-	}
-
 	if (event.event == SDL_WINDOWEVENT_CLOSE) {
 		Stop();
-	}
-}
-
-void Application::TickFocusDebounce()
-{
-	if (m_focusLostDispatched || !m_focusLostAt.has_value()) {
-		return;
-	}
-	// Антидребезг 100 мс — фильтр шума (шторки/диалоги мигают фокусом),
-	// а не решение: после него машина получает ровно одно FocusLost.
-	if (std::chrono::steady_clock::now() - *m_focusLostAt >= std::chrono::milliseconds(100)) {
-		m_focusLostDispatched = true;
-		m_coverMachine.Handle(launcher::aurora::CoverEvent::FocusLost);
 	}
 }
 

@@ -9,7 +9,6 @@
 #include "ScreenOrientation.hpp"
 #include "DisplayBlankerController.hpp"
 #include "AuroraOSAudio.hpp"
-#include "GameCover.hpp"
 
 #include <SDL2/SDL_video.h>
 
@@ -92,11 +91,7 @@ static SDL_EventFilter rotate_and_fit_filter = [](void *userdata, SDL_Event * ev
     if (event->type == SDL_DISPLAYEVENT && event->display.event == SDL_DISPLAYEVENT_ORIENTATION) {
         const auto orientation = static_cast<SDL_DisplayOrientation>(event->display.data1);
         if (AuroraApplyOrientation(orientation)) {
-            // В плитке transform не трогаем: карточка обложки портретная,
-            // GameCover выставит новый transform при возврате к игре.
-            if (!launcher::aurora::GameCover::IsHidden()) {
-                AuroraApplyWindowTransform(window->sdl_window);
-            }
+            AuroraApplyWindowTransform(window->sdl_window);
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "aurora-orient: ландшафт сменился (data1=%d)",
                 event->display.data1);
         }
