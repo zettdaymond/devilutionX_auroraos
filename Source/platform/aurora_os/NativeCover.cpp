@@ -223,7 +223,7 @@ void SetProperty(wl_proxy *extendedSurface, const char *name, const std::vector<
 // Поверхность обложки. Своя, минуя SDL: SDL делает окно toplevel и не
 // отдаёт wl_shell_surface, а обложка обязана быть transient — иначе она
 // поднимается в стек обычных окон (реестр ошибки Aurora 5.2 от автора
-// winit-форка). Кадр — свой SHM-буфер XRGB8888.
+// winit-форка). Кадр — свой SHM-буфер ARGB8888.
 // ---------------------------------------------------------------------------
 
 struct NativeCoverState {
@@ -255,6 +255,15 @@ NativeCoverState &State()
 bool EnsureShmBuffer(NativeCoverState &s, wl_shm *shm);
 bool CommitFrame(const unsigned char *rgb24, int strideBytes, int srcWidth, int srcHeight);
 
+/// Тип события «configure обложки». Регистрируется лениво, один на
+/// процесс; отдельное имя — чтобы метод NativeCover::ConfigureEventType
+/// не звал сам себя (класс-скоуп перекрывает неймспейс).
+Uint32 CoverResizeEventType()
+{
+	static const Uint32 type = SDL_RegisterEvents(1);
+	return type;
+}
+
 void ShellSurfacePing(void *data, wl_shell_surface *shellSurface, uint32_t serial)
 {
 	(void)data;
@@ -275,8 +284,19 @@ void ShellSurfaceConfigure(void *data, wl_shell_surface *shellSurface,
 	if (!s.linked || width <= 0 || height <= 0 || (width == s.width && height == s.height)) {
 		return;
 	}
+	spdlog::info("aurora-native-cover: configure {}x{}", width, height);
 	s.width = width;
 	s.height = height;
+	// Будим цикл обложки: карточку надо перерисовать в новом размере
+	// (лого/шрифты ложатся под аспект плитки, кроп в UpdateFrame —
+	// тождество). Слушатель живёт на дефолтной очереди дисплея SDL,
+	// диспетчеризует его сам SDL из Poll/WaitEvent — главный поток,
+	// поэтому SDL_PushEvent здесь безопасен (как из потоков StateWatch).
+	{
+		SDL_Event resize {};
+		resize.type = CoverResizeEventType();
+		SDL_PushEvent(&resize);
+	}
 	if (s.buffer != nullptr) {
 		wl_buffer_destroy(s.buffer);
 		s.buffer = nullptr;
@@ -466,9 +486,9 @@ bool NativeCover::CreateAndLink(
 		return false;
 	}
 
-	// Собственная поверхность обложки: transient к самой себе — так окно
-	// выпадает из стека обычных окон и остаётся только в слое обложек
-	// (рецепт рабочий связки Aurora 5.2 из форка lmaxyz/winit).
+	// Собственная поверхность обложки: transient к ГЛАВНОМУ окну, как у
+	// Qt/Silica, — так окно выпадает из стека обычных окон и живёт только
+	// в слое обложек (transient к самой себе на 5.2.1.200 не мапился).
 	auto *compositor = reinterpret_cast<wl_compositor *>(compositorProxy);
 	auto *shell = reinterpret_cast<wl_shell *>(shellProxy);
 	wl_surface *coverSurface = wl_compositor_create_surface(compositor);
@@ -584,6 +604,18 @@ bool NativeCover::UpdateFrame(const unsigned char *rgb24, int strideBytes, int s
 		return false;
 	}
 	return CommitFrame(rgb24, strideBytes, srcWidth, srcHeight);
+}
+
+void NativeCover::Size(int &outWidth, int &outHeight)
+{
+	NativeCoverState &s = State();
+	outWidth = s.linked ? s.width : 0;
+	outHeight = s.linked ? s.height : 0;
+}
+
+Uint32 NativeCover::ConfigureEventType()
+{
+	return CoverResizeEventType();
 }
 
 } // namespace devilution
