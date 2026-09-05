@@ -1,9 +1,12 @@
+diff --git a/src/video/wayland/SDL_waylandwindow.c b/src/video/wayland/SDL_waylandwindow.c
+index 4cb20af..76a1d84 100644
 --- a/src/video/wayland/SDL_waylandwindow.c
 +++ b/src/video/wayland/SDL_waylandwindow.c
-@@ -2443,6 +2443,35 @@
+@@ -2443,6 +2443,64 @@ void Wayland_QuitWin(SDL_VideoData *data)
      SDL_DelHintCallback(SDL_HINT_VIDEO_EGL_ALLOW_TRANSPARENCY, EGLTransparencyChangedCallback, data);
  }
  
++
 +#ifdef SDL_VIDEO_DRIVER_WAYLAND_QT_TOUCH
 +/*
 + * Set a generic window property on the qt_extended_surface created by SDL
@@ -30,6 +33,34 @@
 +    array.alloc = 0;
 +    array.data = (void *)value;
 +    qt_extended_surface_update_generic_property(wind->extended_surface, name, &array);
++}
++
++/*
++ * Make the wl_shell_surface of this window a toplevel. The Aurora/Lipstick
++ * builds have no xdg_wm_base and no libdecor at runtime, and this SDL fork
++ * only issues wl_shell_surface_set_toplevel() from code paths that never run
++ * there (Wayland_SetWindowBordered takes the libdecor no-op branch). A shell
++ * surface without a role is never mapped by the compositor: buffers keep
++ * being committed, but the window never appears and can never be activated.
++ */
++void SDL_WaylandSetWindowShellToplevel(SDL_Window *window)
++{
++    SDL_WindowData *wind;
++    SDL_VideoData *viddata;
++
++    if (window == NULL || window->driverdata == NULL) {
++        return;
++    }
++    wind = (SDL_WindowData *)window->driverdata;
++    viddata = wind->waylandData;
++    if (viddata == NULL || viddata->shell.xdg != NULL) {
++        return; /* xdg-shell assigns the toplevel role on its own */
++    }
++    if (wind->shell_surface.wl == NULL) {
++        return; /* no shell surface yet */
++    }
++    wl_shell_surface_set_toplevel(wind->shell_surface.wl);
++    WAYLAND_wl_display_flush(viddata->display);
 +}
 +#endif /* SDL_VIDEO_DRIVER_WAYLAND_QT_TOUCH */
 +
