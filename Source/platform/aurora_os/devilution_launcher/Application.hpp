@@ -12,6 +12,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace launcher {
 class Store;
@@ -141,23 +142,35 @@ private:
 	/// WindowHidden(); события из его потока дрена будят цикл обложки.
 	std::unique_ptr<launcher::aurora::StateWatch> m_stateWatch;
 
-	/// Запечь обложку для фазы движка (GameCover) в офскрин-таргет — один
-	/// раз на старте: на Авроре после «Играть» окно лаунчера умирает, а
-	/// плитку ведёт нативное окно обложки; рендер не касается буферов
-	/// окна (иначе кадр мигал бы перед стартом игры).
-	void BakeGameCover();
+	/// Свежий кадр карточки: ImGui-рендер обложки (LauncherView::
+	/// RenderCover) в офскрин-таргет размера окна обложки (NativeCover::
+	/// Size — аспект плитки) и снимок пикселей RGB24. false — кадр не
+	/// собрался (нет рендерера/таргет не создался).
+	[[nodiscard]] bool RenderCoverPixels(
+	    std::vector<unsigned char> &outPixels, int &outWidth, int &outHeight);
+
+	/// Перерисовать нативную обложку живым кадром (если связана).
+	void UpdateNativeCover();
 
 	/// POC нативной обложки Lipstick: окно категории cover, связанное с
 	/// главным через SAILFISH_COVER_WINDOW (см. NativeCover). Отключается
 	/// на устройстве через DEVILUTIONX_NATIVE_COVER=0.
 	void TryNativeCover();
 
-	/// Нативная обложка связана (для кардиограммы отладки).
+	/// Нативная обложка связана (живой рендер и кардиограмма отладки).
 	bool m_nativeCoverActive = false;
 
 	/// Пользовательское событие «перезалить кадр обложки» (таймер 500 мс
 	/// в режиме DEVILUTIONX_NATIVE_COVER_DEBUG=1).
 	Uint32 m_nativeCoverHeartbeat = 0;
+
+	/// Кадр обложки устарел: wake-пинок стора (прогресс загрузки),
+	/// configure свитчера или кардиограмма — цикл обложки перерисует.
+	bool m_coverDirty = false;
+
+	/// Тип пользовательского SDL-события «фоновый поток положил интент
+	/// в Store» — будит цикл обложки на перерисовку прогресса в плитке.
+	Uint32 m_wakeEventType { 0 };
 
 #endif
 };

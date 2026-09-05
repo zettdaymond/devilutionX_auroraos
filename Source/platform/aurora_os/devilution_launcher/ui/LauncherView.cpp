@@ -284,6 +284,14 @@ void LauncherView::Render(const LauncherState &state, const Dispatcher &dispatch
 	}
 }
 
+void LauncherView::NotifyShown()
+{
+	// RenderDialogs открывает ImGui-попап только на СМЕНУ state.dialog.
+	// За кадры обложки (ImGui без окон) попап умер — сбрасываем кэш, и
+	// первый видимый кадр переоткроет активный диалог (с fade).
+	m_lastDialog = Dialog::None;
+}
+
 bool LauncherView::LaunchIrisDone() const
 {
 	if (m_irisStartedAt < 0.0) {

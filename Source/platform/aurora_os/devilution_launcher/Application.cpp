@@ -31,6 +31,7 @@
 #endif
 
 #include <chrono>
+#include <cstdio>
 #include <filesystem>
 #include <iterator>
 #include <utility>
@@ -38,7 +39,6 @@
 
 #ifdef AURORA_OS
 #	include "AuroraStateWatch.hpp"
-#	include "GameCover.hpp"
 #endif
 
 CMRC_DECLARE(assets);
@@ -326,6 +326,17 @@ AppResult Application::Run()
 	    *m_services.config, *m_services.files, *m_services.downloads, *m_services.paths,
 	    *m_services.engineOptions, std::move(displayHeights));
 
+#ifdef AURORA_OS
+	// Wake-пинк стора: фоновый поток (прогресс/финиш загрузки) положил
+	// интент — свёрнутый цикл обложки проснётся и перерисует карточку.
+	m_wakeEventType = SDL_RegisterEvents(1);
+	m_store->SetWakeCallback([this]() {
+		SDL_Event wake {};
+		wake.type = m_wakeEventType;
+		SDL_PushEvent(&wake);
+	});
+#endif
+
 	// Setup() создаёт контекст ImGui и грузит шрифты, поэтому вид (и его
 	// файловый браузер, которому нужен шрифтовый атлас) создаётся после него.
 	if (m_renderer == nullptr && !Setup()) {
@@ -355,11 +366,10 @@ AppResult Application::Run()
 	// Наблюдатель состояния Авроры: дисплей для WindowHidden(); события
 	// из его потока дрена (смена дисплея) будят цикл обложки.
 	m_stateWatch = std::make_unique<launcher::aurora::StateWatch>();
-	// Обложка для фазы движка запекается офскрин уже здесь: к моменту
-	// «Играть» пиксели готовы, из пути выхода рендер убран совсем.
-	BakeGameCover();
-	// POC нативной обложки Lipstick: то же изображение уезжает в окно
-	// категории cover — плитку показывает композитор, не наш буфер.
+	// Нативная обложка Lipstick: первый кадр карточки рендерится офскрин
+	// (RenderCoverPixels) и уезжает в окно категории cover — плитку
+	// показывает композитор, не наш буфер. Дальше кадры живые: цикл
+	// обложки перерисовывает их по wake-пинкам (прогресс загрузки).
 	TryNativeCover();
 	// Кардиограмма отладки: DEVILUTIONX_NATIVE_COVER_DEBUG=1 — каждые
 	// 500 мс перезаливать кадр обложки (красным), чтобы видеть, живут ли
@@ -420,6 +430,9 @@ AppResult Application::Run()
 			if (!m_running || m_store->State().pendingLaunch.has_value()) {
 				break;
 			}
+			// Живые кадры обложки (ImGui без окон) убили попап активного
+			// диалога — первый видимый кадр переоткроет его.
+			m_view->NotifyShown();
 			continue;
 		}
 
@@ -483,6 +496,9 @@ AppResult Application::Run()
 	}
 
 #ifdef AURORA_OS
+	// Финальный живой кадр: плитка на фазе движка показывает карточку
+	// состояния лаунчера на момент запуска игры.
+	UpdateNativeCover();
 	m_stateWatch.reset();
 #endif
 
@@ -506,14 +522,21 @@ void Application::ProcessEvent(const SDL_Event &event)
 
 #ifdef AURORA_OS
 	if (m_nativeCoverHeartbeat != 0 && event.type == m_nativeCoverHeartbeat) {
-		// Кардиограмма обложки: свежий кадр в её окно (в режиме
-		// DEVILUTIONX_NATIVE_COVER_DEBUG=1 — красным).
-		std::vector<unsigned char> pixels;
-		int width = 0;
-		int height = 0;
-		if (launcher::aurora::GameCover::CopyBakedPixels(pixels, width, height)) {
-			devilution::NativeCover::UpdateFrame(pixels.data(), width * 3, width, height);
-		}
+		// Кардиограмма обложки: перезалить кадр живым рендером (в режиме
+		// DEVILUTIONX_NATIVE_COVER_DEBUG=1 NativeCover краснит его красным).
+		m_coverDirty = true;
+	}
+	if (m_wakeEventType != 0 && event.type == m_wakeEventType) {
+		// Фоновый поток положил интент в Store — в свёрнутом состоянии
+		// это значит, что карточку (прогресс в плитке) надо перерисовать.
+		m_coverDirty = true;
+	}
+	if (event.type == devilution::NativeCover::ConfigureEventType()) {
+		// Свитчер задал размер окна обложки (обычно сразу после старта,
+		// ещё в видимом состоянии): перерисовываем немедленно, чтобы
+		// первое же сворачивание показало карточку в правильном аспекте,
+		// а не стартовый кадр размера окна, сжатый кропом.
+		UpdateNativeCover();
 	}
 #endif
 	if (event.type == SDL_QUIT) {
@@ -547,13 +570,18 @@ bool Application::WindowHidden() const
 
 void Application::RunCoverLoop()
 {
-	// Плитку ведёт нативная обложка Lipstick, интерфейс в свёрнутом окне
-	// не меняется — рендерить не для кого. Спим в блокирующем SDL_WaitEvent:
-	// будит любое событие (возврат фокуса/закрытие окна, кардиограмма
-	// отладки, события наблюдателя дисплея), а wake-интенты стора
-	// применяются сразу, чтобы состояние не старело. Выход: окно снова
-	// видимо, приложение закрывается или запускается игра (iris в скрытом
-	// окне анимировать некому).
+	// Плитку ведёт нативная обложка Lipstick: интерфейс в свёрнутом окне
+	// не меняется, а карточка — живая. Первый кадр рендерим сразу (карточка
+	// отвечает состоянию на момент сворачивания), дальше спим в блокирующем
+	// SDL_WaitEvent: будит любое событие (возврат фокуса/закрытие окна,
+	// wake-пинки стора, configure свитчера, события наблюдателя дисплея),
+	// wake-интенты применяются сразу, устаревший кадр перерисовывается.
+	// Выход: окно снова видимо, приложение закрывается или запускается
+	// игра (iris в скрытом окне анимировать некому).
+#ifdef AURORA_OS
+	UpdateNativeCover();
+	m_coverDirty = false;
+#endif
 	while (m_running
 	    && !m_store->State().pendingLaunch.has_value()
 	    && WindowHidden()) {
@@ -564,60 +592,122 @@ void Application::RunCoverLoop()
 		} else {
 			SDL_Delay(100);
 		}
+#ifdef AURORA_OS
+		if (m_coverDirty) {
+			UpdateNativeCover();
+			m_coverDirty = false;
+		}
+#endif
 	}
 }
 
 #ifdef AURORA_OS
 
-void Application::BakeGameCover()
+bool Application::RenderCoverPixels(std::vector<unsigned char> &outPixels, int &outWidth, int &outHeight)
 {
-	// Кадр тот же, что рисует плитка лаунчера (RenderCover), но рендерим
-	// его офскрин — в текстуру-таргет: кадр не касается буферов окна
-	// (прежняя запечка на выходе.present'илась в окно, и обложка мигала
-	// перед стартом игры). Пиксели снимаются сразу и переживают смерть
-	// окна лаунчера.
+	// Полотно карточки — окно обложки (размер диктует свитчер Lipstick
+	// configure'ом), а не окно приложения: разметка ложится под аспект
+	// плитки, и кроп в NativeCover::UpdateFrame вырождается в тождество.
+	// До первого configure (или без нативной обложки) — размер рендерера.
 	int width = 0;
 	int height = 0;
-	if (SDL_GetRendererOutputSize(m_renderer, &width, &height) != 0 || width <= 0 || height <= 0) {
-		return;
+	devilution::NativeCover::Size(width, height);
+	if (width <= 0 || height <= 0) {
+		if (SDL_GetRendererOutputSize(m_renderer, &width, &height) != 0 || width <= 0 || height <= 0) {
+			return false;
+		}
 	}
 	SDL_Texture *target = SDL_CreateTexture(
 	    m_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width, height);
 	if (target == nullptr) {
-		spdlog::warn("aurora: SDL_CreateTexture(таргет запечки) не удалась: {}", SDL_GetError());
-		return;
+		spdlog::warn("aurora: SDL_CreateTexture(таргет обложки) не удалась: {}", SDL_GetError());
+		return false;
 	}
 	SDL_Texture *previousTarget = SDL_GetRenderTarget(m_renderer);
 	SDL_SetRenderTarget(m_renderer, target);
 
 	ImGui_ImplSDLRenderer2_NewFrame();
 	ImGui_ImplSDL2_NewFrame();
+	// Backend-кадры заполняют DisplaySize размером ОКНА — подменяем на
+	// размер полотна: вьюпорт, rem и MinSide принадлежат карточке, а не
+	// интерфейсу (главный вьюпорт пересчитывается в ImGui::NewFrame).
+	// Рядом гасится DisplayFramebufferScale: с привязанным таргетом
+	// SDL_GetRendererOutputSize отдаёт размер ТАРГЕТА, и backend считает
+	// масштаб «таргет/окно» (316/720), на который RenderDrawData молча
+	// сжимает вершины — карточка уезжала патчем в угол. Наш таргет —
+	// он и есть framebuffer: масштаб 1:1.
+	ImGuiIO &io = ImGui::GetIO();
+	const ImVec2 savedDisplaySize = io.DisplaySize;
+	const ImVec2 savedFramebufferScale = io.DisplayFramebufferScale;
+	io.DisplaySize = ImVec2(static_cast<float>(width), static_cast<float>(height));
+	io.DisplayFramebufferScale = ImVec2(1.0F, 1.0F);
 	ImGui::NewFrame();
 
-	// Вьюха обновляет масштаб только в живом кадре UI; без этого
-	// офскрин-кадр запечки брал дефолтный MinSide=540 и обложка игры
-	// запекалась со старыми мелкими шрифтами (плитка лаунчера при этом
-	// рисовала уже увеличенные).
+	// Вьюха обновляет масштаб только в живом кадре UI; без этого офскрин-
+	// кадр брал масштаб прошлого кадра интерфейса.
 	launcher::ui::Scale::BeginFrame(DPIHandler::GetScale());
 
 	m_view->RenderCover(m_store->State());
 
 	ImGui::Render();
+	io.DisplaySize = savedDisplaySize;
+	io.DisplayFramebufferScale = savedFramebufferScale;
 
 	SDL_SetRenderDrawColor(m_renderer, 10, 7, 5, 255);
 	SDL_RenderClear(m_renderer);
 	ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_renderer);
 	// ReadPixels читает текущий таргет — снимаем офскрин-кадр.
-	launcher::aurora::GameCover::CaptureFromBackbuffer(m_renderer);
+	std::vector<unsigned char> pixels(static_cast<size_t>(width) * static_cast<size_t>(height) * 3);
+	const SDL_Rect full { 0, 0, width, height };
+	const bool ok = SDL_RenderReadPixels(m_renderer, &full, SDL_PIXELFORMAT_RGB24, pixels.data(), width * 3) == 0;
+	if (!ok) {
+		spdlog::warn("aurora: SDL_RenderReadPixels(обложка) не удался: {}", SDL_GetError());
+	}
 
 	SDL_SetRenderTarget(m_renderer, previousTarget);
 	SDL_DestroyTexture(target);
+	if (!ok) {
+		return false;
+	}
+	// Dev-дамп снимка карточки (диагностика живого рендера без экрана):
+	// DEVILUTIONX_COVER_DUMP=1 — BMP-файлы рядом с настройками.
+	const char *dumpEnv = SDL_getenv("DEVILUTIONX_COVER_DUMP");
+	if (dumpEnv != nullptr && dumpEnv[0] == '1') {
+		static int dumpNo = 0;
+		char path[128];
+		std::snprintf(path, sizeof(path), "%s/cover_dump_%d.bmp",
+		    m_services.paths->ConfigDir().string().c_str(), dumpNo++);
+		SDL_Surface *shot = SDL_CreateRGBSurfaceWithFormatFrom(
+		    pixels.data(), width, height, 24, width * 3, SDL_PIXELFORMAT_RGB24);
+		if (shot != nullptr) {
+			SDL_SaveBMP(shot, path);
+			SDL_FreeSurface(shot);
+			spdlog::info("aurora: дамп карточки {}x{} -> {}", width, height, path);
+		}
+	}
+	outPixels = std::move(pixels);
+	outWidth = width;
+	outHeight = height;
+	return true;
+}
+
+void Application::UpdateNativeCover()
+{
+	if (!m_nativeCoverActive) {
+		return;
+	}
+	std::vector<unsigned char> pixels;
+	int width = 0;
+	int height = 0;
+	if (RenderCoverPixels(pixels, width, height)) {
+		devilution::NativeCover::UpdateFrame(pixels.data(), width * 3, width, height);
+	}
 }
 
 void Application::TryNativeCover()
 {
 	// Гейт для A/B-проверки на устройстве: DEVILUTIONX_NATIVE_COVER=0 —
-	// только старая схема (запечённый кадр в буфере главного окна).
+	// плитка показывает последний кадр главного окна, без карточки.
 	const char *disabled = SDL_getenv("DEVILUTIONX_NATIVE_COVER");
 	if (disabled != nullptr && disabled[0] == '0') {
 		spdlog::info("aurora-native-cover: выключен (DEVILUTIONX_NATIVE_COVER=0)");
@@ -626,13 +716,13 @@ void Application::TryNativeCover()
 	std::vector<unsigned char> pixels;
 	int width = 0;
 	int height = 0;
-	if (!launcher::aurora::GameCover::CopyBakedPixels(pixels, width, height)) {
-		spdlog::info("aurora-native-cover: запечённых пикселей нет — пропускаем");
+	if (!RenderCoverPixels(pixels, width, height)) {
+		spdlog::info("aurora-native-cover: кадр карточки не собрался — пропускаем");
 		return;
 	}
 	m_nativeCoverActive = devilution::NativeCover::CreateAndLink(m_window, width, height, pixels.data(), width * 3);
 	if (!m_nativeCoverActive) {
-		spdlog::info("aurora-native-cover: композитор не поддержал, работает старая схема");
+		spdlog::info("aurora-native-cover: композитор не поддержал — плитка без карточки");
 	}
 }
 

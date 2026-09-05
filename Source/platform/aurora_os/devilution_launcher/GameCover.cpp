@@ -11,7 +11,6 @@
 #include <SDL2/SDL.h>
 
 #include <memory>
-#include <vector>
 
 // Пауза аудиоустройства SDL_audiolib в свёрнутом состоянии: колбэк
 // устройства продолжал микшировать заглушённую музыку (~10% CPU в
@@ -40,11 +39,8 @@ void PauseAudioDevice(bool pause)
 
 struct CoverState {
 	std::unique_ptr<StateWatch> watch; ///< второй экземпляр на время движка
-	std::vector<unsigned char> pixels; ///< запечённый кадр лаунчера, RGB24
-	int width = 0;
-	int height = 0;
-	SDL_Window *window = nullptr; ///< окно движка — флаги видимости
-	bool audioPaused = false;     ///< край скрытости: аудио на паузе
+	SDL_Window *window = nullptr;      ///< окно движка — флаги видимости
+	bool audioPaused = false;          ///< край скрытости: аудио на паузе
 };
 
 CoverState &Cover()
@@ -54,39 +50,6 @@ CoverState &Cover()
 }
 
 } // namespace
-
-void GameCover::CaptureFromBackbuffer(SDL_Renderer *renderer)
-{
-	CoverState &s = Cover();
-	int width = 0;
-	int height = 0;
-	if (SDL_GetRendererOutputSize(renderer, &width, &height) != 0 || width <= 0 || height <= 0) {
-		spdlog::warn("aurora: SDL_GetRendererOutputSize не удался: {}", SDL_GetError());
-		return;
-	}
-	std::vector<unsigned char> pixels(static_cast<size_t>(width) * static_cast<size_t>(height) * 3);
-	const SDL_Rect full { 0, 0, width, height };
-	if (SDL_RenderReadPixels(renderer, &full, SDL_PIXELFORMAT_RGB24, pixels.data(), width * 3) != 0) {
-		spdlog::warn("aurora: SDL_RenderReadPixels(обложка) не удался: {}", SDL_GetError());
-		return;
-	}
-	s.pixels = std::move(pixels);
-	s.width = width;
-	s.height = height;
-	spdlog::info("aurora: обложка для фазы движка запечена ({}x{})", width, height);
-}
-
-bool GameCover::CopyBakedPixels(std::vector<unsigned char> &out, int &width, int &height)
-{
-	CoverState &s = Cover();
-	if (s.pixels.empty()) {
-		return false;
-	}
-	out = s.pixels;
-	width = s.width;
-	height = s.height;
-	return true;
-}
 
 void GameCover::Init(SDL_Window *window)
 {

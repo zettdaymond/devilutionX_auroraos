@@ -175,9 +175,15 @@ devilution_launcher [--mock-scenario=<имя>] [--screen=home|data|settings|abou
 (`WINID`/`CATEGORY`/`SAILFISH_COVER_WINDOW=__winref:<id>`, значения —
 QVariant). Так плитку показывают Qt-приложения Авроры: композитор сам
 рисует окно обложки при уходе приложения в фон, без нашего детекта
-свёрнутости. На старте лаунчер отдаёт туда запечённый кадр
-(`GameCover::CopyBakedPixels`); карточка статична до живого рендера
-(следующие стадии WindowSystem). A/B-гейт на устройстве —
+свёрнутости. Карточка живая: `Application::RenderCoverPixels` рендерит
+`LauncherView::RenderCover` офскрин в размере окна обложки (аспект
+плитки из configure свитчера; подменяются `io.DisplaySize` и
+`DisplayFramebufferScale` — с привязанным таргетом SDL отдаёт его размер
+как «output size», и backend сжимал разметку) и заливает пиксели через
+`NativeCover::UpdateFrame`. Перерисовка — по wake-пинкам стора (живой
+процент/скорость загрузки в плитке) и по configure; на выходе «Играть»
+уходит финальный кадр. В свёрнутом состоянии главный цикл спит в
+`SDL_WaitEvent` (`RunCoverLoop`). A/B-гейт на устройстве —
 `DEVILUTIONX_NATIVE_COVER=0` (тогда плитка показывает последний буфер
 окна, без карточки). На фазе движка `GameCover::IsHidden()` (флаги окна
 + состояние дисплея из второго `StateWatch`) честно усыпляет меню,
