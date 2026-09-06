@@ -28,8 +28,13 @@
 #ifdef AURORA_OS
 #   include "../NativeCover.hpp"
 #   include "../StandartPaths.hpp"
+#   include <SimpleIni.h>
+#   include <spawn.h>
+#   include <sys/wait.h>
 #   include <unistd.h>
 #   include <cstring>
+#   include <fstream>
+extern char **environ;
 #endif
 
 #include <chrono>
@@ -177,6 +182,9 @@ Application::Application(SDL_Window *window, const std::string &companyNamespace
 	SDL_free(enginePref);
 #endif
 
+#ifdef AURORA_OS
+	m_configDir = baseDir;
+#endif
 	m_services = launcher::MakeRealServices(baseDir, std::move(engineIni));
 }
 
@@ -605,12 +613,14 @@ void Application::ProcessEvent(const SDL_Event &event)
 		devilution::NativeCover::Poke();
 	}
 	if (m_coverProbeEvent != 0 && event.type == m_coverProbeEvent) {
-		// Зонд Silica Theme ответил размером плитки. Применяем и печём
-		// карточку заново: разметка ляжет под истинный аспект.
-		devilution::NativeCover::ApplyTileSize(
-		    static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1)),
-		    static_cast<int>(reinterpret_cast<intptr_t>(event.user.data2)));
+		// Зонд Silica Theme ответил размером плитки. Применяем, печём
+		// карточку заново (разметка ляжет под истинный аспект) и кэшируем
+		// ответ — следующий старт обойдётся без зонда.
+		const int tileWidth = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1));
+		const int tileHeight = static_cast<int>(reinterpret_cast<intptr_t>(event.user.data2));
+		devilution::NativeCover::ApplyTileSize(tileWidth, tileHeight);
 		UpdateNativeCover();
+		WriteCoverCache(tileWidth, tileHeight);
 	}
 #endif
 	if (event.type == SDL_QUIT) {
@@ -808,6 +818,91 @@ void Application::UpdateNativeCover()
 	}
 }
 
+namespace {
+
+/// Версия ОС из /etc/os-release — часть ключа кэша зонда (размер плитки
+/// может поменяться обновлением Silica).
+std::string CoverCacheOsTag()
+{
+	std::ifstream release("/etc/os-release");
+	std::string line;
+	while (std::getline(release, line)) {
+		if (line.starts_with("VERSION=")) {
+			return line.substr(8);
+		}
+	}
+	return {};
+}
+
+/// Логический экран — вторая часть ключа (геометрия плитки следует за
+/// экраном Silica-темы).
+std::string CoverCacheScreenTag()
+{
+	SDL_DisplayMode mode {};
+	if (SDL_GetDesktopDisplayMode(0, &mode) != 0 || mode.w <= 0 || mode.h <= 0) {
+		return {};
+	}
+	return std::to_string(mode.w) + "x" + std::to_string(mode.h);
+}
+
+/// Те же флаги формата, что у ConfigService — один файл, один стиль.
+void ConfigureCoverIni(CSimpleIniA &ini)
+{
+	ini.SetSpaces(false);
+	ini.SetMultiKey();
+}
+
+constexpr const char *kCoverSection = "Cover";
+constexpr const char *kCoverTileWidth = "TileWidth";
+constexpr const char *kCoverTileHeight = "TileHeight";
+constexpr const char *kCoverOsTag = "OsVersion";
+constexpr const char *kCoverScreenTag = "Screen";
+
+} // namespace
+
+bool Application::TryApplyCoverCache()
+{
+	if (m_configDir.empty()) {
+		return false;
+	}
+	const std::filesystem::path file = m_configDir / "launcher.ini";
+	CSimpleIniA ini;
+	ConfigureCoverIni(ini);
+	if (ini.LoadFile(file.string().c_str()) != SI_OK) {
+		return false;
+	}
+	const long width = ini.GetLongValue(kCoverSection, kCoverTileWidth, 0);
+	const long height = ini.GetLongValue(kCoverSection, kCoverTileHeight, 0);
+	const std::string os = ini.GetValue(kCoverSection, kCoverOsTag, "");
+	const std::string screen = ini.GetValue(kCoverSection, kCoverScreenTag, "");
+	if (width <= 0 || height <= 0 || os.empty() || screen.empty()
+	    || os != CoverCacheOsTag() || screen != CoverCacheScreenTag()) {
+		return false;
+	}
+	spdlog::info("aurora: размер плитки из кэша {}x{} (зонд не нужен)", width, height);
+	devilution::NativeCover::ApplyTileSize(static_cast<int>(width), static_cast<int>(height));
+	UpdateNativeCover();
+	return true;
+}
+
+void Application::WriteCoverCache(int tileWidth, int tileHeight)
+{
+	if (m_configDir.empty()) {
+		return;
+	}
+	const std::filesystem::path file = m_configDir / "launcher.ini";
+	CSimpleIniA ini;
+	ConfigureCoverIni(ini);
+	ini.LoadFile(file.string().c_str()); // отсутствие файла — норма
+	ini.SetLongValue(kCoverSection, kCoverTileWidth, tileWidth);
+	ini.SetLongValue(kCoverSection, kCoverTileHeight, tileHeight);
+	ini.SetValue(kCoverSection, kCoverOsTag, CoverCacheOsTag().c_str());
+	ini.SetValue(kCoverSection, kCoverScreenTag, CoverCacheScreenTag().c_str());
+	if (ini.SaveFile(file.string().c_str()) != SI_OK) {
+		spdlog::info("aurora: кэш размера плитки не записан");
+	}
+}
+
 void Application::TryNativeCover()
 {
 	// Гейт для A/B-проверки на устройстве: DEVILUTIONX_NATIVE_COVER=0 —
@@ -834,6 +929,12 @@ void Application::TryNativeCover()
 
 void Application::StartCoverProbe()
 {
+	// Размер плитки — константа Silica для связки «устройство + ОС»:
+	// прогнав зонд однажды, ответ кэшируется в launcher.ini и каждый
+	// следующий старт применяет его мгновенно, без QML-движка.
+	if (TryApplyCoverCache()) {
+		return;
+	}
 	// Зонд — Qt-бинарь пакета (devilutionx-coverprobe): единственный
 	// источник геометрии плитки на 5.1, где configure от свитчера не
 	// приходит. Живёт в своём процессе (~секунда), ответ приезжает
@@ -867,17 +968,41 @@ void Application::StartCoverProbe()
 			return;
 		}
 		spdlog::info("aurora: зонд запускается: {}", cmd);
-		FILE *pipe = ::popen((cmd + " 2>/dev/null").c_str(), "r");
-		if (pipe == nullptr) {
-			spdlog::info("aurora: зонд popen не открылся");
+		// posix_spawn вместо popen: без прослойки /bin/sh и без полного
+		// fork процесса игры (копирование таблиц страниц сотен МБ RSS на
+		// armv7 дороже самого зонда). stderr наследуется — ошибки зонда
+		// видны в журнале приложения.
+		int outfd[2];
+		if (::pipe(outfd) != 0) {
+			spdlog::info("aurora: зонд — pipe не создан");
 			return;
 		}
+		::posix_spawn_file_actions_t actions;
+		::posix_spawn_file_actions_init(&actions);
+		::posix_spawn_file_actions_adddup2(&actions, outfd[1], STDOUT_FILENO);
+		::posix_spawn_file_actions_addclose(&actions, outfd[0]);
+		::posix_spawn_file_actions_addclose(&actions, outfd[1]);
+		pid_t pid = 0;
+		char *const argv[] = { cmd.data(), nullptr };
+		if (::posix_spawn(&pid, cmd.c_str(), &actions, nullptr, argv, environ) != 0) {
+			spdlog::info("aurora: зонд posix_spawn не удался");
+			::posix_spawn_file_actions_destroy(&actions);
+			::close(outfd[0]);
+			::close(outfd[1]);
+			return;
+		}
+		::posix_spawn_file_actions_destroy(&actions);
+		::close(outfd[1]);
 		std::string out;
 		char buf[256];
-		while (::fgets(buf, sizeof(buf), pipe) != nullptr) {
-			out += buf;
+		ssize_t got = 0;
+		while ((got = ::read(outfd[0], buf, sizeof(buf))) > 0) {
+			out.append(buf, static_cast<size_t>(got));
 		}
-		const int rc = ::pclose(pipe);
+		::close(outfd[0]);
+		int status = 0;
+		::waitpid(pid, &status, 0);
+		const int rc = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 		int vw = 0, vh = 0, hw = 0, hh = 0;
 		int coverOrientation = -1;
 		int nativeOrientation = -1;
