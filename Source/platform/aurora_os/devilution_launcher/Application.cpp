@@ -839,20 +839,22 @@ void Application::StartCoverProbe()
 	// SDL-событием; до ответа карточка печётся фолбэком.
 	m_coverProbeEvent = SDL_RegisterEvents(1);
 	const Uint32 probeEvent = m_coverProbeEvent;
+	// База выбора ориентации — аспект текущего экрана: лаунчер стартует
+	// из домашнего экрана, режим дисплея совпадает с ориентацией плиток.
 	SDL_DisplayMode mode {};
-	const bool landscape = SDL_GetDesktopDisplayMode(0, &mode) == 0 && mode.w > mode.h;
-	std::thread([this, probeEvent, landscape]() {
+	const bool screenLandscape = SDL_GetDesktopDisplayMode(0, &mode) == 0 && mode.w > mode.h;
+	std::thread([this, probeEvent, screenLandscape]() {
 		char exe[512] {};
 		const ssize_t n = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
 		if (n <= 0) {
 			return;
 		}
-		exe[n] = ' ';
+		exe[n] = '\0';
 		char *slash = std::strrchr(exe, '/');
 		if (slash == nullptr) {
 			return;
 		}
-		*slash = ' ';
+		*slash = '\0';
 		// Материализатор Авроры перекладывает /usr/bin пакета в bin/ рядом
 		// с главным бинарём — ищем относительно себя, запасной путь — /usr/bin.
 		std::string cmd = std::string(exe) + "/devilutionx-coverprobe";
@@ -876,18 +878,41 @@ void Application::StartCoverProbe()
 		}
 		const int rc = ::pclose(pipe);
 		int vw = 0, vh = 0, hw = 0, hh = 0;
+		int coverOrientation = -1;
+		int nativeOrientation = -1;
 		const int parsed = std::sscanf(out.c_str(), "vertical %d %d horizontal %d %d", &vw, &vh, &hw, &hh);
-		int pickW = vw;
-		int pickH = vh;
-		if (landscape && parsed >= 4 && hw > 0 && hh > 0) {
-			pickW = hw;
-			pickH = hh;
+		// sscanf не ищет подстроки — строки зонда стоят с начала буфера
+		// только у vertical/horizontal, остальные ищем strstr'ом.
+		if (const char *line = std::strstr(out.c_str(), "coverOrientation ")) {
+			std::sscanf(line, "coverOrientation %d", &coverOrientation);
 		}
-		spdlog::info("aurora: зонд ответил (rc={}, parsed={})", rc, parsed);
-		if (rc != 0 || parsed < 2 || pickW <= 0 || pickH <= 0) {
+		if (const char *line = std::strstr(out.c_str(), "native ")) {
+			std::sscanf(line, "native %d", &nativeOrientation);
+		}
+		if (rc != 0 || parsed < 2 || vw <= 0 || vh <= 0) {
 			spdlog::info("aurora: зонд размера плитки не ответил (rc={}, parsed={})", rc, parsed);
 			return;
 		}
+		// Ориентация. На практике оба «умных» источника бывают пусты:
+		// Cover.orientation невалиден, пока Cover не показан композитором
+		// (headless-зонд), а nativeOrientation на 5.1-телефоне Qt отдаёт
+		// как 0. Поэтому база — аспект экрана; native (>0, биты Qt:
+		// портрет 1|4, ландшафт 2|8) уточняет, Cover.orientation только
+		// сверяется и пишется в лог для накопления данных с устройств.
+		const bool nativeLandscape = nativeOrientation > 0 && (nativeOrientation & 2) != 0;
+		const bool landscape = nativeOrientation > 0 ? nativeLandscape : screenLandscape;
+		if (coverOrientation >= 0 && nativeOrientation > 0 && (coverOrientation == 1) != nativeLandscape) {
+			spdlog::info("aurora: зонд — Cover.orientation({}) расходится с native({})",
+			    coverOrientation, nativeOrientation);
+		}
+		int pickW = landscape ? hw : vw;
+		int pickH = landscape ? hh : vh;
+		if (pickW <= 0 || pickH <= 0) {
+			pickW = vw;
+			pickH = vh;
+		}
+		spdlog::info("aurora: зонд ответил (rc={}, parsed={}, cover={}, native={}, экран={})",
+		    rc, parsed, coverOrientation, nativeOrientation, screenLandscape ? "ландшафт" : "портрет");
 		SDL_Event probe {};
 		probe.type = probeEvent;
 		probe.user.code = 0;
