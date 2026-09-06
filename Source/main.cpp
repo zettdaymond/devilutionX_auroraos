@@ -81,7 +81,9 @@ FUNC_EXPORT(int argc, char **argv)
     std::vector<std::string> engineArgs;
     std::vector<char *> engineArgv;
 
-    if (SDL_Init(SDL_INIT_VIDEO) <= -1) {
+    // TIMER — для отладочных таймеров обложки (кардиограмма, пинк
+    // композитора): SDL_AddTimer без подсистемы молча не тикает.
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) <= -1) {
         devilution::ErrSdl();
     }
 

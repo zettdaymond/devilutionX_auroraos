@@ -231,6 +231,7 @@ struct NativeCoverState {
 	wl_proxy *extension = nullptr;
 	wl_shm *shm = nullptr;
 	wl_surface *surface = nullptr;
+	wl_surface *parentSurface = nullptr;
 	wl_shell_surface *shellSurface = nullptr;
 	wl_shm_pool *pool = nullptr;
 	wl_buffer *buffer = nullptr;
@@ -536,6 +537,7 @@ bool NativeCover::CreateAndLink(
 	s.extension = extension;
 	s.shm = reinterpret_cast<wl_shm *>(shmProxy);
 	s.surface = coverSurface;
+	s.parentSurface = *mainSurface;
 	s.shellSurface = shellSurface;
 	s.width = width;
 	s.height = height;
@@ -619,6 +621,40 @@ void NativeCover::Size(int &outWidth, int &outHeight)
 Uint32 NativeCover::ConfigureEventType()
 {
 	return CoverResizeEventType();
+}
+
+void NativeCover::Poke()
+{
+	NativeCoverState &s = State();
+	if (!s.linked || s.shellSurface == nullptr || s.parentSurface == nullptr) {
+		spdlog::info("aurora-native-cover: пинк пропущен — обложка не связана");
+		return;
+	}
+	spdlog::info("aurora-native-cover: пинк композитору (re-transient + кадр 500x620)");
+	// Повтор роли transient — сервер может ответить configure'ом.
+	wl_shell_surface_set_transient(s.shellSurface, s.parentSurface, 0, 0, 0);
+	// Кадр другого размера — реакция композитора на смену геометрии буфера
+	// (аспект прежний, контент перезаливается тем же кроп-путём).
+	s.width = 500;
+	s.height = 620;
+	if (s.buffer != nullptr) {
+		wl_buffer_destroy(s.buffer);
+		s.buffer = nullptr;
+	}
+	if (s.pool != nullptr) {
+		wl_shm_pool_destroy(s.pool);
+		s.pool = nullptr;
+	}
+	if (s.poolPixels != nullptr) {
+		::munmap(s.poolPixels, s.poolSize);
+		s.poolPixels = nullptr;
+		s.poolSize = 0;
+	}
+	if (s.shm == nullptr || s.content.empty() || !EnsureShmBuffer(s, s.shm)
+	    || !CommitFrame(s.content.data(), s.contentStride, s.contentWidth, s.contentHeight)) {
+		spdlog::warn("aurora-native-cover: пинк — перезаливка не удалась");
+	}
+	wl_display_flush(s.display);
 }
 
 } // namespace devilution

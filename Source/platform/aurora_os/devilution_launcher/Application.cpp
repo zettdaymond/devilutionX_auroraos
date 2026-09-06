@@ -595,6 +595,11 @@ void Application::ProcessEvent(const SDL_Event &event)
 		// а не стартовый кадр размера окна, сжатый кропом.
 		UpdateNativeCover();
 	}
+	if (m_coverPokeEvent != 0 && event.type == m_coverPokeEvent) {
+		// Диагностика DEVILUTIONX_COVER_POKE=1: дёрнуть композитор —
+		// ответит ли configure'ом на повтор transient/смену размера.
+		devilution::NativeCover::Poke();
+	}
 #endif
 	if (event.type == SDL_QUIT) {
 		Stop();
@@ -647,6 +652,22 @@ void Application::RunCoverLoop()
 #ifdef AURORA_OS
 	UpdateNativeCover();
 	m_coverDirty = false;
+	// Диагностика DEVILUTIONX_COVER_POKE=1: через 3 с спячки дёрнуть
+	// композитор (одноразово на процесс). Если configure в ответ всё же
+	// приходит — «пинок» можно превратить в штатный способ разузнать
+	// размер плитки на 5.1.
+	if (m_coverPokeEvent == 0 && m_nativeCoverActive) {
+		const char *poke = SDL_getenv("DEVILUTIONX_COVER_POKE");
+		if (poke != nullptr && poke[0] == '1') {
+			m_coverPokeEvent = SDL_RegisterEvents(1);
+			SDL_AddTimer(3000, [](Uint32, void *userdata) -> Uint32 {
+				SDL_Event pulse {};
+				pulse.type = *static_cast<Uint32 *>(userdata);
+				SDL_PushEvent(&pulse);
+				return 0;
+			}, &m_coverPokeEvent);
+		}
+	}
 #endif
 	while (m_running
 	    && !m_store->State().pendingLaunch.has_value()
