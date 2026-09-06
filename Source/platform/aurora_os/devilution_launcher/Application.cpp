@@ -826,7 +826,18 @@ std::string CoverCacheOsTag()
 	std::string line;
 	while (std::getline(release, line)) {
 		if (line.starts_with("VERSION=")) {
-			return line.substr(8);
+			// Значение в os-release обрамлено кавычками — стрижём их:
+			// SimpleIni при перезаписи launcher.ini (смена настроек)
+			// нормализует кавычки прочь, и тег с ними расхолился бы с
+			// сохранённым — кэш мисмитился после каждой правки настроек.
+			std::string tag = line.substr(8);
+			if (!tag.empty() && tag.front() == '"') {
+				tag.erase(0, 1);
+			}
+			if (!tag.empty() && tag.back() == '"') {
+				tag.pop_back();
+			}
+			return tag;
 		}
 	}
 	return {};
