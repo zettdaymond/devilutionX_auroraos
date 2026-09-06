@@ -10,6 +10,8 @@ project(devilution_launcher LANGUAGES CXX)
 # легаси-раскладка PSDK.
 set(CMAKE_IGNORE_PATH
     "/usr/lib/cmake/CURL"
+    "/usr/lib64/cmake/CURL"
+    "/lib64/cmake/CURL"
     "/opt/cross/armv7hl-meego-linux-gnueabi/sys-root/usr/lib/cmake/CURL"
     CACHE STRING "" FORCE)
 
