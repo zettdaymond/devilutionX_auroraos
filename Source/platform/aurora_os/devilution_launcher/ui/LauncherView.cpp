@@ -457,21 +457,17 @@ void LauncherView::RenderCover(const LauncherState &state)
 
 	// Ember-свечение за центральным элементом: вложенные круги с ростом
 	// непрозрачности к центру — имитация радиального градиента.
-	// В состоянии «пауза» (запущена игра) уголёк дышит: медленная синусоида
-	// ~3.5 с — жар то разгорается ярче статики, то тлеет глубже, но не
-	// гаснет; текста на карточке нет, топить нечего, поэтому пик горит
-	// в полную силу. Простой лаунчера и загрузка статичны и сдержанны:
-	// жив только тот, кто ждёт игрока.
+	// Состояние «пауза» (запущена игра): призрак лица, слово и умеренное
+	// тепло углей — статично. Живое «дыхание» отложено до GPU-рендера
+	// обложки (WIP 4b): ненавязчивая анимация ~20 FPS со всплеском раз
+	// в ~5 с. Простой лаунчера и загрузка сдержаннее — пауза ждёт игрока.
 	constexpr float kPi = 3.14159265F;
 	const bool paused = launching;
-	const float breath = paused
-	    ? 0.5F + 0.5F * std::sin(static_cast<float>(ImGui::GetTime()) * (2.0F * kPi / 3.5F))
-	    : 1.0F;
-	const float emberR = paused ? 0.82F + 0.18F * breath : 1.0F;
-	const float emberG = paused ? 0.30F + 0.12F * breath : 0.42F;
+	const float emberR = paused ? 0.92F : 1.0F;
+	const float emberG = paused ? 0.36F : 0.42F;
 	const float glowY = top.y + v.y * (download != nullptr ? 0.41F : 0.43F);
-	const float glowR = Scale::MinSide() * 0.55F * (paused ? 0.85F + 0.20F * breath : 1.0F);
-	const float glowAlpha = paused ? 1.00F + 1.30F * breath : 1.0F;
+	const float glowR = Scale::MinSide() * 0.55F * (paused ? 0.95F : 1.0F);
+	const float glowAlpha = paused ? 1.80F : 1.0F;
 	// Нормировка на число слоёв: суммарная непрозрачность в центре от
 	// kGlowLayers не зависит (профиль слоя 6+9·(1−t) суммируется в
 	// 10.5N−4.5 — без нормировки рост слоёв раздувает центр пятном).
@@ -559,7 +555,19 @@ void LauncherView::RenderCover(const LauncherState &state)
 		h = s.x > 0.0F ? w * s.y / s.x : w;
 		draw->AddImage(m_coverFaces[faceIdx], ImVec2(center.x - w * 0.5F, center.y - h * 0.5F),
 		    ImVec2(center.x + w * 0.5F, center.y + h * 0.5F), ImVec2(0, 0), ImVec2(1, 1),
-		    ImGui::GetColorU32(ImVec4(0.93F, 0.89F, 0.80F, launching ? 0.28F + 0.08F * breath : 0.95F)));
+		    ImGui::GetColorU32(ImVec4(0.93F, 0.89F, 0.80F, launching ? 0.32F : 0.95F)));
+	}
+	if (launching) {
+		// Слово паузы — Beaufort Bold (кириллица без стилизации Exocet:
+		// её ревью ругали), золотом, под призраком.
+		ImFont *pauseFont = Theme::Font(FontRole::BodyBold);
+		if (pauseFont != nullptr) {
+			constexpr const char *kPaused = "ПАУЗА";
+			const float sizePx = Scale::MinSide() * 0.115F;
+			const ImVec2 ts = pauseFont->CalcTextSizeA(sizePx, FLT_MAX, 0.0F, kPaused);
+			draw->AddText(pauseFont, sizePx, ImVec2(centerX - ts.x * 0.5F, top.y + v.y * 0.76F),
+			    ImGui::GetColorU32(ImVec4(0.95F, 0.72F, 0.30F, 0.95F)), kPaused);
+		}
 	}
 }
 

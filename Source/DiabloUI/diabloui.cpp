@@ -788,12 +788,7 @@ void UiPollAndRender(std::optional<tl::function_ref<bool(SDL_Event &)>> eventHan
 	// события (смена фокуса/дисплея всегда приходит событием) и
 	// возвращаем его в очередь — обработает насос следующего прохода.
 	if (launcher::aurora::GameCover::IsHidden()) {
-		SDL_Event wait {};
-		if (SDL_WaitEvent(&wait) == 1) {
-			SDL_PushEvent(&wait);
-		} else {
-			SDL_Delay(100);
-		}
+		launcher::aurora::GameCover::SleepWhileHidden();
 		return;
 	}
 #endif

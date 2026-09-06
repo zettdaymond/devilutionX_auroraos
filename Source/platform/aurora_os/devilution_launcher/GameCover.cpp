@@ -89,6 +89,17 @@ bool GameCover::IsHidden()
 	return hidden;
 }
 
+
+void GameCover::SleepWhileHidden()
+{
+	SDL_Event wait {};
+	if (SDL_WaitEvent(&wait) != 1) {
+		SDL_Delay(100);
+		return;
+	}
+	SDL_PushEvent(&wait);
+}
+
 } // namespace launcher::aurora
 
 #endif

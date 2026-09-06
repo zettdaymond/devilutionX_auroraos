@@ -36,6 +36,7 @@ public:
 	/// лишь открывает приложение.
 	void RenderCover(const LauncherState &state);
 
+
 	/// Окно снова видимо после плитки. Живые кадры обложки не содержат
 	/// ImGui-окон, и открытый модальный диалог за них умирает — вызов
 	/// заставляет следующий Render переоткрыть активный диалог.
@@ -112,6 +113,7 @@ private:
 	Screen m_lastScreen = Screen::Home;
 	double m_screenShownAt = 0.0;
 	double m_dialogShownAt = 0.0;
+
 
 	/// Момент старта iris-анимации запуска (< 0 — не запускалась).
 	double m_irisStartedAt = -1.0;

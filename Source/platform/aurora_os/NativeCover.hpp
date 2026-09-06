@@ -4,6 +4,8 @@
 
 #include <SDL2/SDL_stdinc.h>
 
+#include <vector>
+
 struct SDL_Window;
 
 namespace devilution {

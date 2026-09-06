@@ -247,6 +247,7 @@ struct NativeCoverState {
 	bool linked = false;
 	/// Размер пришёл configure'ом от свитчера — зонд его уже не перебивает.
 	bool sizeFromConfigure = false;
+
 };
 
 NativeCoverState &State()
@@ -257,6 +258,7 @@ NativeCoverState &State()
 
 bool EnsureShmBuffer(NativeCoverState &s, wl_shm *shm);
 bool CommitFrame(const unsigned char *rgb24, int strideBytes, int srcWidth, int srcHeight);
+bool RebuildPool(NativeCoverState &s);
 
 /// Тип события «configure обложки». Регистрируется лениво, один на
 /// процесс; отдельное имя — чтобы метод NativeCover::ConfigureEventType
@@ -304,23 +306,7 @@ void ShellSurfaceConfigure(void *data, wl_shell_surface *shellSurface,
 		resize.type = CoverResizeEventType();
 		SDL_PushEvent(&resize);
 	}
-	if (s.buffer != nullptr) {
-		wl_buffer_destroy(s.buffer);
-		s.buffer = nullptr;
-	}
-	if (s.pool != nullptr) {
-		wl_shm_pool_destroy(s.pool);
-		s.pool = nullptr;
-	}
-	if (s.poolPixels != nullptr) {
-		::munmap(s.poolPixels, s.poolSize);
-		s.poolPixels = nullptr;
-		s.poolSize = 0;
-	}
-	if (s.shm == nullptr || s.content.empty()) {
-		return;
-	}
-	if (EnsureShmBuffer(s, s.shm) && !CommitFrame(s.content.data(), s.contentStride, s.contentWidth, s.contentHeight)) {
+	if (!RebuildPool(s)) {
 		spdlog::warn("aurora-native-cover: перезаливка после configure не удалась");
 	}
 }
@@ -336,6 +322,30 @@ const wl_shell_surface_listener kShellSurfaceListener = {
 	ShellSurfaceConfigure,
 	ShellSurfacePopupDone,
 };
+
+/// Снести SHM-пул/буфер, пересоздать под текущие s.width/height и
+/// перезалить последний контент (общая последовательность для configure,
+/// зонда, пинка и старта цикла).
+bool RebuildPool(NativeCoverState &s)
+{
+	if (s.buffer != nullptr) {
+		wl_buffer_destroy(s.buffer);
+		s.buffer = nullptr;
+	}
+	if (s.pool != nullptr) {
+		wl_shm_pool_destroy(s.pool);
+		s.pool = nullptr;
+	}
+	if (s.poolPixels != nullptr) {
+		::munmap(s.poolPixels, s.poolSize);
+		s.poolPixels = nullptr;
+		s.poolSize = 0;
+	}
+	if (s.shm == nullptr || s.content.empty() || !EnsureShmBuffer(s, s.shm)) {
+		return false;
+	}
+	return CommitFrame(s.content.data(), s.contentStride, s.contentWidth, s.contentHeight);
+}
 
 
 std::optional<wl_surface *> WindowSurface(SDL_Window *window)
@@ -640,21 +650,7 @@ void NativeCover::Poke()
 	// (аспект прежний, контент перезаливается тем же кроп-путём).
 	s.width = 500;
 	s.height = 620;
-	if (s.buffer != nullptr) {
-		wl_buffer_destroy(s.buffer);
-		s.buffer = nullptr;
-	}
-	if (s.pool != nullptr) {
-		wl_shm_pool_destroy(s.pool);
-		s.pool = nullptr;
-	}
-	if (s.poolPixels != nullptr) {
-		::munmap(s.poolPixels, s.poolSize);
-		s.poolPixels = nullptr;
-		s.poolSize = 0;
-	}
-	if (s.shm == nullptr || s.content.empty() || !EnsureShmBuffer(s, s.shm)
-	    || !CommitFrame(s.content.data(), s.contentStride, s.contentWidth, s.contentHeight)) {
+	if (!RebuildPool(s)) {
 		spdlog::warn("aurora-native-cover: пинк — перезаливка не удалась");
 	}
 	wl_display_flush(s.display);
@@ -677,21 +673,7 @@ void NativeCover::ApplyTileSize(int width, int height)
 	spdlog::info("aurora-native-cover: размер плитки от зонда {}x{}", width, height);
 	s.width = width;
 	s.height = height;
-	if (s.buffer != nullptr) {
-		wl_buffer_destroy(s.buffer);
-		s.buffer = nullptr;
-	}
-	if (s.pool != nullptr) {
-		wl_shm_pool_destroy(s.pool);
-		s.pool = nullptr;
-	}
-	if (s.poolPixels != nullptr) {
-		::munmap(s.poolPixels, s.poolSize);
-		s.poolPixels = nullptr;
-		s.poolSize = 0;
-	}
-	if (s.shm == nullptr || s.content.empty() || !EnsureShmBuffer(s, s.shm)
-	    || !CommitFrame(s.content.data(), s.contentStride, s.contentWidth, s.contentHeight)) {
+	if (!RebuildPool(s)) {
 		spdlog::warn("aurora-native-cover: перезаливка после зонда не удалась");
 	}
 	wl_display_flush(s.display);

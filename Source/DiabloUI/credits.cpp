@@ -168,12 +168,7 @@ void CreditsRenderer::PauseIfHidden()
 	}
 	// Спим до события (фокус/дисплей всегда событием), проснутое
 	// возвращаем в очередь — его обработает насос цикла диалога.
-	SDL_Event wait {};
-	if (SDL_WaitEvent(&wait) == 1) {
-		SDL_PushEvent(&wait);
-	} else {
-		SDL_Delay(100);
-	}
+	launcher::aurora::GameCover::SleepWhileHidden();
 #endif
 }
 

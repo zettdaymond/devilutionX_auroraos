@@ -107,12 +107,7 @@ void play_movie(const char *pszMovie, bool userCanClose)
 					videoPauseStartedAt = std::chrono::steady_clock::now();
 					SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "aurora: видео на паузе");
 				}
-				SDL_Event wait {};
-				if (SDL_WaitEvent(&wait) == 1) {
-					SDL_PushEvent(&wait);
-				} else {
-					SDL_Delay(100);
-				}
+				launcher::aurora::GameCover::SleepWhileHidden();
 				continue;
 			}
 			if (videoPaused) {

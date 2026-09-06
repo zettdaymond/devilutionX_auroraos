@@ -172,6 +172,7 @@ private:
 	/// ApplyTileSize. Вызывается после успешного линка обложки.
 	void StartCoverProbe();
 
+
 	/// Нативная обложка связана (живой рендер и кардиограмма отладки).
 	bool m_nativeCoverActive = false;
 

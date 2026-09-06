@@ -882,12 +882,7 @@ void RunGameLoop(interface_mode uMsg)
 		// CPU: vsync не душит (кадр не презентится), логика стоит
 		// (PauseMode), а цикл — нет.
 		if (launcher::aurora::GameCover::IsHidden()) {
-			SDL_Event wait {};
-			if (SDL_WaitEvent(&wait) == 1) {
-				SDL_PushEvent(&wait);
-			} else {
-				SDL_Delay(100);
-			}
+			launcher::aurora::GameCover::SleepWhileHidden();
 			continue;
 		}
 #endif
