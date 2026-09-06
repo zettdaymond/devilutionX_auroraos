@@ -93,7 +93,7 @@ export CMAKE_GENERATOR=Ninja
 
 %files
 %{_bindir}/%{name}
-%{_bindir}/devilutionx-coverprobe
+%{_bindir}/org.diasurgical.devilutionx.coverprobe
 %{_datadir}/applications/%{name}.desktop
 %{_datadir}/icons/hicolor/*/apps/%{name}.png
 %{_datadir}/%{name}/assets/*

@@ -5,7 +5,7 @@
 # приложение ищет его относительно /proc/self/exe.
 find_package(Qt5 COMPONENTS Core Gui Qml REQUIRED)
 
-add_executable(devilutionx-coverprobe cover_probe.cpp)
-target_link_libraries(devilutionx-coverprobe PRIVATE Qt5::Core Qt5::Gui Qt5::Qml)
+add_executable(org.diasurgical.devilutionx.coverprobe cover_probe.cpp)
+target_link_libraries(org.diasurgical.devilutionx.coverprobe PRIVATE Qt5::Core Qt5::Gui Qt5::Qml)
 
-install(TARGETS devilutionx-coverprobe RUNTIME DESTINATION bin)
+install(TARGETS org.diasurgical.devilutionx.coverprobe RUNTIME DESTINATION bin)

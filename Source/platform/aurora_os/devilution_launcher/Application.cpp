@@ -858,9 +858,9 @@ void Application::StartCoverProbe()
 		*slash = '\0';
 		// Материализатор Авроры перекладывает /usr/bin пакета в bin/ рядом
 		// с главным бинарём — ищем относительно себя, запасной путь — /usr/bin.
-		std::string cmd = std::string(exe) + "/devilutionx-coverprobe";
+		std::string cmd = std::string(exe) + "/org.diasurgical.devilutionx.coverprobe";
 		if (::access(cmd.c_str(), X_OK) != 0) {
-			cmd = "/usr/bin/devilutionx-coverprobe";
+			cmd = "/usr/bin/org.diasurgical.devilutionx.coverprobe";
 		}
 		if (::access(cmd.c_str(), X_OK) != 0) {
 			spdlog::info("aurora: зонд размера плитки не найден — остаёмся на фолбэке");
