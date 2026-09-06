@@ -676,17 +676,21 @@ bool Application::RenderCoverPixels(std::vector<unsigned char> &outPixels, int &
 	// плитки, и кроп в NativeCover::UpdateFrame вырождается в тождество.
 	// Lipstick 5.1 configure не шлёт вовсе: размер плитки клиент задаёт
 	// сам (Qt-приложения — из Silica Theme.coverSize*). Фолбэк до
-	// первого configure — геометрия плитки 5.2 (316x392: ширина = экран/
-	// 2 − поля при логическом экране 720, высота = ширина × 1.2405);
+	// первого configure — геометрия плитки 5.2-эмулятора (316x392,
+	// ориентация — по аспекту экрана: на ландшафтных устройствах плитки
+	// горизонтальные; ландшафтные размеры — гипотеза, устройства не было);
 	// окно приложения (портрет 720x1440) давало сплющенную карточку.
 	int width = 0;
 	int height = 0;
 	devilution::NativeCover::Size(width, height);
 	if (width <= 0 || height <= 0) {
-		constexpr int kFallbackCoverWidth = 316;
-		constexpr int kFallbackCoverHeight = 392;
-		width = kFallbackCoverWidth;
-		height = kFallbackCoverHeight;
+		constexpr int kFallbackPortraitCoverWidth = 316;
+		constexpr int kFallbackPortraitCoverHeight = 392;
+		SDL_DisplayMode mode {};
+		const bool landscape = SDL_GetDesktopDisplayMode(0, &mode) == 0 && mode.w > mode.h;
+		width = landscape ? kFallbackPortraitCoverHeight : kFallbackPortraitCoverWidth;
+		height = landscape ? kFallbackPortraitCoverWidth : kFallbackPortraitCoverHeight;
+		spdlog::info("aurora: фолбэк плитки {}x{} (configure не приходил)", width, height);
 	}
 	SDL_Texture *target = SDL_CreateTexture(
 	    m_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width, height);
