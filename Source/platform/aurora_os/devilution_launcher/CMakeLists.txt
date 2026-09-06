@@ -2,20 +2,6 @@ cmake_minimum_required(VERSION 3.19)
 
 project(devilution_launcher LANGUAGES CXX)
 
-# Перезаписываем путь игнорирования, чтобы CMake не заходил в сломанные
-# конфиги пакета CURL: хостовый /usr/lib/cmake/CURL движка-контейнера
-# тянет find_dependency(OpenSSL REQUIRED) и чужую архитектуру в кросс-
-# сборке armv7hl (сискroot цели получает libcurl через module-режим
-# FindCURL: заголовки include/curl + libcurl.so в цели); второй путь —
-# легаси-раскладка PSDK.
-set(CMAKE_IGNORE_PATH
-    "/usr/lib/cmake/CURL"
-    "/usr/lib64/cmake/CURL"
-    "/lib64/cmake/CURL"
-    "/opt/cross/armv7hl-meego-linux-gnueabi/sys-root/usr/lib/cmake/CURL"
-    CACHE STRING "" FORCE)
-
-
 option(LAUNCHER_DESKTOP "Build the standalone desktop launcher executable" OFF)
 # Отладочные env-ручки (DebugConfig.hpp): в Debug читаются из окружения,
 # в Release без флага вырождаются в constexpr и выпиливаются компилятором.
