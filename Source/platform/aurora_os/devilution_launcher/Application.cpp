@@ -1,5 +1,6 @@
 #include "Application.hpp"
 
+#include "DebugConfig.hpp"
 #include "DPIHandler.hpp"
 #include "core/Store.hpp"
 #include "ui/LauncherView.hpp"
@@ -403,8 +404,7 @@ AppResult Application::Run()
 	// 500 мс перезаливать кадр обложки (красным), чтобы видеть, живут ли
 	// коммиты окна обложки (в плитке или где-либо ещё).
 	if (m_nativeCoverActive) {
-		const char *debugEnv = SDL_getenv("DEVILUTIONX_NATIVE_COVER_DEBUG");
-		if (debugEnv != nullptr && debugEnv[0] == '1') {
+		if (launcher::DebugConfig::NativeCoverDebug()) {
 			const Uint32 heartbeat = SDL_RegisterEvents(1);
 			m_nativeCoverHeartbeat = heartbeat;
 			SDL_AddTimer(500, [](Uint32, void *userdata) -> Uint32 {
@@ -498,7 +498,7 @@ AppResult Application::Run()
 		// устройства код не попадает.
 		static const std::vector<int> dumpFrames = [] {
 			std::vector<int> frames;
-			const char *env = SDL_getenv("DEVILUTIONX_DUMP_FRAME");
+			const char *env = launcher::DebugConfig::DumpFrameSpec();
 			if (env == nullptr) {
 				return frames;
 			}
@@ -534,7 +534,7 @@ AppResult Application::Run()
 			    0, dumpW, dumpH, 0, SDL_PIXELFORMAT_RGB24);
 			if (shot != nullptr) {
 				if (SDL_RenderReadPixels(m_renderer, nullptr, SDL_PIXELFORMAT_RGB24, shot->pixels, shot->pitch) == 0) {
-					const char *dumpPath = SDL_getenv("DEVILUTIONX_DUMP_PATH");
+					const char *dumpPath = launcher::DebugConfig::DumpFramePath();
 					std::string path = dumpPath != nullptr ? dumpPath : "devilutionx_frame.bmp";
 					const size_t hole = path.find("{}");
 					if (hole != std::string::npos) {
@@ -679,8 +679,7 @@ void Application::RunCoverLoop()
 	// приходит — «пинок» можно превратить в штатный способ разузнать
 	// размер плитки на 5.1.
 	if (m_coverPokeEvent == 0 && m_nativeCoverActive) {
-		const char *poke = SDL_getenv("DEVILUTIONX_COVER_POKE");
-		if (poke != nullptr && poke[0] == '1') {
+		if (launcher::DebugConfig::CoverPoke()) {
 			m_coverPokeEvent = SDL_RegisterEvents(1);
 			SDL_AddTimer(3000, [](Uint32, void *userdata) -> Uint32 {
 				SDL_Event pulse {};
@@ -785,8 +784,7 @@ bool Application::RenderCoverPixels(std::vector<unsigned char> &outPixels, int &
 	}
 	// Dev-дамп снимка карточки (диагностика живого рендера без экрана):
 	// DEVILUTIONX_COVER_DUMP=1 — BMP-файлы рядом с настройками.
-	const char *dumpEnv = SDL_getenv("DEVILUTIONX_COVER_DUMP");
-	if (dumpEnv != nullptr && dumpEnv[0] == '1') {
+	if (launcher::DebugConfig::CoverDump()) {
 		static int dumpNo = 0;
 		char path[128];
 		std::snprintf(path, sizeof(path), "%s/cover_dump_%d.bmp",
@@ -907,8 +905,7 @@ void Application::TryNativeCover()
 {
 	// Гейт для A/B-проверки на устройстве: DEVILUTIONX_NATIVE_COVER=0 —
 	// плитка показывает последний кадр главного окна, без карточки.
-	const char *disabled = SDL_getenv("DEVILUTIONX_NATIVE_COVER");
-	if (disabled != nullptr && disabled[0] == '0') {
+	if (!launcher::DebugConfig::NativeCoverEnabled()) {
 		spdlog::info("aurora-native-cover: выключен (DEVILUTIONX_NATIVE_COVER=0)");
 		return;
 	}

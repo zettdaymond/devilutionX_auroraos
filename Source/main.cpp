@@ -26,6 +26,7 @@
 #   include "StandartPaths.hpp"
 #   include "DisplayBlankerController.hpp"
 #   include "Application.hpp"
+#   include "DebugConfig.hpp"
 #   include "core/EngineLaunch.hpp"
 #   include "appfat.h"
 #   include <spdlog/spdlog.h>
@@ -103,7 +104,7 @@ FUNC_EXPORT(int argc, char **argv)
     }
     spdlog::info("aurora: окно лаунчера {}x{} (режим дисплея {}x{})",
         launcherWinW, launcherWinH, desktopMode.w, desktopMode.h);
-    if (const char *windowed = SDL_getenv("DEVILUTIONX_COVER_WINDOWED"); windowed != nullptr && windowed[0] == '0') {
+    if (!launcher::DebugConfig::CoverWindowed()) {
         launcherWinFlags = SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_ALLOW_HIGHDPI;
         launcherWinW = 1;
         launcherWinH = 1;

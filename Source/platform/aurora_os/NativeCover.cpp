@@ -4,6 +4,8 @@
 
 #include "NativeCover.hpp"
 
+#include "devilution_launcher/DebugConfig.hpp"
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
 
@@ -416,10 +418,7 @@ bool CommitFrame(const unsigned char *rgb24, int strideBytes, int srcWidth, int 
 	s.contentHeight = srcHeight;
 	s.contentStride = strideBytes;
 	// Дебаг-гейт: сплошной красный вместо контента.
-	const bool debugRed = [] {
-		const char *env = SDL_getenv("DEVILUTIONX_NATIVE_COVER_DEBUG");
-		return env != nullptr && env[0] == '1';
-	}();
+	const bool debugRed = launcher::DebugConfig::NativeCoverDebug();
 	auto *dst = static_cast<uint32_t *>(s.poolPixels);
 	// Aspect crop: заполняем карточку целиком, сохраняя пропорции —
 	// избыток исходника режется по центру (без полей, full-bleed).
@@ -522,8 +521,7 @@ bool NativeCover::CreateAndLink(
 	//   a: transient -> свойства -> commit (классификация до мапа);
 	//   b: toplevel -> commit -> свойства -> transient (флоу aurora-gui);
 	//   c: toplevel -> свойства -> transient -> commit.
-	const char *seqEnv = SDL_getenv("DEVILUTIONX_COVER_SEQ");
-	const char seq = (seqEnv != nullptr && seqEnv[0] >= 'a' && seqEnv[0] <= 'c') ? seqEnv[0] : 'a';
+	const char seq = launcher::DebugConfig::CoverSequence();
 	const bool roleTopFirst = seq == 'b' || seq == 'c';
 	if (roleTopFirst) {
 		wl_shell_surface_set_toplevel(shellSurface);
@@ -566,8 +564,7 @@ bool NativeCover::CreateAndLink(
 		SDL_WaylandSetWindowGenericProperty(mainWindow, "WINID", mainWinId.data(), mainWinId.size());
 		// Зонд живости SDL-пути: DEVILUTIONX_NATIVE_COVER_PROBE=1 —
 		// статусбар должен появиться поверх приложения.
-		const char *probe = SDL_getenv("DEVILUTIONX_NATIVE_COVER_PROBE");
-		if (probe != nullptr && probe[0] == '1') {
+		if (launcher::DebugConfig::StatusBarProbe()) {
 			const std::vector<unsigned char> statusBar = QVariantBool(true);
 			SDL_WaylandSetWindowGenericProperty(mainWindow, "STATUSBAR_VISIBLE", statusBar.data(), statusBar.size());
 		}

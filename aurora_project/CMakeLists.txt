@@ -59,6 +59,21 @@ set(DEVILUTIONX_DISABLE_EXCEPTIONS OFF)
 # протекал в armv7hl-конфигур как OpenSSL_FOUND без таргетов).
 set(CMAKE_DISABLE_FIND_PACKAGE_OpenSSL TRUE CACHE BOOL "" FORCE)
 
+# Отладочные env-ручки (DebugConfig.hpp): Debug-сборки читают окружение,
+# релиз без флага получает constexpr-константы (ветки выпиливаются).
+# Девелоперский цикл на движке: один раз закэшировать ON в CMakeCache.
+if(NOT DEFINED DEVILUTIONX_DEBUG_ENV_GATES)
+  if("${CMAKE_BUILD_TYPE}" MATCHES "^Debug$")
+    set(DEVILUTIONX_DEBUG_ENV_GATES ON)
+  else()
+    set(DEVILUTIONX_DEBUG_ENV_GATES OFF)
+  endif()
+endif()
+option(DEVILUTIONX_DEBUG_ENV_GATES "" ${DEVILUTIONX_DEBUG_ENV_GATES})
+if(DEVILUTIONX_DEBUG_ENV_GATES)
+  add_compile_definitions(DEVILUTIONX_DEBUG_ENV_GATES=1)
+endif()
+
 # Package the assets with the APK.
 list(APPEND CMAKE_PROGRAM_PATH "${CMAKE_CURRENT_SOURCE_DIR}/smpq/${CMAKE_HOST_SYSTEM_PROCESSOR}")
 set(BUILD_ASSETS_MPQ ON)

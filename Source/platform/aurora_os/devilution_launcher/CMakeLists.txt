@@ -15,6 +15,16 @@ set(CMAKE_IGNORE_PATH
 
 
 option(LAUNCHER_DESKTOP "Build the standalone desktop launcher executable" OFF)
+# Отладочные env-ручки (DebugConfig.hpp): в Debug читаются из окружения,
+# в Release без флага вырождаются в constexpr и выпиливаются компилятором.
+if(NOT DEFINED DEVILUTIONX_DEBUG_ENV_GATES)
+  if("${CMAKE_BUILD_TYPE}" MATCHES "^Debug$")
+    set(DEVILUTIONX_DEBUG_ENV_GATES ON)
+  else()
+    set(DEVILUTIONX_DEBUG_ENV_GATES OFF)
+  endif()
+endif()
+option(DEVILUTIONX_DEBUG_ENV_GATES "" ${DEVILUTIONX_DEBUG_ENV_GATES})
 option(LAUNCHER_TESTS "Build launcher unit tests" ${LAUNCHER_DESKTOP})
 # Отладка UI по скриншотам через vision-модели: обычная тёмная ручка
 # включённого тумблера путает модели (читают «золотая ручка» как вкл),
@@ -105,6 +115,10 @@ if(LAUNCHER_DESKTOP)
   # иконки декодирует вендоренный stb_image, SDL_image не нужен вовсе.
   find_package(SDL2 CONFIG REQUIRED)
   find_package(CURL REQUIRED)
+endif()
+
+if(DEVILUTIONX_DEBUG_ENV_GATES)
+  add_compile_definitions(DEVILUTIONX_DEBUG_ENV_GATES=1)
 endif()
 
 add_library(imgui STATIC
