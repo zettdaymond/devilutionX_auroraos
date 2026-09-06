@@ -472,11 +472,18 @@ void LauncherView::RenderCover(const LauncherState &state)
 	const float glowY = top.y + v.y * (download != nullptr ? 0.41F : 0.43F);
 	const float glowR = Scale::MinSide() * 0.55F * (paused ? 0.85F + 0.20F * breath : 1.0F);
 	const float glowAlpha = paused ? 1.00F + 1.30F * breath : 1.0F;
+	// Нормировка на число слоёв: суммарная непрозрачность в центре от
+	// kGlowLayers не зависит (профиль слоя 6+9·(1−t) суммируется в
+	// 10.5N−4.5 — без нормировки рост слоёв раздувает центр пятном).
+	// Итоговый вес задан из вида на устройстве: 72 — тепло держат и края
+	// (профиль с высоким основанием), центр не прожигает.
 	constexpr int kGlowLayers = 48;
+	constexpr float kGlowTotalWeight = 72.0F;
+	const float layerGain = kGlowTotalWeight / (10.5F * kGlowLayers - 4.5F);
 	for (int i = kGlowLayers; i >= 1; --i) {
 		const float t = static_cast<float>(i) / kGlowLayers;
 		draw->AddCircleFilled(ImVec2(centerX, glowY), glowR * t,
-		    ImGui::GetColorU32(ImVec4(emberR, emberG, 0.12F, (2.0F + 8.0F * (1.0F - t)) * glowAlpha / 255.0F)), 40);
+		    ImGui::GetColorU32(ImVec4(emberR, emberG, 0.12F, (6.0F + 9.0F * (1.0F - t)) * layerGain * glowAlpha / 255.0F)), 40);
 	}
 
 	if (download != nullptr) {

@@ -280,11 +280,14 @@ void ShellSurfaceConfigure(void *data, wl_shell_surface *shellSurface,
 	// Свитчер ресайзит окно обложки под карточку плитки (cover.resize):
 	// без ответа на configure плитка остаётся пустой. Пересоздаём пул под
 	// новый размер и перезаливаем контент с масштабированием.
+	// Логируем КАЖДЫЙ configure (в т.ч. 0x0 «выбирай сам» и повторы) —
+	// Lipstick 5.1 телефона ведёт себя не как 5.2 эмулятора, и без
+	// полного следа событий размер карточки не диагностировать.
+	spdlog::info("aurora-native-cover: configure {}x{}", width, height);
 	NativeCoverState &s = State();
 	if (!s.linked || width <= 0 || height <= 0 || (width == s.width && height == s.height)) {
 		return;
 	}
-	spdlog::info("aurora-native-cover: configure {}x{}", width, height);
 	s.width = width;
 	s.height = height;
 	// Будим цикл обложки: карточку надо перерисовать в новом размере

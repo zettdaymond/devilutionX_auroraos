@@ -52,6 +52,13 @@ set(DEVILUTIONX_SYSTEM_LUA OFF)
 set(DEVILUTIONX_DISABLE_STRIP ON)
 set(DEVILUTIONX_DISABLE_EXCEPTIONS OFF)
 
+# OpenSSL в этом дереве нужен только опциональной фичей zoe (TLS идёт
+# через системный libcurl). Find-пакет отключаем: движок-контейнер держит
+# хостовый x86_64 OpenSSL в /usr/lib, и кросс-сборка armv7hl ловила его
+# как «найденный» — чужая архитектура роняла линк (а кеш от x86_64-цели
+# протекал в armv7hl-конфигур как OpenSSL_FOUND без таргетов).
+set(CMAKE_DISABLE_FIND_PACKAGE_OpenSSL TRUE CACHE BOOL "" FORCE)
+
 # Package the assets with the APK.
 list(APPEND CMAKE_PROGRAM_PATH "${CMAKE_CURRENT_SOURCE_DIR}/smpq/${CMAKE_HOST_SYSTEM_PROCESSOR}")
 set(BUILD_ASSETS_MPQ ON)

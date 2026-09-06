@@ -674,14 +674,19 @@ bool Application::RenderCoverPixels(std::vector<unsigned char> &outPixels, int &
 	// Полотно карточки — окно обложки (размер диктует свитчер Lipstick
 	// configure'ом), а не окно приложения: разметка ложится под аспект
 	// плитки, и кроп в NativeCover::UpdateFrame вырождается в тождество.
-	// До первого configure (или без нативной обложки) — размер рендерера.
+	// Lipstick 5.1 configure не шлёт вовсе: размер плитки клиент задаёт
+	// сам (Qt-приложения — из Silica Theme.coverSize*). Фолбэк до
+	// первого configure — геометрия плитки 5.2 (316x392: ширина = экран/
+	// 2 − поля при логическом экране 720, высота = ширина × 1.2405);
+	// окно приложения (портрет 720x1440) давало сплющенную карточку.
 	int width = 0;
 	int height = 0;
 	devilution::NativeCover::Size(width, height);
 	if (width <= 0 || height <= 0) {
-		if (SDL_GetRendererOutputSize(m_renderer, &width, &height) != 0 || width <= 0 || height <= 0) {
-			return false;
-		}
+		constexpr int kFallbackCoverWidth = 316;
+		constexpr int kFallbackCoverHeight = 392;
+		width = kFallbackCoverWidth;
+		height = kFallbackCoverHeight;
 	}
 	SDL_Texture *target = SDL_CreateTexture(
 	    m_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width, height);
@@ -792,6 +797,13 @@ void Application::TryNativeCover()
 
 void Application::OnEvent(const SDL_WindowEvent &event)
 {
+	// Диагностика плитки на реальных устройствах: некоторые версии
+	// Lipstick (5.1) ресайзят под карточку главное окно, а не окно
+	// обложки — без следа размеров понять, кто получает размер, нельзя.
+	if (event.event == SDL_WINDOWEVENT_RESIZED || event.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+		spdlog::info("aurora: окно {} -> {}x{}",
+		    event.event == SDL_WINDOWEVENT_RESIZED ? "RESIZED" : "SIZE_CHANGED", event.data1, event.data2);
+	}
 	// Зашёлка «окно уже показывалось»: только FOCUS_GAINED считается
 	// доказательством (FOCUS_LOST приходит и до первого кадра).
 	if (event.event == SDL_WINDOWEVENT_FOCUS_GAINED) {

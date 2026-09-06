@@ -28,6 +28,7 @@
 #   include "Application.hpp"
 #   include "core/EngineLaunch.hpp"
 #   include "appfat.h"
+#   include <spdlog/spdlog.h>
 #   include <string>
 #   include <vector>
 #   define FUNC_EXPORT extern "C" __attribute__((visibility("default"))) int main
@@ -84,12 +85,22 @@ FUNC_EXPORT(int argc, char **argv)
         devilution::ErrSdl();
     }
 
-    // Оконный режим по умолчанию (720x1600 toplevel) — fullscreen-роль
-    // маскирует windowProperties lipstick'а (статусбар-зонд). Полный
-    // экран можно вернуть DEVILUTIONX_COVER_WINDOWED=0.
+    // Оконный режим по умолчанию (toplevel на весь логический экран) —
+    // fullscreen-роль маскирует windowProperties lipstick'а (статусбар-
+    // зонд). Полный экран можно вернуть DEVILUTIONX_COVER_WINDOWED=0.
+    // Размер берём из режима дисплея: жёсткие 720x1600 (логический экран
+    // эмулятора) на телефонах с меньшей логической плотностью вылезали
+    // за края.
     Uint32 launcherWinFlags = SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE;
     int launcherWinW = 720;
     int launcherWinH = 1600;
+    SDL_DisplayMode desktopMode {};
+    if (SDL_GetDesktopDisplayMode(0, &desktopMode) == 0 && desktopMode.w > 0 && desktopMode.h > 0) {
+        launcherWinW = desktopMode.w;
+        launcherWinH = desktopMode.h;
+    }
+    spdlog::info("aurora: окно лаунчера {}x{} (режим дисплея {}x{})",
+        launcherWinW, launcherWinH, desktopMode.w, desktopMode.h);
     if (const char *windowed = SDL_getenv("DEVILUTIONX_COVER_WINDOWED"); windowed != nullptr && windowed[0] == '0') {
         launcherWinFlags = SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_ALLOW_HIGHDPI;
         launcherWinW = 1;
