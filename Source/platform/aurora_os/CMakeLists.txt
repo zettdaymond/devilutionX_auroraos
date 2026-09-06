@@ -49,3 +49,6 @@ target_link_libraries(libdevilutionx_aurora_os
 
 add_subdirectory(devilution_launcher)
 target_link_libraries(libdevilutionx_aurora_os PUBLIC devilution_launcher)
+
+# Зонд размера плитки (Silica Theme) — отдельный бинарь в пакете.
+add_subdirectory(cover_probe)

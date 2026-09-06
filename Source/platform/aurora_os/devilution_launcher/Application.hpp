@@ -167,6 +167,11 @@ private:
 	/// на устройстве через DEVILUTIONX_NATIVE_COVER=0.
 	void TryNativeCover();
 
+	/// Запустить Qt-зонд размера плитки (Silica Theme) в фоне; ответ
+	/// приедет событием m_coverProbeEvent и применяется NativeCover::
+	/// ApplyTileSize. Вызывается после успешного линка обложки.
+	void StartCoverProbe();
+
 	/// Нативная обложка связана (живой рендер и кардиограмма отладки).
 	bool m_nativeCoverActive = false;
 
@@ -181,6 +186,10 @@ private:
 	/// Диагностика (DEVILUTIONX_COVER_POKE=1): пользовательское событие
 	/// «пнуть композитор» — одноразовый таймер из цикла обложки.
 	Uint32 m_coverPokeEvent { 0 };
+
+	/// Событие «Qt-зонд ответил размером плитки» (фоновый поток стора
+	/// пушит его после devilutionx-coverprobe; data1/data2 — ширина/высота).
+	Uint32 m_coverProbeEvent { 0 };
 
 	/// Тип пользовательского SDL-события «фоновый поток положил интент
 	/// в Store» — будит цикл обложки на перерисовку прогресса в плитке.

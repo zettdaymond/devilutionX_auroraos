@@ -28,9 +28,12 @@
 #ifdef AURORA_OS
 #   include "../NativeCover.hpp"
 #   include "../StandartPaths.hpp"
+#   include <unistd.h>
+#   include <cstring>
 #endif
 
 #include <chrono>
+#include <thread>
 #include <cstdio>
 #include <filesystem>
 #include <iterator>
@@ -600,6 +603,14 @@ void Application::ProcessEvent(const SDL_Event &event)
 		// ответит ли configure'ом на повтор transient/смену размера.
 		devilution::NativeCover::Poke();
 	}
+	if (m_coverProbeEvent != 0 && event.type == m_coverProbeEvent) {
+		// Зонд Silica Theme ответил размером плитки. Применяем и печём
+		// карточку заново: разметка ляжет под истинный аспект.
+		devilution::NativeCover::ApplyTileSize(
+		    static_cast<int>(reinterpret_cast<intptr_t>(event.user.data1)),
+		    static_cast<int>(reinterpret_cast<intptr_t>(event.user.data2)));
+		UpdateNativeCover();
+	}
 #endif
 	if (event.type == SDL_QUIT) {
 		Stop();
@@ -815,7 +826,75 @@ void Application::TryNativeCover()
 	m_nativeCoverActive = devilution::NativeCover::CreateAndLink(m_window, width, height, pixels.data(), width * 3);
 	if (!m_nativeCoverActive) {
 		spdlog::info("aurora-native-cover: композитор не поддержал — плитка без карточки");
+		return;
 	}
+	StartCoverProbe();
+}
+
+void Application::StartCoverProbe()
+{
+	// Зонд — Qt-бинарь пакета (devilutionx-coverprobe): единственный
+	// источник геометрии плитки на 5.1, где configure от свитчера не
+	// приходит. Живёт в своём процессе (~секунда), ответ приезжает
+	// SDL-событием; до ответа карточка печётся фолбэком.
+	m_coverProbeEvent = SDL_RegisterEvents(1);
+	const Uint32 probeEvent = m_coverProbeEvent;
+	SDL_DisplayMode mode {};
+	const bool landscape = SDL_GetDesktopDisplayMode(0, &mode) == 0 && mode.w > mode.h;
+	std::thread([this, probeEvent, landscape]() {
+		char exe[512] {};
+		const ssize_t n = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+		if (n <= 0) {
+			return;
+		}
+		exe[n] = ' ';
+		char *slash = std::strrchr(exe, '/');
+		if (slash == nullptr) {
+			return;
+		}
+		*slash = ' ';
+		// Материализатор Авроры перекладывает /usr/bin пакета в bin/ рядом
+		// с главным бинарём — ищем относительно себя, запасной путь — /usr/bin.
+		std::string cmd = std::string(exe) + "/devilutionx-coverprobe";
+		if (::access(cmd.c_str(), X_OK) != 0) {
+			cmd = "/usr/bin/devilutionx-coverprobe";
+		}
+		if (::access(cmd.c_str(), X_OK) != 0) {
+			spdlog::info("aurora: зонд размера плитки не найден — остаёмся на фолбэке");
+			return;
+		}
+		spdlog::info("aurora: зонд запускается: {}", cmd);
+		FILE *pipe = ::popen((cmd + " 2>/dev/null").c_str(), "r");
+		if (pipe == nullptr) {
+			spdlog::info("aurora: зонд popen не открылся");
+			return;
+		}
+		std::string out;
+		char buf[256];
+		while (::fgets(buf, sizeof(buf), pipe) != nullptr) {
+			out += buf;
+		}
+		const int rc = ::pclose(pipe);
+		int vw = 0, vh = 0, hw = 0, hh = 0;
+		const int parsed = std::sscanf(out.c_str(), "vertical %d %d horizontal %d %d", &vw, &vh, &hw, &hh);
+		int pickW = vw;
+		int pickH = vh;
+		if (landscape && parsed >= 4 && hw > 0 && hh > 0) {
+			pickW = hw;
+			pickH = hh;
+		}
+		spdlog::info("aurora: зонд ответил (rc={}, parsed={})", rc, parsed);
+		if (rc != 0 || parsed < 2 || pickW <= 0 || pickH <= 0) {
+			spdlog::info("aurora: зонд размера плитки не ответил (rc={}, parsed={})", rc, parsed);
+			return;
+		}
+		SDL_Event probe {};
+		probe.type = probeEvent;
+		probe.user.code = 0;
+		probe.user.data1 = reinterpret_cast<void *>(static_cast<intptr_t>(pickW));
+		probe.user.data2 = reinterpret_cast<void *>(static_cast<intptr_t>(pickH));
+		SDL_PushEvent(&probe);
+	}).detach();
 }
 
 #endif

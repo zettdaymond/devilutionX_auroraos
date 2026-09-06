@@ -245,6 +245,8 @@ struct NativeCoverState {
 	int contentStride = 0;
 	uint64_t winId = 0;
 	bool linked = false;
+	/// Размер пришёл configure'ом от свитчера — зонд его уже не перебивает.
+	bool sizeFromConfigure = false;
 };
 
 NativeCoverState &State()
@@ -291,6 +293,7 @@ void ShellSurfaceConfigure(void *data, wl_shell_surface *shellSurface,
 	}
 	s.width = width;
 	s.height = height;
+	s.sizeFromConfigure = true;
 	// Будим цикл обложки: карточку надо перерисовать в новом размере
 	// (лого/шрифты ложатся под аспект плитки, кроп в UpdateFrame —
 	// тождество). Слушатель живёт на дефолтной очереди дисплея SDL,
@@ -653,6 +656,43 @@ void NativeCover::Poke()
 	if (s.shm == nullptr || s.content.empty() || !EnsureShmBuffer(s, s.shm)
 	    || !CommitFrame(s.content.data(), s.contentStride, s.contentWidth, s.contentHeight)) {
 		spdlog::warn("aurora-native-cover: пинк — перезаливка не удалась");
+	}
+	wl_display_flush(s.display);
+}
+
+void NativeCover::ApplyTileSize(int width, int height)
+{
+	NativeCoverState &s = State();
+	if (!s.linked || width <= 0 || height <= 0) {
+		return;
+	}
+	if (s.sizeFromConfigure) {
+		spdlog::info("aurora-native-cover: зонд {}x{} проигнорирован — размер задан configure", width, height);
+		return;
+	}
+	if (width == s.width && height == s.height) {
+		spdlog::info("aurora-native-cover: зонд подтвердил текущий размер {}x{}", width, height);
+		return;
+	}
+	spdlog::info("aurora-native-cover: размер плитки от зонда {}x{}", width, height);
+	s.width = width;
+	s.height = height;
+	if (s.buffer != nullptr) {
+		wl_buffer_destroy(s.buffer);
+		s.buffer = nullptr;
+	}
+	if (s.pool != nullptr) {
+		wl_shm_pool_destroy(s.pool);
+		s.pool = nullptr;
+	}
+	if (s.poolPixels != nullptr) {
+		::munmap(s.poolPixels, s.poolSize);
+		s.poolPixels = nullptr;
+		s.poolSize = 0;
+	}
+	if (s.shm == nullptr || s.content.empty() || !EnsureShmBuffer(s, s.shm)
+	    || !CommitFrame(s.content.data(), s.contentStride, s.contentWidth, s.contentHeight)) {
+		spdlog::warn("aurora-native-cover: перезаливка после зонда не удалась");
 	}
 	wl_display_flush(s.display);
 }
